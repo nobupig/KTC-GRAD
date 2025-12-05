@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="kindai.png">
+  <title>近大高専 成績システム | 科目登録</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- シンプルなスタイル -->
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    header {
+      background: #004A99; /* 近大ブルー */
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+    header .user-info {
+      font-size: 12px;
+      text-align: right;
+    }
+    header button {
+      border: none;
+      padding: 6px 12px;
+      margin-top: 4px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    main {
+      max-width: 1100px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 20px;
+      border-left: 4px solid #004A99;
+      padding-left: 10px;
+    }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+      align-items: end;
+    }
+    .field label {
+      font-size: 12px;
+      color: #4b5563;
+      display: block;
+      margin-bottom: 4px;
+    }
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      background: #fff;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-primary {
+      background: #004A99;
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      font-size: 13px;
+      color: #6b7280;
+      margin: 4px 0 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    thead {
+      background: #f9fafb;
+    }
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 6px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th:first-child, td:first-child {
+      text-align: center;
+      width: 40px;
+    }
+    tbody tr:hover {
+      background: #f3f4f6;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+    .footer-actions {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+    .error {
+      color: #b91c1c;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    dialog {
+      border: none;
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 420px;
+      width: 100%;
+    }
+    dialog::backdrop {
+      background: rgba(0,0,0,0.25);
+    }
+    dialog h3 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .modal-actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .selected-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px;
+      background: #f9fafb;
+      font-size: 13px;
+    }
+    .no-data {
+      padding: 16px;
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+      background: #f9fafb;
+      border-radius: 12px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="kindai.png" alt="校章" style="width:32px; height:32px; margin-right:12px;">
+    <h1>近大高専 成績システム｜科目登録</h1>
+    <div class="user-info">
+      <div id="userEmail">ログイン情報取得中...</div>
+      <button id="logoutBtn">ログアウト</button>
+    </div>
+  </header>
+
+  <div style="max-width:1100px; margin: 10px auto; text-align:right;">
+  <button id="viewModeBtn" class="btn btn-secondary"
+    onclick="location.href='view.html'">
+    📄 閲覧モードを開く
+  </button>
+</div>
+
+<div id="periodBlock" style="
+  display:none;
+  max-width:650px;
+  margin:40px auto;
+  background:white;
+  padding:30px;
+  border-radius:16px;
+  box-shadow:0 8px 25px rgba(0,0,0,0.1);
+  text-align:center;
+">
+  <h2 style="margin-top:0;color:#b91c1c;">現在は成績入力期間外です</h2>
+  <p style="font-size:14px;color:#374151;margin-top:10px;">
+    成績の修正・変更は行えませんが、入力済みの成績は閲覧できます。
+  </p>
+
+  <button class="btn btn-primary" style="margin-top:20px;"
+    onclick="location.href='view.html'">
+    📄 閲覧モードを開く
+  </button>
+</div>
+
+  <main>
+    <h2>担当科目の選択</h2>
+    <p class="status">
+      学年・コース・開講期を選んで「科目を読み込む」を押してください。<br>
+      都市環境は <strong>C / CC / CA をまとめて表示</strong> します。
+    </p>
+
+    <!-- フィルタエリア -->
+    <div class="filters">
+      <div class="field">
+        <label for="gradeSelect">学年</label>
+        <select id="gradeSelect">
+          <option value="">選択してください</option>
+          <option value="1">1年</option>
+          <option value="2">2年</option>
+          <option value="3">3年</option>
+          <option value="4">4年</option>
+          <option value="5">5年</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="courseSelect">コース</label>
+        <select id="courseSelect">
+          <option value="">選択してください</option>
+          <option value="G">一般（G）</option>
+          <option value="M">機械システム（M）</option>
+          <option value="E">電気電子（E）</option>
+          <option value="I">制御情報（I）</option>
+          <!-- ★ C/CC/CA を統合表示 -->
+          <option value="C_ALL">都市環境（C / CC / CA）</option>
+          <!-- 必要なら S2 などを追加 -->
+        </select>
+      </div>
+
+         <div class="field">
+        <label>&nbsp;</label>
+        <button id="loadBtn" class="btn btn-secondary">科目を読み込む</button>
+      </div>
+    </div>
+
+    <div id="loadStatus" class="status"></div>
+    <div id="loadError" class="error"></div>
+
+    <!-- 科目一覧テーブル -->
+    <div id="tableContainer">
+      <table id="subjectsTable" hidden>
+        <thead>
+          <tr>
+            <th>選択</th>
+            <th>科目名</th>
+            <th>学年</th>
+            <th>コース</th>
+            <th>開講期</th>
+            <th>履修区分</th>
+          </tr>
+        </thead>
+        <tbody id="subjectsTbody"></tbody>
+      </table>
+   
+    </div>
+
+    <div class="footer-actions">
+      <div>
+        <span id="selectedCount">選択中：0件</span>
+      </div>
+      <div>
+        <button id="saveBtn" class="btn btn-primary" disabled>選択した科目を登録</button>
+      </div>
+    </div>
+
+    <div id="saveStatus" class="status"></div>
+    <div id="saveError" class="error"></div>
+
+    <!-- 自分が担当するはずの科目が一覧に無いとき用の連絡ボタン -->
+<div id="contactOfficeAnytimeArea"
+     style="margin:12px 0 0; font-size:13px; color:#374151;">
+  担当しているはずの科目が一覧にない場合は、教務へ連絡してください。
+  <button id="contactOfficeAnytimeBtn"
+          class="btn btn-secondary"
+          style="margin-left:8px; padding:5px 12px; font-size:12px;">
+    教務へ連絡する
+  </button>
+</div>
+
+  </main>
+
+  <!-- 確認モーダル -->
+  <dialog id="confirmDialog">
+    <h3>担当科目として登録しますか？</h3>
+    <p style="font-size:13px;">
+      以下の科目を <strong>担当科目</strong> として登録します。内容を確認してください。
+      （登録済みの科目はこのリストに置き換えられます）
+    </p>
+    <div id="selectedList" class="selected-list"></div>
+    <div class="modal-actions">
+      <button id="cancelConfirmBtn" class="btn btn-secondary">キャンセル</button>
+      <button id="okConfirmBtn" class="btn btn-primary">登録する</button>
+    </div>
+  </dialog>
+
+  <!-- Firebase & ロジック -->
+  <script type="module">
+    // ===== Firebase 初期化 =====
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      getDocs,
+      doc,
+      setDoc,
+      serverTimestamp,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+//----------------------------------------------------------
+// 成績入力期間チェック：前期/後期/期間外を判定
+//----------------------------------------------------------
+async function checkInputPeriod() {
+  // UI の主要部分
+  const mainArea = document.querySelector("main");
+  const periodBlock = document.getElementById("periodBlock");
+
+  // Firestore の period 設定を取得
+  const ref = doc(db, "settings", "period");
+  const snap = await getDoc(ref);
+
+  if (!snap.exists()) {
+    // 期間データがない場合も「期間外」と扱う
+    periodBlock.style.display = "block";
+    mainArea.style.display = "none";
+    return { mode: "none" };
+  }
+
+  const p = snap.data();
+
+  const now = new Date();
+  const firstStart  = new Date(p.firstStart);
+  const firstEnd    = new Date(p.firstEnd);
+  const secondStart = new Date(p.secondStart);
+  const secondEnd   = new Date(p.secondEnd);
+
+  let mode = "none";  // 初期値：期間外
+
+  if (now >= firstStart && now <= firstEnd) {
+    mode = "first";   // 前期
+  } else if (now >= secondStart && now <= secondEnd) {
+    mode = "second";  // 後期
+  }
+
+  // 期間外の場合はUIブロック
+  if (mode === "none") {
+    periodBlock.style.display = "block";
+    mainArea.style.display = "none";
+  } else {
+    // 期間中 → main は表示、ブロック非表示
+    periodBlock.style.display = "none";
+    mainArea.style.display = "block";
+  }
+
+  return { mode };
+}
+
+let periodMode = "none";
+
+
+    // ★ここはご自身のプロジェクトの設定に差し替え
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
+      authDomain: "ktc-grade-system.firebaseapp.com",
+      projectId: "ktc-grade-system",
+      storageBucket: "ktc-grade-system.appspot.com",
+      messagingSenderId: "490169300362",
+      appId: "1:490169300362:web:7c6e7b47a394d68d514473"
+    };
+
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ===== DOM 取得 =====
+    const userEmailEl = document.getElementById("userEmail");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const gradeSelect = document.getElementById("gradeSelect");
+    const courseSelect = document.getElementById("courseSelect");
+    const loadBtn = document.getElementById("loadBtn");
+
+    // ★ 学年変更時にコース自動制御（1・2年はG固定）
+gradeSelect.addEventListener("change", () => {
+  const grade = gradeSelect.value;
+
+  if (grade === "1" || grade === "2") {
+    courseSelect.value = "G";
+    courseSelect.disabled = true;
+  } else {
+    courseSelect.disabled = false;
+  }
+});
+
+
+    const loadStatus = document.getElementById("loadStatus");
+    const loadError = document.getElementById("loadError");
+
+    const subjectsTable = document.getElementById("subjectsTable");
+    const subjectsTbody = document.getElementById("subjectsTbody");
+       const selectedCount = document.getElementById("selectedCount");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveStatus = document.getElementById("saveStatus");
+    const saveError = document.getElementById("saveError");
+
+    const confirmDialog = document.getElementById("confirmDialog");
+    const selectedList = document.getElementById("selectedList");
+    const cancelConfirmBtn = document.getElementById("cancelConfirmBtn");
+    const okConfirmBtn = document.getElementById("okConfirmBtn");
+
+    const noSubjectDialog = document.getElementById("noSubjectDialog");
+    const mailFromDialogBtn = document.getElementById("mailFromDialogBtn");
+    const closeNoSubjectDialogBtn = document.getElementById("closeNoSubjectDialogBtn");
+
+    // ==== ログイン状態監視 ====
+    let currentUser = null;
+
+  onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+  currentUser = user;
+  userEmailEl.textContent = `${user.email}`;
+
+  // ★★★ ここで成績入力期間を判定 ★★★
+  const period = await checkInputPeriod();
+  periodMode = period.mode;
+
+  // 期間外ならこの後の UI 全て非表示
+  if (periodMode === "none") return;
+});
+
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "login.html";
+    });
+
+    // ===== 科目読み込み処理 =====
+    loadBtn.addEventListener("click", () => {
+      loadSubjects();
+    });
+
+    async function loadSubjects() {
+      saveStatus.textContent = "";
+      saveError.textContent = "";
+
+      const grade = gradeSelect.value;
+      const courseKey = courseSelect.value;
+      
+      if (!grade || !courseKey) {
+        loadError.textContent = "学年とコースを選択してください。";
+        return;
+      }
+      loadError.textContent = "";
+
+      // 状態リセット
+      subjectsTbody.innerHTML = "";
+      subjectsTable.hidden = true;
+      updateSelectedCount();
+      saveBtn.disabled = true;
+
+      // コース条件：C_ALL は C/CC/CA をまとめて検索
+      let courseValues;
+      if (courseKey === "C_ALL") {
+        courseValues = ["C", "CC", "CA"];
+      } else {
+        courseValues = [courseKey];
+      }
+
+      loadStatus.textContent = "科目を読み込み中...";
+      try {
+        const constraints = [
+          where("grade", "==", grade)
+        ];
+
+        // course: in 検索
+        if (courseValues.length === 1) {
+          constraints.push(where("course", "==", courseValues[0]));
+        } else {
+          constraints.push(where("course", "in", courseValues));
+        }
+
+        // 開講期フィルタ
+      // ★ 成績入力期間に応じた固定セメスター
+if (periodMode === "first") {
+  constraints.push(where("semester", "==", "前期"));
+} else if (periodMode === "second") {
+  constraints.push(where("semester", "in", ["後期", "通年"]));
+} else {
+}
+
+
+        const q = query(collection(db, "subjects"), ...constraints);
+        const snap = await getDocs(q);
+
+        const rows = [];
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          rows.push({
+            id: docSnap.id,
+            name: data.name ?? "",
+            grade: data.grade ?? "",
+            course: data.course ?? "",
+            semester: data.semester ?? "",
+            required: data.required === true,
+            specialType: data.specialType ?? 0,
+            isSkillLevel: data.isSkillLevel === true,
+            passRule: data.passRule ?? "fixed60",
+            fixedPassLine: data.fixedPassLine ?? 60,
+            useAdjustment: data.useAdjustment ?? false
+          });
+        });
+
+        // 表に反映
+        for (const s of rows) {
+          const tr = document.createElement("tr");
+          tr.dataset.id = s.id;
+
+          const tdCheck = document.createElement("td");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.addEventListener("change", updateSelectedCount);
+          tdCheck.appendChild(checkbox);
+
+          const tdName = document.createElement("td");
+          tdName.textContent = s.name;
+
+          const tdGrade = document.createElement("td");
+          tdGrade.textContent = s.grade + "年";
+
+          const tdCourse = document.createElement("td");
+          tdCourse.textContent = s.course;
+
+          const tdSemester = document.createElement("td");
+          tdSemester.textContent = s.semester;
+
+          const tdRequired = document.createElement("td");
+          tdRequired.innerHTML = s.required
+            ? '<span class="badge">必修</span>'
+            : '<span class="badge" style="background:#fef3c7;color:#92400e;">選択</span>';
+
+          tr.appendChild(tdCheck);
+          tr.appendChild(tdName);
+          tr.appendChild(tdGrade);
+          tr.appendChild(tdCourse);
+          tr.appendChild(tdSemester);
+          tr.appendChild(tdRequired);
+        
+          subjectsTbody.appendChild(tr);
+        }
+
+        subjectsTable.hidden = false;
+        loadStatus.textContent = `科目を読み込みました（${rows.length}件）。チェックを付けて登録してください。`;
+      } catch (err) {
+        console.error(err);
+        loadStatus.textContent = "";
+        loadError.textContent = "科目一覧の取得に失敗しました。Firestoreのインデックス設定も含めて確認してください。";
+      }
+    }
+
+    function getSelectedSubjects() {
+      const result = [];
+      const trs = subjectsTbody.querySelectorAll("tr");
+      trs.forEach((tr) => {
+        const check = tr.querySelector("input[type='checkbox']");
+        if (check && check.checked) {
+          const tds = tr.querySelectorAll("td");
+          result.push({
+            id: tr.dataset.id,
+            name: tds[1].textContent,
+            grade: tds[2].textContent.replace("年", ""),
+            course: tds[3].textContent,
+            semester: tds[4].textContent
+          });
+        }
+      });
+      return result;
+    }
+
+    function updateSelectedCount() {
+      const selected = getSelectedSubjects();
+      selectedCount.textContent = `選択中：${selected.length}件`;
+      saveBtn.disabled = selected.length === 0;
+    }
+
+    // ===== 保存処理（teacherSubjects へ登録） =====
+    saveBtn.addEventListener("click", () => {
+      const selected = getSelectedSubjects();
+      if (!selected.length) return;
+
+      // モーダルに一覧を表示
+      selectedList.innerHTML = "";
+      selected.forEach((s) => {
+        const div = document.createElement("div");
+        div.textContent = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
+        selectedList.appendChild(div);
+      });
+
+      confirmDialog.showModal();
+    });
+
+    cancelConfirmBtn.addEventListener("click", () => {
+      confirmDialog.close();
+    });
+
+    okConfirmBtn.addEventListener("click", async () => {
+      saveStatus.textContent = "";
+      saveError.textContent = "";
+
+      const selected = getSelectedSubjects();
+      if (!selected.length) {
+        confirmDialog.close();
+        return;
+      }
+      if (!currentUser) {
+        saveError.textContent = "ログイン情報が取得できません。いったんログアウトしてやり直してください。";
+        confirmDialog.close();
+        return;
+      }
+
+      saveStatus.textContent = "担当科目を登録中...";
+      try {
+        // teacherSubjects コレクション
+        // ドキュメントIDは user.email を採用（teachers コレクションと同じキー思想）
+        const ref = doc(db, "teacherSubjects", currentUser.email);
+
+        const payload = {
+          teacherEmail: currentUser.email,
+          teacherUid: currentUser.uid,
+          subjects: selected.map((s) => ({
+            subjectId: s.id,
+            name: s.name,
+            grade: s.grade,
+            course: s.course,
+            semester: s.semester
+          })),
+          updatedAt: serverTimestamp()
+        };
+
+        // 既存 subjects はこのリストに「置き換え」る運用
+        await setDoc(ref, payload, { merge: true });
+
+        saveStatus.textContent = "担当科目を登録しました。";
+        saveError.textContent = "";
+      } catch (err) {
+        console.error(err);
+        saveError.textContent = "担当科目の登録に失敗しました。ネットワークまたは Firestore 権限を確認してください。";
+      } finally {
+        confirmDialog.close();
+      }
+    });
+
+    // ===== 科目なし時：教務へメール =====
+    function buildMailToLink() {
+      const grade = gradeSelect.value || "";
+      const courseKey = courseSelect.value || "";
+      
+      let courseLabel = courseKey;
+      if (courseKey === "C_ALL") {
+        courseLabel = "都市環境（C/CC/CA）";
+      }
+
+      // ★教務のメールアドレスをここに設定
+      const officeMail = "nyasui@ktc.ac.jp";
+
+      const subject = encodeURIComponent("【科目マスタ確認依頼】科目一覧に表示されない科目について");
+      const bodyLines = [
+        "教務ご担当者様",
+        "",
+        "成績システム（Firebase版）の科目登録画面で、該当する科目が表示されません。",
+        "科目マスタの内容をご確認いただけますでしょうか。",
+        "",
+        `学年：${grade ? grade + "年" : "-"}`,
+        `コース：${courseLabel || "-"}`,
+         "",
+        `教員メール：${currentUser ? currentUser.email : ""}`,
+        "",
+        "お手数をおかけしますが、よろしくお願いいたします。"
+      ];
+      const body = encodeURIComponent(bodyLines.join("\n"));
+      return `mailto:${officeMail}?subject=${subject}&body=${body}`;
+    }
+const contactOfficeAnytimeBtn =
+  document.getElementById("contactOfficeAnytimeBtn");
+
+if (contactOfficeAnytimeBtn) {
+  contactOfficeAnytimeBtn.addEventListener("click", () => {
+    window.location.href = buildMailToLink();
+  });
+}
+
+  </script>
+</body>
+</html>

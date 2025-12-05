@@ -1,0 +1,198 @@
+📘 **KTC 成績システム（Firebase版）
+
+科目一覧インポート工程：完全引き継ぎ書（2025/12/04 最新版）**
+
+🟦 1. 全体概要
+
+本工程では、KTCの「科目一覧スプレッドシート」を、
+Google Apps Script（GAS）を用いて Firestore に subjects コレクションとして取り込む仕組み を構築し、
+392 科目のうち数件をテストインポート → 本番全件インポートまで正常に完了した。
+
+本作業は、今後の「科目登録画面」「成績評価基準入力」「成績入力画面」を構築するための 基盤データ整備 の役割を持つ。
+
+🟦 2. Firestore 構造（subjects コレクション）
+
+Firestore に登録される1科目分のデータ構造は以下：
+
+subjects/{docId} {
+  name: "測量学",
+  grade: "3",
+  course: "CC",                 // ★ C/CC/CA を区別して保存（重要）
+  semester: "前期",
+
+  required: true,                // 必修=真
+  useAdjustment: false,          // 調整点使用有無（〇 → false）
+  passRule: "fixed60",           // fixed60 / adjustment
+  fixedPassLine: 60,             // 合格基準（調整点使用しない科目）
+
+  specialType: 0,                // 特別科目 1/2 の区別
+  isSkillLevel: false,           // 習熟度科目判定
+
+  teacherList: [],               // まだ空（後の科目登録で使用）
+
+  createdAt: "timestamp"
+}
+
+🔥 特記事項（超重要）
+✔ コース（course）は C/CC/CA を統合しない
+
+C → 通常都市環境
+
+CC → 都市環境（クラスB）
+
+CA → 都市環境（クラスA）
+
+成績入力で学生名簿の取り扱いが異なるため、
+元の値のまま Firestore に保存する必要がある。
+
+🟦 3. 科目一覧スプレッドシート（列構造）
+列番号	列名	説明
+0	科目名	例：数学Ⅰ
+1	開設学年	1〜5年
+2	組・コース	G, M, E, I, C, CC, CA
+3	開講期	前期 / 後期 / 通年
+4	履修区分	必修 or 選択
+5	調整点	〇 → 調整点なし（合格60固定）
+6	特別科目	1/2（成績処理方法が異なる）
+7	習熟度	〇（特殊扱い）
+
+この構造を完全に解析し、Firestore 用に正規化して保存。
+
+🟦 4. Firestore セキュリティルール（現時点の運用版）
+
+以下ルールを設定し「公開（デプロイ）」済み。
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. teachers：ログイン済みユーザーは読み取り専用
+    match /teachers/{email} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // 2. subjects：GAS（認証済み OAuth）とログインユーザーのみ read/write
+    match /subjects/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // 3. その他は拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+✔ セキュリティ上のポイント
+
+teachers は書き換え不可（攻撃されても安全）
+
+subjects はログイン（Auth）済ユーザーのみ可
+
+外部からの匿名アクセスは全て拒否
+
+🟦 5. GAS 側の設定（appsscript.json）
+
+Firestore 書き込みに必要な OAuth スコープを追加：
+
+{
+  "timeZone": "Asia/Tokyo",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/datastore"   // ★FireStore書き込み用（必須）
+  ]
+}
+
+✔ “auth/datastore” がないと Firestore 書き込み 403 になる
+
+今回の失敗→成功はここがポイント。
+
+🟦 6. GAS と Firebase プロジェクトの紐付け
+
+Apps Script のプロジェクトは
+Firebaseプロジェクト（ktc-grade-system）へ接続（Google Cloud プロジェクト変更） した。
+
+これにより：
+
+Cloud Firestore API が有効
+
+OAuth トークンが「Firebaseプロジェクトとして有効」
+
+になり、書き込み権限が整った。
+
+🟦 7. インポートスクリプトの完成版（重要部分のみ）
+
+以下の GAS コードにより科目を Firestore に投入。
+
+主なポイント：
+
+C/CC/CA を normalize しない
+
+特別科目・習熟度・調整点を正確に解釈
+
+Firestore ドキュメントIDは
+grade_course_semester_name
+形式で一意に生成
+
+teacherList は空配列（後で科目登録画面から登録）
+
+※コード全文は前チャット参照（有効確認済）
+
+🟦 8. テストインポート → 本番インポートの流れ
+
+appsscript.json を修正
+
+GAS を再認証
+
+インポート対象を 5 行だけに制限
+
+Firestore subjects に正しく追加されたか確認
+
+全件インポートへ切替
+
+392 科目中、全件正常に投入
+
+🔥 結果：全て Firestore に正しく取り込み成功
+
+🟩 9. この段階での成果（非常に重要）
+
+Firestore に KTC版科目マスタが構築完了
+
+教員側の科目登録画面で利用するデータが揃った
+
+成績評価基準入力・成績入力に必要なデータ構造が確定した
+
+これにより、
+次の工程「科目登録画面 subjects.html」へ進む準備が完全に整った。
+
+🟦 10. 次のステップ
+
+次チャットでは以下のどれから開始するか選べます：
+
+A. 科目登録画面（subjects.html）をスタイリッシュに実装
+
+学年→コース制御
+
+都市環境 C/CC/CA 統合表示
+
+前期/後期/通年のフィルタ
+
+表から複数科目に✔選択登録
+
+確認モーダル
+
+科目が見つからない場合 → 教務へメール
+
+Firestore teacherSubjects への保存
+
+B. UI ラフデザイン → 仕様書先に作成
+C. Firestore セキュリティルールの先行構築
+🎉 以上が「完全引き継ぎ書（最新版）」です。
+
+必要なら PDF 版も作成できます。
+次チャットでは 科目登録画面の実装 に進みましょう！

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="kindai.png">
+  <title>近大高専　成績処理システム　ログイン</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --ktc-blue: #004A99;
+      --ktc-blue-light: #1b74d4;
+      --bg-light: #f4f7fb;
+      --text-main: #222;
+      --text-sub: #666;
+      --danger: #e53935;
+      --success: #43a047;
+      --info: #2196f3;
+      --card-radius: 18px;
+      --shadow-soft: 0 14px 28px rgba(0, 0, 0, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--ktc-blue), #0b72c1);
+      color: var(--text-main);
+    }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 440px;
+      padding: 16px;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: var(--card-radius);
+      box-shadow: var(--shadow-soft);
+      padding: 32px 28px 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: "";
+      position: absolute;
+      top: -80px;
+      right: -80px;
+      width: 160px;
+      height: 160px;
+      background: radial-gradient(circle at center, rgba(0, 74, 153, 0.18), transparent 65%);
+      pointer-events: none;
+    }
+
+    .logo-circle {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--ktc-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #111;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0, 74, 153, 0.06);
+      color: var(--ktc-blue);
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #12c064;
+      margin-right: 6px;
+    }
+
+    .info-box {
+      background: #f5f8ff;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-bottom: 24px;
+      border-left: 3px solid var(--ktc-blue-light);
+    }
+
+    .info-box strong {
+      color: #333;
+    }
+
+    .google-btn {
+      width: 100%;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--ktc-blue);
+      color: #fff;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+      box-shadow: 0 6px 14px rgba(0, 74, 153, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .google-btn:disabled {
+      opacity: 0.7;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .google-btn:not(:disabled):hover {
+      background: var(--ktc-blue-light);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(0, 74, 153, 0.5);
+    }
+
+    .google-btn:not(:disabled):active {
+      transform: translateY(0);
+      box-shadow: 0 4px 10px rgba(0, 74, 153, 0.35);
+    }
+
+    .google-icon-wrapper {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+
+    .google-icon {
+      font-weight: 700;
+      font-size: 18px;
+      background: conic-gradient(
+        from 0deg,
+        #ea4335 0deg 90deg,
+        #34a853 90deg 180deg,
+        #4285f4 180deg 270deg,
+        #fbbc05 270deg 360deg
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .btn-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+      margin-left: 10px;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      text-align: center;
+      margin-top: 12px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    /* Toast (画面中央上) */
+    #toast-container {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .toast {
+      min-width: 320px;
+      max-width: 420px;
+      padding: 16px 20px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: auto;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      font-size: 13px;
+    }
+
+    .toast-message {
+      flex: 1;
+    }
+
+    .toast-success {
+      background: var(--success);
+    }
+
+    .toast-error {
+      background: var(--danger);
+    }
+
+    .toast-info {
+      background: var(--info);
+    }
+
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 24px 18px 20px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-app.js";
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut
+    } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc
+    } from "https://www.gstatic.com/firebasejs/9.6.11/firebase-firestore.js";
+
+    // --- Firebase 設定 ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
+      authDomain: "ktc-grade-system.firebaseapp.com",
+      projectId: "ktc-grade-system",
+      storageBucket: "ktc-grade-system.appspot.com",
+      messagingSenderId: "490169300362",
+      appId: "1:490169300362:web:7c6e7b47a394d68d514473"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // --- Toast 表示 ---
+    function showToast(message, type = "info", duration = 3000) {
+      const container = document.getElementById("toast-container");
+      if (!container) return;
+
+      const toast = document.createElement("div");
+      toast.className = `toast toast-${type}`;
+
+      const icon = document.createElement("div");
+      icon.className = "toast-icon";
+
+      if (type === "success") {
+        icon.textContent = "✓";
+      } else if (type === "error") {
+        icon.textContent = "!";
+      } else {
+        icon.textContent = "i";
+      }
+
+      const msg = document.createElement("div");
+      msg.className = "toast-message";
+      msg.textContent = message;
+
+      toast.appendChild(icon);
+      toast.appendChild(msg);
+      container.appendChild(toast);
+
+      // 表示アニメーション
+      requestAnimationFrame(() => toast.classList.add("show"));
+
+      // 自動クローズ
+      setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => {
+          toast.remove();
+        }, 200);
+      }, duration);
+    }
+
+    // --- ローディング状態制御 ---
+    function setLoading(isLoading) {
+      const btn = document.getElementById("google-login-btn");
+      const textSpan = document.getElementById("btn-text");
+      const spinner = document.getElementById("btn-spinner");
+
+      if (!btn || !textSpan || !spinner) return;
+
+      btn.disabled = isLoading;
+      if (isLoading) {
+        textSpan.textContent = "ログイン処理中...";
+        spinner.style.display = "inline-block";
+      } else {
+        textSpan.textContent = "Googleアカウントでログイン";
+        spinner.style.display = "none";
+      }
+    }
+
+    // --- ログイン処理 ---
+    async function login() {
+      const provider = new GoogleAuthProvider();
+      setLoading(true);
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const email = result.user.email || "";
+
+        // 1. @ktc.ac.jp 以外は拒否
+        if (!email.endsWith("@ktc.ac.jp")) {
+          showToast("教員アカウント（@ktc.ac.jp）のみ利用可能です。", "error", 5000);
+          await signOut(auth);
+          return;
+        }
+
+        // 2. 学生のアドレス（g/s + 数字）は拒否
+        if (/^[gs]\d+@ktc\.ac\.jp$/.test(email)) {
+          showToast("学生アカウントではログインできません。", "error", 5000);
+          await signOut(auth);
+          return;
+        }
+
+        // 3. Firestore の teachers に登録されているか確認
+        const ref = doc(db, "teachers", email);
+        const snap = await getDoc(ref);
+
+        if (!snap.exists()) {
+          showToast("教員名簿に登録されていません。ログインできません。", "error", 5000);
+          await signOut(auth);
+          return;
+        }
+
+        // OK
+        // トーストは出すが2秒に短縮（任意）
+          showToast("ログインに成功しました。", "success", 2000);
+
+          // 即遷移
+        location.href = "subjects.html";
+        
+      } catch (e) {
+        console.error(e);
+        showToast("ログインに失敗しました。時間をおいて再度お試しください。", "error", 5000);
+      } finally {
+        // リダイレクト済みなら画面遷移でこの処理はほぼ気にならない
+        setLoading(false);
+      }
+    }
+
+    // グローバル公開（onclick から呼ぶ）
+    window.login = login;
+  </script>
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="logo-circle">
+        K
+      </div>
+      <div class="badge">
+        <span class="badge-dot"></span>
+        KTC 成績処理システム（教員専用）
+      </div>
+      <h1 class="title">教員ログイン</h1>
+      <p class="subtitle">
+        近畿大学工業高等専門学校・成績処理システムへログインします。
+      </p>
+
+      <div class="info-box">
+        <strong>※ 利用条件</strong><br>
+        ・ @ktc.ac.jp ドメインの<strong style="color:#e53935; font-weight:bold;">教員アカウント</strong>のみ利用可能です。<br>
+        ・ 個人アカウント(@gmail.com)ではログインできません。
+      </div>
+
+      <button id="google-login-btn" class="google-btn" onclick="login()">
+        <div class="google-icon-wrapper">
+          <span class="google-icon">G</span>
+        </div>
+        <span class="btn-label">
+          <span id="btn-text">Googleアカウントでログイン</span>
+          <span id="btn-spinner" class="spinner" style="display:none;"></span>
+        </span>
+      </button>
+    </div>
+
+    <div class="footer">
+      © 2025 Kinki University Technical College · 成績処理システム
+    </div>
+  </div>
+</body>
+</html>
