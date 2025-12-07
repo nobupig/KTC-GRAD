@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="kindai.png">
+  <title>近大高専 成績システム｜評価基準入力</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    header {
+      background: #004A99;
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 18px; margin: 0; }
+    header .user-info { font-size: 12px; text-align: right; }
+    header button {
+      border: none; padding: 6px 12px;
+      border-radius: 999px; cursor: pointer;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+    }
+    h2 {
+      font-size: 20px;
+      border-left: 4px solid #004A99;
+      padding-left: 10px;
+      margin-top: 0;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary { background: #004A99; color: white; }
+    .btn-secondary { background: #e5e7eb; color: #111; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    thead { background: #f9fafb; }
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 6px 8px; white-space: nowrap;
+    }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:hover { background: #f3f4f6; }
+
+    .field { margin-bottom: 12px; }
+    select, input {
+      width: 100%; padding: 6px 8px;
+      border-radius: 8px; border: 1px solid #d1d5db;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .total-area { margin-top: 12px; font-size: 14px; }
+
+    .actions { margin-top: 16px; display: flex; gap: 8px; }
+
+    /* ★ 評価方式カードUI（横並びシンプル版） */
+    #schemeBlock {
+      margin-top: 20px;
+      margin-bottom: 20px;
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* 評価方式：横並びの最終調整 */
+    .scheme-row {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 10px;
+    }
+
+    .scheme-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;            /* ラジオと文字の距離最適化 */
+      font-size: 13px;     /* テキストサイズ調整 */
+      white-space: nowrap; 
+      min-width: 180px;    /* 幅を揃える */
+      cursor: pointer;
+    }
+
+    .scheme-item .icon {
+      font-size: 16px;
+      position: relative;
+      top: 1px;
+    }
+
+    .scheme-item input[type="radio"] {
+      transform: scale(1.1);
+    }
+
+    .scheme-item input[type="radio"]:checked + .icon + .text {
+      font-weight: 600;
+      color: #1e3a8a;
+    }
+
+    /* ▼ ログイン中： の表示 */
+    #userInfoArea {
+      max-width: 1100px;
+      margin: 4px auto 0;
+      padding: 0 20px;
+    }
+  #userInfoDisplay {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e3a8a;   /* 濃い青で強調 */
+  text-align: right;
+}
+  </style>
+</head>
+<body>
+  <header>
+    <img src="kindai.png" alt="校章" style="width:32px; height:32px; margin-right:12px;">
+
+    <h1>近大高専 成績システム｜評価基準入力</h1>
+
+    <div class="user-info" style="display:flex; align-items:center; gap:10px;">
+      <button id="viewModeBtn" class="btn btn-secondary" style="font-size:12px;"
+        onclick="location.href='view.html'">
+        📄 閲覧モード
+      </button>
+      <button id="logoutBtn">ログアウト</button>
+    </div>
+  </header>
+
+  <div id="backArea"
+    style="max-width:1100px; margin:10px auto 0; padding:0 20px;">
+    <button id="backToSubjectsBtn" class="btn btn-secondary" style="font-size:12px;">
+      ◀ 科目登録に戻る
+    </button>
+  </div>
+
+  <!-- ★ ログイン中：表示（帯の外・カードと同じ幅／右寄せ） -->
+  <div id="userInfoArea">
+    <div id="userInfoDisplay"></div>
+  </div>
+
+  <main>
+    <div id="multiTeacherWarning" 
+         style="display:none; 
+                background:#fff3cd; 
+                color:#856404; 
+                padding:10px 14px; 
+                border-radius:8px; 
+                margin-bottom:12px;
+                border:1px solid #ffeeba;">
+      ※ この科目は複数の教員が担当科目に登録しています。誤登録の可能性がある場合、教務へご連絡ください。
+    </div>
+
+    <h2>評価基準の設定</h2>
+
+    <div class="field" id="subjectSelectorArea">
+      <label for="subjectSelect" style="font-size:13px; color:#4b5563;">担当科目を選択</label>
+      <select id="subjectSelect">
+        <option value="">科目を選択してください</option>
+      </select>
+      <div id="subjectStatus" style="margin-top:6px; font-size:12px; color:#6b7280;"></div>
+    </div>
+
+    <div id="schemeBlock">
+      <!-- ★ 評価方式の選択 -->
+      <div class="field" id="schemeSelectorArea" style="margin-bottom:16px;">
+        <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">評価方式を選択</div>
+        <div class="scheme-row">
+          <label class="scheme-item">
+            <input type="radio" name="schemeType" value="exam_only" checked>
+            <span class="icon">📝</span>
+            <span class="text">考査のみで評価（期末考査100%）</span>
+          </label>
+          <label class="scheme-item">
+            <input type="radio" name="schemeType" value="exam_plus_assignments">
+            <span class="icon">📚</span>
+            <span class="text">考査＋課題等で評価</span>
+          </label>
+          <label class="scheme-item">
+            <input type="radio" name="schemeType" value="practice_only">
+            <span class="icon">🧪</span>
+            <span class="text">実験・実習系の課題作品で評価</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <table id="criteriaTable">
+      <thead>
+        <tr>
+          <th>評価項目</th>
+          <th>割合 (%)</th>
+          <th>削除</th>
+        </tr>
+      </thead>
+      <tbody id="criteriaTbody"></tbody>
+    </table>
+
+    <div class="actions">
+      <button id="addRowBtn" class="btn btn-secondary">+ 行追加</button>
+    </div>
+
+    <div id="totalArea" class="total-area">合計：0%</div>
+
+    <div class="actions" style="margin-top:20px;">
+      <button id="saveBtn" class="btn btn-primary">保存する（未実装）</button>
+    </div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      collection,
+      getDocs,
+      setDoc,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
+      authDomain: "ktc-grade-system.firebaseapp.com",
+      projectId: "ktc-grade-system",
+      storageBucket: "ktc-grade-system.appspot.com",
+      messagingSenderId: "490169300362",
+      appId: "1:490169300362:web:7c6e7b47a394d68d514473"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const userInfoDisplay = document.getElementById("userInfoDisplay");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const subjectSelect = document.getElementById("subjectSelect");
+    const backToSubjectsBtn = document.getElementById("backToSubjectsBtn");
+    const subjectStatus = document.getElementById("subjectStatus");
+    const addRowBtn = document.getElementById("addRowBtn");
+    const criteriaTbody = document.getElementById("criteriaTbody");
+    const totalArea = document.getElementById("totalArea");
+    const saveBtn = document.getElementById("saveBtn");
+    const schemeRadios = document.querySelectorAll('input[name="schemeType"]');
+
+    // ★ 科目登録へ戻るボタン（subjects.html へ遷移）
+    const backBtn = document.getElementById("backToSubjectsBtn");
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        window.location.href = "subjects.html";
+      });
+    }
+
+    const currentYear = new Date().getFullYear();
+    const evalColName = `evaluationCriteria_${currentYear}`;
+
+    let currentUser = null;
+    let currentTeacherName = "";
+    let currentScheme = "exam_only";
+
+    async function loadTeacherName() {
+      if (!currentUser) return;
+      const ref = doc(db, "teachers", currentUser.email);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        currentTeacherName = snap.data().name || "";
+      } else {
+        currentTeacherName = "";
+      }
+    }
+
+    async function loadTeacherSubjects() {
+      if (!currentUser) return;
+      subjectSelect.innerHTML = '<option value="">科目を選択してください</option>';
+      subjectStatus.textContent = "";
+
+      const year = new Date().getFullYear();
+      const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists() || !snap.data().subjects || !snap.data().subjects.length) {
+        subjectStatus.textContent = "担当科目が登録されていません。まず科目登録を完了してください。";
+        return;
+      }
+
+      const subjects = snap.data().subjects;
+      let hasNormal = false;
+      subjects.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s.subjectId || "";
+
+        const baseLabel = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
+
+        if (s.specialType === true) {
+          opt.textContent = `${baseLabel}（評価基準入力不要）`;
+          opt.disabled = true;
+        } else {
+          opt.textContent = baseLabel;
+          hasNormal = true;
+        }
+
+        subjectSelect.appendChild(opt);
+      });
+
+      if (!hasNormal) {
+        subjectStatus.textContent = "この教員が担当する科目は、すべて『評価基準入力不要の特別科目』として登録されています。成績入力画面から直接入力してください。";
+      }
+    }
+
+    async function loadCriteria(subjectId) {
+      if (!currentUser || !subjectId) {
+        applyCurrentScheme();
+        return;
+      }
+
+      const docId = `${currentUser.email}_${subjectId}`;
+      const ref = doc(db, evalColName, docId);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) {
+        applyCurrentScheme();
+        return;
+      }
+
+      const data = snap.data();
+      const scheme = data.schemeType || "exam_only";
+      const radio = document.querySelector(`input[name="schemeType"][value="${scheme}"]`);
+      if (radio) radio.checked = true;
+
+      criteriaTbody.innerHTML = "";
+
+      if (scheme === "exam_only") {
+        setupSchemeExamOnly();
+        return;
+      }
+
+      if (scheme === "exam_plus_assignments") {
+        setupSchemeExamPlusAssignments();
+      } else if (scheme === "practice_only") {
+        setupSchemePracticeOnly();
+      }
+
+      (data.criteria || []).forEach((item) => {
+        addCriteriaRow(item.name, item.percent, {
+          fixedName: item.fixedName || false,
+          fixedPercent: item.fixedPercent || false,
+          allowDelete: !item.fixedName
+        });
+      });
+
+      updateTotal();
+    }
+
+    function addCriteriaRow(itemName = "", percent = "", options = {}) {
+      const { fixedName = false, fixedPercent = false, allowDelete = true } = options;
+
+      const tr = document.createElement("tr");
+
+      const tdName = document.createElement("td");
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.placeholder = "例：レポート";
+      nameInput.value = itemName;
+      if (fixedName) {
+        nameInput.readOnly = true;
+        nameInput.style.backgroundColor = "#f3f4f6";
+      }
+      tdName.appendChild(nameInput);
+
+      const tdPercent = document.createElement("td");
+      const percentInput = document.createElement("input");
+      percentInput.type = "number";
+      percentInput.min = "0";
+      percentInput.max = "100";
+      percentInput.value = percent;
+      if (fixedPercent) {
+        percentInput.readOnly = true;
+        percentInput.style.backgroundColor = "#f3f4f6";
+      } else {
+        percentInput.addEventListener("input", updateTotal);
+      }
+      tdPercent.appendChild(percentInput);
+
+      const tdDelete = document.createElement("td");
+      if (allowDelete) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-secondary";
+        delBtn.style.fontSize = "12px";
+        delBtn.textContent = "削除";
+        delBtn.addEventListener("click", () => {
+          tr.remove();
+          updateTotal();
+        });
+        tdDelete.appendChild(delBtn);
+      } else {
+        tdDelete.textContent = "-";
+      }
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdPercent);
+      tr.appendChild(tdDelete);
+
+      criteriaTbody.appendChild(tr);
+    }
+
+    // ★ 評価方式ごとの行セットアップ
+    function setupSchemeExamOnly() {
+      currentScheme = "exam_only";
+      criteriaTbody.innerHTML = "";
+      addRowBtn.disabled = true;
+      addCriteriaRow("期末考査", 100, {
+        fixedName: true,
+        fixedPercent: true,
+        allowDelete: false
+      });
+      updateTotal();
+    }
+
+    function setupSchemeExamPlusAssignments() {
+      currentScheme = "exam_plus_assignments";
+      criteriaTbody.innerHTML = "";
+      addRowBtn.disabled = false;
+      addCriteriaRow("期末考査", "", {
+        fixedName: true,
+        fixedPercent: false,
+        allowDelete: false
+      });
+      updateTotal();
+    }
+
+    function setupSchemePracticeOnly() {
+      currentScheme = "practice_only";
+      criteriaTbody.innerHTML = "";
+      addRowBtn.disabled = false;
+      addCriteriaRow("", "", {
+        fixedName: false,
+        fixedPercent: false,
+        allowDelete: true
+      });
+      updateTotal();
+    }
+
+    function applyCurrentScheme() {
+      const scheme = document.querySelector('input[name="schemeType"]:checked').value;
+      if (scheme === "exam_only") setupSchemeExamOnly();
+      else if (scheme === "exam_plus_assignments") setupSchemeExamPlusAssignments();
+      else setupSchemePracticeOnly();
+    }
+
+    function updateTotal() {
+      const inputs = criteriaTbody.querySelectorAll("input[type='number']");
+      let total = 0;
+      inputs.forEach((el) => {
+        const val = parseFloat(el.value);
+        if (!isNaN(val)) total += val;
+      });
+
+      totalArea.textContent = `合計：${total}%`;
+
+      const lower = 99;
+      const upper = 101;
+
+      if (currentScheme === "exam_only") {
+        totalArea.style.color = "#111827";
+        saveBtn.disabled = false;
+        return;
+      }
+
+      if (total >= lower && total <= upper) {
+        totalArea.style.color = "#111827";
+        saveBtn.disabled = false;
+      } else {
+        totalArea.style.color = "#b91c1c";
+        saveBtn.disabled = true;
+      }
+    }
+
+    // ★ 同一科目を登録している教員の人数を調べる
+    async function checkMultiTeacher(subjectId) {
+      const thisCollection = `teacherSubjects_${currentYear}`;
+      const colRef = collection(db, thisCollection);
+      const snap = await getDocs(colRef);
+
+      let count = 0;
+
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (!data.subjects) return;
+
+        const has = data.subjects.some(s => s.subjectId === subjectId);
+        if (has) count++;
+      });
+
+      return count;
+    }
+
+    // ★ 評価方式の変更イベント
+    schemeRadios.forEach((radio) => {
+      radio.addEventListener("change", (e) => {
+        if (!e.target.checked) return;
+
+        const value = e.target.value;
+        if (value === "exam_only") {
+          setupSchemeExamOnly();
+        } else if (value === "exam_plus_assignments") {
+          setupSchemeExamPlusAssignments();
+        } else if (value === "practice_only") {
+          setupSchemePracticeOnly();
+        }
+      });
+    });
+
+    // 行追加ボタン（現在の方式に応じて自由行を追加）
+    addRowBtn.addEventListener("click", () => {
+      addCriteriaRow("", "", {
+        fixedName: false,
+        fixedPercent: false,
+        allowDelete: true
+      });
+      updateTotal();
+    });
+
+    subjectSelect.addEventListener("change", async () => {
+      const selectedOption = subjectSelect.options[subjectSelect.selectedIndex];
+      const subjectId = selectedOption ? selectedOption.value : "";
+      await loadCriteria(subjectId);
+
+      // ★ 複数担当チェック
+      const multiCount = await checkMultiTeacher(subjectId);
+      const warningEl = document.getElementById("multiTeacherWarning");
+      if (multiCount > 1) {
+        warningEl.style.display = "block";
+      } else {
+        warningEl.style.display = "none";
+      }
+    });
+
+    saveBtn.addEventListener("click", async () => {
+      const text = totalArea.textContent || "";
+      const match = text.match(/合計：(\d+(\.\d+)?)%/);
+      let total = null;
+      if (match) {
+        total = parseFloat(match[1]);
+      }
+
+      if (currentScheme !== "exam_only" && (total === null || total < 99 || total > 101)) {
+        alert("合計が100%になるように調整してください。（許容誤差 ±1%）");
+        return;
+      }
+
+      if (!currentUser) {
+        alert("ログイン情報が取得できません。再ログインしてください。");
+        return;
+      }
+
+      const selectedOption = subjectSelect.options[subjectSelect.selectedIndex];
+      const subjectId = selectedOption.value;
+      const subjectName = selectedOption.textContent;
+
+      if (!subjectId) {
+        alert("科目が選択されていません。");
+        return;
+      }
+
+      const scheme = document.querySelector('input[name="schemeType"]:checked').value;
+      const rows = criteriaTbody.querySelectorAll("tr");
+      const criteria = [];
+      rows.forEach((tr) => {
+        const nameInput = tr.querySelector("td:nth-child(1) input");
+        const percentInput = tr.querySelector("td:nth-child(2) input");
+        const name = nameInput.value.trim();
+        const percent = parseFloat(percentInput.value);
+
+        const isFixedName = nameInput.readOnly;
+        const isFixedPercent = percentInput.readOnly;
+
+        criteria.push({
+          name,
+          percent,
+          fixedName: isFixedName,
+          fixedPercent: isFixedPercent
+        });
+      });
+
+      const payload = {
+        teacherEmail: currentUser.email,
+        teacherName: currentTeacherName || "",
+        subjectId,
+        subjectName,
+        schemeType: scheme,
+        criteria,
+        updatedAt: serverTimestamp(),
+        updatedBy: currentUser.email
+      };
+
+      const docId = `${currentUser.email}_${subjectId}`;
+      await setDoc(doc(db, evalColName, docId), payload, { merge: true });
+
+      alert("評価基準を保存しました。");
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "login.html";
+    });
+
+    console.log("Referrer:", document.referrer);
+    onAuthStateChanged(auth, async (user) => {
+      if (user === null) {
+        const referrer = document.referrer || "";
+        const fromSubjects = referrer.includes("subjects.html");
+        if (fromSubjects) {
+          return;
+        }
+        window.location.href = "login.html";
+        return;
+      }
+      currentUser = user;
+      await loadTeacherName();
+      userInfoDisplay.textContent = `ログイン中：${currentTeacherName || user.email}（${user.email}）`;
+      await loadTeacherSubjects();
+
+      // ★ 初期評価方式の再適用
+      applyCurrentScheme();
+    });
+  </script>
+</body>
+</html>
