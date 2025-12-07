@@ -461,6 +461,7 @@
       getDocs,
       doc,
       setDoc,
+      deleteDoc,
       serverTimestamp,
       getDoc
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
@@ -857,17 +858,7 @@
     // ▼ STEP3-2：科目削除（Firestore 更新のみ。UIとは未接続）
     async function deleteSubject(subjectId) {
       if (!currentUser) return;
-      // ★ STEP3-3b：評価基準が保存されている科目は削除禁止
       const evalCol = `evaluationCriteria_${new Date().getFullYear()}`;
-      const evalDocId = `${currentUser.email}_${subjectId}`;
-      const evalRef = doc(db, evalCol, evalDocId);
-      const evalSnap = await getDoc(evalRef);
-
-      if (evalSnap.exists()) {
-        alert("この科目は「評価基準」が保存されているため削除できません。教務へ連絡してください。");
-        return;
-      }
-
       const year = new Date().getFullYear();
       const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
       const snap = await getDoc(ref);
@@ -886,6 +877,26 @@
       // 削除後、最新状態を UI に反映させられるように描画関数を呼び出す
       // （renderRegisteredSubjects は既存STEP2で実装済み）
       renderRegisteredSubjects(newList);
+
+      // ★ teacherSubjects 更新後に追加する処理：
+      // この科目を担当している教員が何人いるかをチェックする
+      const colRef = collection(db, `teacherSubjects_${year}`);
+      const allSnaps = await getDocs(colRef);
+
+      let teacherCount = 0;
+      allSnaps.forEach(docSnap => {
+        const data = docSnap.data();
+        const subjects = data.subjects || [];
+        if (subjects.some(s => s.subjectId === subjectId)) {
+          teacherCount++;
+        }
+      });
+
+      // ★ 担当教員が0人になったら評価基準を削除
+      if (teacherCount === 0) {
+        const evalCol = `evaluationCriteria_${year}`;
+        await deleteDoc(doc(db, evalCol, subjectId));
+      }
 
       // 「科目登録画面の科目選択部分」を最新にするため、既存関数を呼び出す
       if (typeof loadTeacherSubjects === "function") {

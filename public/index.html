@@ -372,8 +372,22 @@
         const result = await signInWithPopup(auth, provider);
         const email = result.user.email || "";
 
-        // 1. @ktc.ac.jp 以外は拒否
-        if (!email.endsWith("@ktc.ac.jp")) {
+        // =========================
+        // ★ TEST MODE（後で削除可）
+        // テスト用 gmail アカウントを暫定的にログイン許可する
+        // 本番公開前に、この if 文ブロックを必ず削除してください
+        // =========================
+        const TEST_ALLOWED_EMAILS = [
+          "nobupig@gmail.com",   // ← テスト許可したいアカウント
+        ];
+
+        // TEST MODE: 特例許可
+        if (TEST_ALLOWED_EMAILS.includes(email)) {
+          // 通知（任意）
+          console.log("TEST MODE: gmail ログイン特例許可:", email);
+          // このまま次の教師名簿チェックへ進む
+        } else if (!email.endsWith("@ktc.ac.jp")) {
+          // 本番ルール（変更不可）
           showToast("教員アカウント（@ktc.ac.jp）のみ利用可能です。", "error", 5000);
           await signOut(auth);
           return;

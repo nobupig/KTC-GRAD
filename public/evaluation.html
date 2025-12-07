@@ -22,7 +22,8 @@
       justify-content: space-between;
     }
     header h1 { font-size: 18px; margin: 0; }
-    header .user-info { font-size: 12px; text-align: right; }
+    .user-info { font-size: 12px; }
+
     header button {
       border: none;
       padding: 6px 12px;
@@ -38,6 +39,7 @@
       border-radius: 16px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.06);
     }
+
     h2 {
       font-size: 20px;
       border-left: 4px solid #004A99;
@@ -60,10 +62,9 @@
     thead { background: #f9fafb; }
     th, td {
       border-bottom: 1px solid #e5e7eb;
-      padding: 6px 8px; white-space: nowrap;
+      padding: 6px 8px;
+      white-space: nowrap;
     }
-    th:first-child, td:first-child { text-align: left; }
-    tbody tr:hover { background: #f3f4f6; }
 
     .field { margin-bottom: 12px; }
     select, input {
@@ -73,127 +74,119 @@
       box-sizing: border-box;
     }
 
-    .total-area { margin-top: 12px; font-size: 14px; }
-
-    .actions { margin-top: 16px; display: flex; gap: 8px; }
-
-    /* ★ 評価方式カードUI（横並びシンプル版） */
-    #schemeBlock {
-      margin-top: 20px;
-      margin-bottom: 20px;
-      padding: 16px;
-      background: #f8fafc;
-      border-radius: 12px;
-      border: 1px solid #e2e8f0;
+    .scheme-tabs {
+      display: flex;
+      border-bottom: 2px solid #d1d5db;
+      margin-bottom: 16px;
     }
 
-    /* 評価方式：横並びの最終調整 */
-    .scheme-row {
+    .scheme-tab {
       display: flex;
       align-items: center;
-      gap: 24px;
-      margin-top: 10px;
-    }
-
-    .scheme-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      white-space: nowrap;
-      min-width: 180px;
+      gap: 6px;
+      padding: 10px 14px;
+      border: 2px solid transparent;
+      border-bottom: none;
       cursor: pointer;
+      font-size: 13px;
+      color: #374151;
+      white-space: nowrap;
     }
 
-    .scheme-item .icon {
+    .scheme-tab:hover {
+      background: #f9fafb;
+    }
+
+    .scheme-tab.active {
+      background: #ffffff;
+      border-color: #004A99;
+      border-bottom: 2px solid #ffffff;
+      color: #004A99;
+      font-weight: 600;
+    }
+
+    .scheme-tab input[type="radio"] {
+      display: none;
+    }
+
+    .scheme-tab .icon {
       font-size: 16px;
-      position: relative;
-      top: 1px;
     }
 
-    .scheme-item input[type="radio"] {
-      transform: scale(1.1);
+    .total-note { font-size: 12px; color: #dc2626; margin-left: 8px; }
+
+    #multiTeacherWarning {
+      background:#fff3cd;
+      color:#856404;
+      padding:10px 14px;
+      border-radius:8px;
+      margin-bottom:12px;
+      border:1px solid #ffeeba;
+      display:none;
     }
 
-    .scheme-item input[type="radio"]:checked + .icon + .text {
-      font-weight: 600;
-      color: #1e3a8a;
-    }
-
-    /* ▼ ログイン中： の表示 */
-    #userInfoArea {
-      max-width: 1100px;
-      margin: 4px auto 0;
-      padding: 0 20px;
-    }
-    #userInfoDisplay {
-      font-size: 14px;
-      font-weight: 600;
-      color: #1e3a8a;
-      text-align: right;
-    }
-
-    /* トースト通知 */
     #toastContainer {
       position: fixed;
       top: 20px;
       right: 20px;
       z-index: 9999;
     }
-    
-    .total-note {
-      font-size: 12px;
-      color: #dc2626;
-      margin-left: 8px;
+
+    /* 修正理由モーダル */
+    #editReasonModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #editReasonModal .box {
+      background: #ffffff;
+      width: 100%;
+      max-width: 420px;
+      padding: 20px 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
   </style>
+
 </head>
 <body>
+
   <header>
     <img src="kindai.png" alt="校章"
          style="width:32px; height:32px; margin-right:12px;">
-
     <h1>近大高専 成績システム｜評価基準入力</h1>
-
-    <div class="user-info" style="display:flex; align-items:center; gap:10px;">
-      <button id="viewModeBtn" class="btn btn-secondary" style="font-size:12px;"
-        onclick="location.href='view.html'">
-        📄 閲覧モード
-      </button>
+    <div class="user-info">
       <button id="logoutBtn">ログアウト</button>
     </div>
   </header>
 
-  <div id="backArea"
-    style="max-width:1100px; margin:10px auto 0; padding:0 20px;">
+  <div style="max-width:1100px; margin:10px auto 0; padding:0 20px;">
     <button id="backToSubjectsBtn" class="btn btn-secondary" style="font-size:12px;">
       ◀ 科目登録に戻る
     </button>
   </div>
 
-  <!-- ★ ログイン中：表示（帯の外・カードと同じ幅／右寄せ） -->
-  <div id="userInfoArea">
-    <div id="userInfoDisplay"></div>
+  <!-- ログイン中表示 -->
+  <div id="userInfoArea" style="max-width:1100px; margin:4px auto 0; padding:0 20px;">
+    <div id="userInfoDisplay" style="font-size:13px; font-weight:600; text-align:right;"></div>
   </div>
 
-  <!-- トースト -->
   <div id="toastContainer"></div>
 
   <main>
-    <div id="multiTeacherWarning" 
-         style="display:none; 
-                background:#fff3cd; 
-                color:#856404; 
-                padding:10px 14px; 
-                border-radius:8px; 
-                margin-bottom:12px;
-                border:1px solid #ffeeba;">
-      ※ この科目は複数の教員が担当科目に登録しています。誤登録の可能性がある場合、教務へご連絡ください。
+
+    <div id="multiTeacherWarning">
+      ※ この科目は複数の教員が担当科目に登録されています。誤登録の可能性がある場合、教務へご連絡ください。
     </div>
 
     <h2>評価基準の設定</h2>
 
-    <div class="field" id="subjectSelectorArea">
+    <!-- 科目選択 -->
+    <div class="field">
       <label for="subjectSelect" style="font-size:13px; color:#4b5563;">担当科目を選択</label>
       <select id="subjectSelect">
         <option value="">科目を選択してください</option>
@@ -201,30 +194,33 @@
       <div id="subjectStatus" style="margin-top:6px; font-size:12px; color:#6b7280;"></div>
     </div>
 
-    <div id="schemeBlock">
-      <!-- ★ 評価方式の選択 -->
-      <div class="field" id="schemeSelectorArea" style="margin-bottom:16px;">
-        <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">評価方式を選択</div>
-        <div class="scheme-row">
-          <label class="scheme-item">
-            <input type="radio" name="schemeType" value="exam_only" checked>
-            <span class="icon">📝</span>
-            <span class="text">考査のみで評価（期末考査100%）</span>
-          </label>
-          <label class="scheme-item">
-            <input type="radio" name="schemeType" value="exam_plus_assignments">
-            <span class="icon">📚</span>
-            <span class="text">考査＋課題等で評価</span>
-          </label>
-          <label class="scheme-item">
-            <input type="radio" name="schemeType" value="practice_only">
-            <span class="icon">🧪</span>
-            <span class="text">実験・実習系の課題作品で評価</span>
-          </label>
+    <!-- 評価方式 -->
+    <div id="schemeBlock" style="margin-bottom:16px;">
+      <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">評価方式を選択</div>
+      <div class="scheme-tabs">
+
+        <div class="scheme-tab" data-value="exam_only">
+          <input type="radio" name="schemeType" value="exam_only" checked>
+          <span class="icon">📝</span>
+          <span class="label">考査のみ（100%）</span>
         </div>
+
+        <div class="scheme-tab" data-value="exam_plus_assignments">
+          <input type="radio" name="schemeType" value="exam_plus_assignments">
+          <span class="icon">📚</span>
+          <span class="label">考査＋課題</span>
+        </div>
+
+        <div class="scheme-tab" data-value="practice_only">
+          <input type="radio" name="schemeType" value="practice_only">
+          <span class="icon">🧪</span>
+          <span class="label">実験・実習</span>
+        </div>
+
       </div>
     </div>
 
+    <!-- 表 -->
     <table id="criteriaTable">
       <thead>
         <tr>
@@ -236,19 +232,39 @@
       <tbody id="criteriaTbody"></tbody>
     </table>
 
-    <div class="actions">
+    <div>
       <button id="addRowBtn" class="btn btn-secondary">+ 行追加</button>
     </div>
 
-    <div id="totalArea" class="total-area">合計：0%</div>
-    <span id="totalNote" class="total-note">
+    <div id="totalArea" style="margin-top:12px; font-size:13px;">合計：0%</div>
+    <span class="total-note">
       ※ 評価基準の合計は必ず100%としてください（許容誤差 ±1%）
     </span>
 
-    <div class="actions" style="margin-top:20px;">
+    <div style="margin-top:20px; display:flex; gap:8px;">
       <button id="saveBtn" class="btn btn-primary">保存する</button>
     </div>
+
   </main>
+
+  <!-- 修正理由モーダル -->
+  <div id="editReasonModal">
+    <div class="box">
+      <h3 style="margin:0 0 8px 0; color:#004A99;">評価基準の修正理由</h3>
+      <p style="font-size:13px; margin:0 0 8px 0;">
+        修正理由を入力してください。（履歴として保存されます）
+      </p>
+
+      <textarea id="editReasonInput"
+        rows="4"
+        style="width:100%; padding:8px; border-radius:8px; border:1px solid #d1d5db; font-size:13px;"></textarea>
+
+      <div style="margin-top:16px; text-align:right;">
+        <button id="editReasonCancelBtn" class="btn btn-secondary" style="font-size:12px;">キャンセル</button>
+        <button id="editReasonOkBtn" class="btn btn-primary" style="font-size:12px;">修正を開始する</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -261,13 +277,15 @@
       getFirestore,
       doc,
       getDoc,
+      setDoc,
       collection,
       getDocs,
-      setDoc,
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+    // ================================
     // Firebase 設定
+    // ================================
     const firebaseConfig = {
       apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
       authDomain: "ktc-grade-system.firebaseapp.com",
@@ -281,52 +299,70 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // ================================
     // DOM 参照
-    const userInfoDisplay = document.getElementById("userInfoDisplay");
+    // ================================
     const logoutBtn = document.getElementById("logoutBtn");
-    const subjectSelect = document.getElementById("subjectSelect");
     const backToSubjectsBtn = document.getElementById("backToSubjectsBtn");
+    const userInfoDisplay = document.getElementById("userInfoDisplay");
+
+    const subjectSelect = document.getElementById("subjectSelect");
     const subjectStatus = document.getElementById("subjectStatus");
-    const addRowBtn = document.getElementById("addRowBtn");
+
+    const schemeRadios = document.querySelectorAll('input[name="schemeType"]');
     const criteriaTbody = document.getElementById("criteriaTbody");
+    const addRowBtn = document.getElementById("addRowBtn");
     const totalArea = document.getElementById("totalArea");
     const saveBtn = document.getElementById("saveBtn");
-    const schemeRadios = document.querySelectorAll('input[name="schemeType"]');
+
+    const multiTeacherWarning = document.getElementById("multiTeacherWarning");
     const toastContainer = document.getElementById("toastContainer");
 
-    // 科目登録へ戻る
-    if (backToSubjectsBtn) {
-      backToSubjectsBtn.addEventListener("click", () => {
-        window.location.href = "subjects.html";
-      });
-    }
+    const editReasonModal = document.getElementById("editReasonModal");
+    const editReasonInput = document.getElementById("editReasonInput");
+    const editReasonCancelBtn = document.getElementById("editReasonCancelBtn");
+    const editReasonOkBtn = document.getElementById("editReasonOkBtn");
 
+    // ================================
+    // グローバル状態
+    // ================================
     const currentYear = new Date().getFullYear();
     const evalColName = `evaluationCriteria_${currentYear}`;
+    const lockColName = `evaluationLocks_${currentYear}`;
 
     let currentUser = null;
     let currentTeacherName = "";
+    let currentSubjectId = null;
     let currentScheme = "exam_only";
 
-    // トースト
+    // ロック情報
+    let currentLockSubjectId = null;
+    let currentLockOwnerEmail = null;
+
+    // 修正モード
+    let isEditingExistingCriteria = false;
+    let currentEditReason = null;
+    let historyBeforeCriteriaSnapshot = null;
+
+    // ================================
+    // 共通 UI ユーティリティ
+    // ================================
     function showToast(message, type = "success") {
       if (!toastContainer) return;
-
       const toast = document.createElement("div");
       toast.textContent = message;
       toast.style.minWidth = "260px";
       toast.style.maxWidth = "360px";
       toast.style.background = type === "success" ? "#16a34a" : "#dc2626";
       toast.style.color = "#fff";
-      toast.style.padding = "12px 18px";
-      toast.style.marginTop = "10px";
+      toast.style.padding = "10px 14px";
+      toast.style.marginTop = "8px";
       toast.style.borderRadius = "10px";
       toast.style.boxShadow = "0 4px 14px rgba(0,0,0,0.2)";
-      toast.style.fontSize = "14px";
+      toast.style.fontSize = "13px";
       toast.style.opacity = "0";
       toast.style.transform = "translateY(-10px)";
       toast.style.transition = "all 0.3s ease";
-
       toastContainer.appendChild(toast);
 
       requestAnimationFrame(() => {
@@ -341,7 +377,15 @@
       }, 2500);
     }
 
-    // 教員名取得
+    if (backToSubjectsBtn) {
+      backToSubjectsBtn.addEventListener("click", () => {
+        window.location.href = "subjects.html";
+      });
+    }
+
+    // ================================
+    // 教員名・担当科目
+    // ================================
     async function loadTeacherName() {
       if (!currentUser) return;
       const ref = doc(db, "teachers", currentUser.email);
@@ -353,14 +397,14 @@
       }
     }
 
-    // 担当科目取得
     async function loadTeacherSubjects() {
       if (!currentUser) return;
-      subjectSelect.innerHTML = '<option value="">科目を選択してください</option>';
+
+      subjectSelect.innerHTML =
+        '<option value="">科目を選択してください</option>';
       subjectStatus.textContent = "";
 
-      const year = new Date().getFullYear();
-      const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
+      const ref = doc(db, `teacherSubjects_${currentYear}`, currentUser.email);
       const snap = await getDoc(ref);
 
       if (!snap.exists() || !snap.data().subjects || !snap.data().subjects.length) {
@@ -375,9 +419,7 @@
       subjects.forEach((s) => {
         const opt = document.createElement("option");
         opt.value = s.subjectId || "";
-
         const baseLabel = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
-
         if (s.specialType === true) {
           opt.textContent = `${baseLabel}（評価基準入力不要）`;
           opt.disabled = true;
@@ -385,69 +427,108 @@
           opt.textContent = baseLabel;
           hasNormal = true;
         }
-
         subjectSelect.appendChild(opt);
       });
 
       if (!hasNormal) {
         subjectStatus.textContent =
-          "この教員が担当する科目は、すべて『評価基準入力不要の特別科目』として登録されています。成績入力画面から直接入力してください。";
+          "この教員が担当する科目はすべて『評価基準入力不要の特別科目』として登録されています。成績入力画面から直接入力してください。";
       }
     }
 
-    // 評価基準の読み込み
-    async function loadCriteria(subjectId) {
-      if (!currentUser || !subjectId) {
-        criteriaTbody.innerHTML = "";
-        applyCurrentScheme();
-        return;
+    // ================================
+    // ロック関連
+    // ================================
+    async function getCurrentLock(subjectId) {
+      const lockRef = doc(db, lockColName, subjectId);
+      const lockSnap = await getDoc(lockRef);
+      if (!lockSnap.exists()) return null;
+      const data = lockSnap.data();
+      return {
+        subjectId: data.subjectId || subjectId,
+        lockedBy: data.lockedBy || "",
+        lockedName: data.lockedName || "",
+        lockedAt: data.lockedAt || null,
+        expiresAt: data.expiresAt || null,
+      };
+    }
+
+    function isLockExpired(lock) {
+      if (!lock || !lock.expiresAt) return true;
+      const now = new Date();
+      const exp = lock.expiresAt.toDate
+        ? lock.expiresAt.toDate()
+        : new Date(lock.expiresAt);
+      return now > exp;
+    }
+
+    async function acquireLockForSubject(subjectId, subjectLabelForMessage) {
+      if (!currentUser || !subjectId) return false;
+
+      const currentLock = await getCurrentLock(subjectId);
+      if (
+        currentLock &&
+        !isLockExpired(currentLock) &&
+        currentLock.lockedBy &&
+        currentLock.lockedBy !== currentUser.email
+      ) {
+        const lockedByName = currentLock.lockedName || currentLock.lockedBy;
+        alert(
+          `この科目「${subjectLabelForMessage}」は現在 ${lockedByName} が編集中のため、評価基準を編集できません。\n` +
+          `編集が終了するまでお待ちいただくか、必要に応じて教務へ連絡してください。`
+        );
+        return false;
       }
 
-      const docId = `${currentUser.email}_${subjectId}`;
-      const ref = doc(db, evalColName, docId);
-      const snap = await getDoc(ref);
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10分
 
-      if (!snap.exists()) {
-        applyCurrentScheme();
-        return;
-      }
+      const lockRef = doc(db, lockColName, subjectId);
+      await setDoc(lockRef, {
+        subjectId,
+        lockedBy: currentUser.email,
+        lockedName: currentTeacherName || currentUser.email,
+        lockedAt: serverTimestamp(),
+        expiresAt,
+      }, { merge: true });
 
-      const data = snap.data();
+      currentLockSubjectId = subjectId;
+      currentLockOwnerEmail = currentUser.email;
+      return true;
+    }
 
-      const method = data.method || "exam_only";
-      currentScheme = method;
-      const radio = document.querySelector(
-        `input[name="schemeType"][value="${method}"]`
-      );
-      if (radio) radio.checked = true;
-
-      applyCurrentScheme();
-
-      criteriaTbody.innerHTML = "";
-      (data.items || []).forEach((item) => {
-        addCriteriaRow(item.name, item.percent, {
-          fixedName: false,
-          fixedPercent: false,
-          allowDelete: true
-        });
-      });
-
-      const totalPercent = data.totalPercent || 0;
-      totalArea.textContent = `合計：${totalPercent}%`;
-
-      updateTotal();
-
-      if (data.isSaved === true) {
-        lockUI();
+    async function releaseCurrentLock() {
+      if (!currentUser || !currentLockSubjectId) return;
+      try {
+        const lockRef = doc(db, lockColName, currentLockSubjectId);
+        const lockSnap = await getDoc(lockRef);
+        if (lockSnap.exists()) {
+          const data = lockSnap.data();
+          if (data.lockedBy === currentUser.email) {
+            await setDoc(lockRef, {
+              subjectId: currentLockSubjectId,
+              lockedBy: null,
+              lockedName: null,
+              expiresAt: null,
+            }, { merge: true });
+          }
+        }
+      } catch (e) {
+        console.error("ロック解放中にエラーが発生しました:", e);
+      } finally {
+        currentLockSubjectId = null;
+        currentLockOwnerEmail = null;
       }
     }
 
-    // 行追加
-    function addCriteriaRow(itemName = "", percent = "", options = {}) {
+    // ================================
+    // 表の行・評価方式
+    // ================================
+    function addCriteriaRow(name = "", percent = "", options = {}) {
       const {
         fixedName = false,
         fixedPercent = false,
-        allowDelete = true
+        allowDelete = true,
       } = options;
 
       const tr = document.createElement("tr");
@@ -456,7 +537,7 @@
       const nameInput = document.createElement("input");
       nameInput.type = "text";
       nameInput.placeholder = "例：レポート";
-      nameInput.value = itemName;
+      nameInput.value = name;
       nameInput.dataset.fixed = fixedName ? "true" : "false";
       if (fixedName) {
         nameInput.readOnly = true;
@@ -479,7 +560,7 @@
       }
       tdPercent.appendChild(percentInput);
 
-      const tdDelete = document.createElement("td");
+      const tdDel = document.createElement("td");
       if (allowDelete) {
         const delBtn = document.createElement("button");
         delBtn.className = "btn btn-secondary";
@@ -489,19 +570,17 @@
           tr.remove();
           updateTotal();
         });
-        tdDelete.appendChild(delBtn);
+        tdDel.appendChild(delBtn);
       } else {
-        tdDelete.textContent = "-";
+        tdDel.textContent = "-";
       }
 
       tr.appendChild(tdName);
       tr.appendChild(tdPercent);
-      tr.appendChild(tdDelete);
-
+      tr.appendChild(tdDel);
       criteriaTbody.appendChild(tr);
     }
 
-    // ★ 評価方式ごとの行セットアップ
     function setupSchemeExamOnly() {
       currentScheme = "exam_only";
       criteriaTbody.innerHTML = "";
@@ -509,74 +588,45 @@
       addCriteriaRow("期末考査", 100, {
         fixedName: true,
         fixedPercent: true,
-        allowDelete: false
+        allowDelete: false,
       });
       updateTotal();
     }
 
-   function setupSchemeExamPlusAssignments() {
-  currentScheme = "exam_plus_assignments";
-  criteriaTbody.innerHTML = "";
-  addRowBtn.disabled = false;
+    function setupSchemeExamPlusAssignments() {
+      currentScheme = "exam_plus_assignments";
+      criteriaTbody.innerHTML = "";
+      addRowBtn.disabled = false;
 
-  // ★ 期末考査（固定）
-  addCriteriaRow("期末考査", "", {
-    fixedName: true,
-    fixedPercent: false,
-    allowDelete: false
-  });
-
-  // ★ 空欄の自由入力行を1つ追加（←これが今回の追加）
-  addCriteriaRow("", "", {
-    fixedName: false,
-    fixedPercent: false,
-    allowDelete: true
-  });
-
-  updateTotal();
-}
-
+      addCriteriaRow("期末考査", "", {
+        fixedName: true,
+        fixedPercent: false,
+        allowDelete: false,
+      });
+      addCriteriaRow("", "", {
+        fixedName: false,
+        fixedPercent: false,
+        allowDelete: true,
+      });
+      updateTotal();
+    }
 
     function setupSchemePracticeOnly() {
       currentScheme = "practice_only";
       criteriaTbody.innerHTML = "";
       addRowBtn.disabled = false;
+
       addCriteriaRow("", "", {
         fixedName: false,
         fixedPercent: false,
-        allowDelete: true
+        allowDelete: true,
       });
       updateTotal();
     }
 
-    // ★ 科目切り替え時に評価基準UI全体を初期状態へリセット
-    function resetEvaluationUI() {
-      saveBtn.textContent = "保存する";
-      saveBtn.disabled = false;
-      saveBtn.style.opacity = "1";
-
-      const editBtn = document.getElementById("editBtn");
-      if (editBtn) {
-        editBtn.remove();
-      }
-
-      if (schemeRadios && schemeRadios.forEach) {
-        schemeRadios.forEach((radio) => {
-          radio.disabled = false;
-        });
-      }
-
-      criteriaTbody.innerHTML = "";
-      addRowBtn.disabled = false;
-
-      totalArea.textContent = "合計：0%";
-      totalArea.style.color = "#111827";
-    }
-
     function applyCurrentScheme() {
-      const scheme = document.querySelector(
-        'input[name="schemeType"]:checked'
-      ).value;
+      const r = document.querySelector('input[name="schemeType"]:checked');
+      const scheme = r ? r.value : "exam_only";
       if (scheme === "exam_only") setupSchemeExamOnly();
       else if (scheme === "exam_plus_assignments") setupSchemeExamPlusAssignments();
       else setupSchemePracticeOnly();
@@ -587,115 +637,201 @@
       const inputs = criteriaTbody.querySelectorAll("input[type='number']");
       let total = 0;
       inputs.forEach((el) => {
-        const val = parseFloat(el.value);
-        if (!isNaN(val)) total += val;
+        const v = parseFloat(el.value);
+        if (!isNaN(v)) total += v;
       });
-
       totalArea.textContent = `合計：${total}%`;
-
-      const lower = 99;
-      const upper = 101;
 
       if (currentScheme === "exam_only") {
         totalArea.style.color = "#111827";
-        // exam_only は常にOK
-        saveBtn.disabled = false;
+        if (saveBtn.dataset.mode !== "locked") saveBtn.disabled = false;
         return;
       }
 
-      if (total >= lower && total <= upper) {
+      if (total >= 99 && total <= 101) {
         totalArea.style.color = "#111827";
-        if (saveBtn.dataset.mode !== "locked") {
-          saveBtn.disabled = false;
-        }
+        if (saveBtn.dataset.mode !== "locked") saveBtn.disabled = false;
       } else {
         totalArea.style.color = "#b91c1c";
-        if (saveBtn.dataset.mode !== "locked") {
-          saveBtn.disabled = true;
-        }
+        if (saveBtn.dataset.mode !== "locked") saveBtn.disabled = true;
       }
     }
 
-    function lockUI() {
+    // 履歴用スナップショット
+    function captureCurrentCriteriaSnapshot(subjectId) {
+      const rows = [];
+      criteriaTbody.querySelectorAll("tr").forEach((tr) => {
+        const nameInput = tr.querySelector("td:nth-child(1) input");
+        const percentInput = tr.querySelector("td:nth-child(2) input");
+        if (!nameInput || !percentInput) return;
+        const name = nameInput.value.trim();
+        const p = parseFloat(percentInput.value);
+        rows.push({
+          name,
+          percent: Number.isNaN(p) ? 0 : p,
+        });
+      });
+
+      const r = document.querySelector('input[name="schemeType"]:checked');
+      const method = r ? r.value : currentScheme;
+
+      const m = totalArea.textContent.match(/合計：(\d+(\.\d+)?)%/);
+      const totalPercent = m ? parseFloat(m[1]) : null;
+
+      return {
+        subjectId: subjectId || null,
+        method,
+        totalPercent,
+        items: rows,
+      };
+    }
+
+    // ================================
+    // UIロック（保存済み状態）
+    // ================================
+    function setSavedUI(allowEditButton) {
       criteriaTbody.querySelectorAll("input").forEach((inp) => {
         inp.readOnly = true;
         inp.disabled = true;
         inp.style.backgroundColor = "#f3f4f6";
       });
-
       criteriaTbody.querySelectorAll("button").forEach((btn) => {
         btn.style.display = "none";
       });
-
       addRowBtn.disabled = true;
-      schemeRadios.forEach((r) => {
-        r.disabled = true;
-      });
+      schemeRadios.forEach((r) => { r.disabled = true; });
 
       saveBtn.disabled = true;
       saveBtn.textContent = "保存済み";
       saveBtn.dataset.mode = "locked";
 
       let editBtn = document.getElementById("editBtn");
+      if (!allowEditButton) {
+        if (editBtn) editBtn.remove();
+        return;
+      }
+
       if (!editBtn) {
-        const btn = document.createElement("button");
-        btn.id = "editBtn";
-        btn.className = "btn btn-secondary";
-        btn.style.marginLeft = "8px";
-        btn.textContent = "修正する";
-        saveBtn.parentNode.appendChild(btn);
-        btn.addEventListener("click", unlockUI);
-        editBtn = btn;
+        editBtn = document.createElement("button");
+        editBtn.id = "editBtn";
+        editBtn.className = "btn btn-secondary";
+        editBtn.style.marginLeft = "8px";
+        editBtn.textContent = "修正する";
+        saveBtn.parentNode.appendChild(editBtn);
       }
       editBtn.style.display = "inline-block";
+
+      editBtn.onclick = () => {
+        if (!currentSubjectId) {
+          alert("科目が選択されていません。");
+          return;
+        }
+        isEditingExistingCriteria = true;
+        currentEditReason = null;
+        historyBeforeCriteriaSnapshot = null;
+        if (editReasonInput) editReasonInput.value = "";
+        if (editReasonModal) editReasonModal.style.display = "flex";
+      };
     }
 
-    function unlockUI() {
+    function unlockUIForEdit() {
       criteriaTbody.querySelectorAll("input").forEach((inp) => {
         inp.readOnly = false;
         inp.disabled = false;
         inp.style.backgroundColor = "";
       });
-
       criteriaTbody.querySelectorAll("button").forEach((btn) => {
         btn.style.display = "inline-block";
       });
-
       addRowBtn.disabled = false;
-      schemeRadios.forEach((r) => {
-        r.disabled = false;
-      });
+      schemeRadios.forEach((r) => { r.disabled = false; });
 
       saveBtn.disabled = false;
       saveBtn.textContent = "保存する（修正反映）";
       saveBtn.dataset.mode = "edit";
 
       const editBtn = document.getElementById("editBtn");
-      if (editBtn) {
-        editBtn.style.display = "none";
+      if (editBtn) editBtn.style.display = "none";
+    }
+
+    function resetEvaluationUI() {
+      criteriaTbody.innerHTML = "";
+      addRowBtn.disabled = false;
+      saveBtn.disabled = false;
+      saveBtn.textContent = "保存する";
+      saveBtn.dataset.mode = "";
+
+      schemeRadios.forEach((r) => { r.disabled = false; });
+      multiTeacherWarning.style.display = "none";
+
+      isEditingExistingCriteria = false;
+      currentEditReason = null;
+      historyBeforeCriteriaSnapshot = null;
+
+      const editBtn = document.getElementById("editBtn");
+      if (editBtn) editBtn.remove();
+
+      totalArea.textContent = "合計：0%";
+      totalArea.style.color = "#111827";
+    }
+
+    // ================================
+    // 評価基準読み込み
+    // ================================
+    async function loadCriteria(subjectId, { editable } = { editable: true }) {
+      criteriaTbody.innerHTML = "";
+      applyCurrentScheme(); // デフォルト生成
+
+      if (!subjectId) return;
+      const ref = doc(db, evalColName, subjectId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const method = data.method || "exam_only";
+      currentScheme = method;
+
+      const r = document.querySelector(`input[name="schemeType"][value="${method}"]`);
+      if (r) r.checked = true;
+      applyCurrentScheme();
+
+      // 中身を上書き
+      criteriaTbody.innerHTML = "";
+      (data.items || []).forEach((item) => {
+        addCriteriaRow(item.name, item.percent, {
+          fixedName: false,
+          fixedPercent: false,
+          allowDelete: true,
+        });
+      });
+
+      const totalPercent = data.totalPercent || 0;
+      totalArea.textContent = `合計：${totalPercent}%`;
+      updateTotal();
+
+      if (data.isSaved) {
+        setSavedUI(editable); // ロック取得者だけ編集ボタン表示
       }
     }
 
-    // ★ 同一科目を登録している教員の人数を調べる
+    // ================================
+    // 複数担当チェック
+    // ================================
     async function checkMultiTeacher(subjectId) {
-      const thisCollection = `teacherSubjects_${currentYear}`;
-      const colRef = collection(db, thisCollection);
+      const colRef = collection(db, `teacherSubjects_${currentYear}`);
       const snap = await getDocs(colRef);
-
       let count = 0;
-
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         if (!data.subjects) return;
-
-        const has = data.subjects.some((s) => s.subjectId === subjectId);
-        if (has) count++;
+        if (data.subjects.some((s) => s.subjectId === subjectId)) count++;
       });
-
       return count;
     }
 
-    // 評価方式変更
+    // ================================
+    // イベント：評価方式切替・行追加
+    // ================================
     schemeRadios.forEach((radio) => {
       radio.addEventListener("change", (e) => {
         if (!e.target.checked) return;
@@ -711,45 +847,103 @@
       });
     });
 
-    // 行追加ボタン
-    addRowBtn.addEventListener("click", () => {
-      addCriteriaRow("", "", {
-        fixedName: false,
-        fixedPercent: false,
-        allowDelete: true
+    document.querySelectorAll(".scheme-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const value = tab.dataset.value;
+
+        const radio = tab.querySelector("input[type='radio']");
+        if (radio) {
+          radio.checked = true;
+        }
+
+        document
+          .querySelectorAll(".scheme-tab")
+          .forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+
+        applyCurrentScheme();
       });
-      updateTotal();
     });
 
-    // 科目選択
+    document
+      .querySelector(".scheme-tab[data-value='exam_only']")
+      ?.classList.add("active");
+    // ================================
+    if (editReasonCancelBtn) {
+      editReasonCancelBtn.addEventListener("click", () => {
+        isEditingExistingCriteria = false;
+        currentEditReason = null;
+        historyBeforeCriteriaSnapshot = null;
+        if (editReasonModal) editReasonModal.style.display = "none";
+      });
+    }
+
+    if (editReasonOkBtn) {
+      editReasonOkBtn.addEventListener("click", () => {
+        const reason = (editReasonInput?.value || "").trim();
+        if (!reason) {
+          alert("修正理由を入力してください。");
+          return;
+        }
+        if (!currentSubjectId) {
+          alert("科目が選択されていません。");
+          return;
+        }
+
+        currentEditReason = reason;
+        historyBeforeCriteriaSnapshot =
+          captureCurrentCriteriaSnapshot(currentSubjectId);
+
+        if (editReasonModal) editReasonModal.style.display = "none";
+
+        // ここで初めて編集可能にする
+        unlockUIForEdit();
+      });
+    }
+
+    // ================================
+    // 科目選択時
+    // ================================
     subjectSelect.addEventListener("change", async () => {
-      // ★ 科目切替時に UI を必ず初期化（ロック状態を解除）
+      // 以前のロックを解放
+      await releaseCurrentLock();
+
       resetEvaluationUI();
 
-      const selectedOption =
-        subjectSelect.options[subjectSelect.selectedIndex];
-      const subjectId = selectedOption ? selectedOption.value : "";
+      const opt = subjectSelect.options[subjectSelect.selectedIndex];
+      const subjectId = opt ? opt.value : "";
+      const subjectLabel = opt ? opt.textContent : subjectId;
+      currentSubjectId = subjectId;
 
-      // ★ 初期評価方式を自動セット（未保存科目の初期状態向け）
-      applyCurrentScheme();
+      if (!subjectId) {
+        applyCurrentScheme();
+        return;
+      }
 
-      await loadCriteria(subjectId);
+      // ロック取得を試みる
+      const lockAcquired = await acquireLockForSubject(subjectId, subjectLabel);
 
-      // ★ 複数担当チェック（既存処理を維持）
-      const multiCount = await checkMultiTeacher(subjectId);
-      const warningEl = document.getElementById("multiTeacherWarning");
-      if (multiCount > 1) {
-        warningEl.style.display = "block";
+      if (lockAcquired) {
+        await loadCriteria(subjectId, { editable: true });
       } else {
-        warningEl.style.display = "none";
+        await loadCriteria(subjectId, { editable: false });
+      }
+
+      const cnt = await checkMultiTeacher(subjectId);
+      multiTeacherWarning.style.display = cnt > 1 ? "block" : "none";
+
+      if (!lockAcquired) {
+        // 他人がロック中 → 完全閲覧専用
+        setSavedUI(false);
       }
     });
 
+    // ================================
     // 保存ボタン
+    // ================================
     saveBtn.addEventListener("click", async () => {
-      const text = totalArea.textContent || "";
-      const match = text.match(/合計：(\d+(\.\d+)?)%/);
-      const total = match ? parseFloat(match[1]) : null;
+      const m = totalArea.textContent.match(/合計：(\d+(\.\d+)?)%/);
+      const total = m ? parseFloat(m[1]) : null;
 
       if (
         currentScheme !== "exam_only" &&
@@ -763,118 +957,129 @@
         alert("ログイン情報が取得できません。再ログインしてください。");
         return;
       }
-
-      const selectedOption =
-        subjectSelect.options[subjectSelect.selectedIndex];
-      const subjectId = selectedOption ? selectedOption.value : "";
-      const subjectName = selectedOption ? selectedOption.textContent : "";
-
-      if (!subjectId) {
+      if (!currentSubjectId) {
         alert("科目が選択されていません。");
         return;
       }
 
-      const scheme = document.querySelector(
-        'input[name="schemeType"]:checked'
-      ).value;
-
       const rows = criteriaTbody.querySelectorAll("tr");
-      const criteria = [];
+      const items = [];
 
       for (const tr of rows) {
         const nameInput = tr.querySelector("td:nth-child(1) input");
         const percentInput = tr.querySelector("td:nth-child(2) input");
 
         const name = nameInput.value.trim();
-        const percentValue = percentInput.value.trim();
-        const percent = parseFloat(percentValue);
+        const percentStr = percentInput.value.trim();
+        const percent = parseFloat(percentStr);
 
-        if (name === "") {
-          alert("評価項目名が空欄の行があります。入力してください。");
+        if (!name) {
+          alert("評価項目名が空欄の行があります。");
           nameInput.focus();
           return;
         }
-
-        if (percentValue === "") {
+        if (!percentStr) {
           alert(`「${name}」の割合(%)が未入力です。`);
           percentInput.focus();
           return;
         }
-
         if (isNaN(percent)) {
           alert(`「${name}」の割合(%)は数値を入力してください。`);
           percentInput.focus();
           return;
         }
-
         if (percent < 0 || percent > 100) {
           alert(`「${name}」の割合(%)は 0～100 の範囲で入力してください。`);
           percentInput.focus();
           return;
         }
 
-        const isFixedName = nameInput.dataset.fixed === "true";
-        const isFixedPercent = percentInput.dataset.fixed === "true";
-
-        criteria.push({
-          name,
-          percent,
-          fixedName: isFixedName,
-          fixedPercent: isFixedPercent
-        });
+        items.push({ name, percent });
       }
+
+      const r = document.querySelector('input[name="schemeType"]:checked');
+      const scheme = r ? r.value : currentScheme;
 
       try {
         const payload = {
-          teacherEmail: currentUser.email,
-          subjectId,
-          items: criteria.map((c) => ({
-            name: c.name,
-            percent: c.percent
-          })),
-          totalPercent: total,
+          subjectId: currentSubjectId,
           method: scheme,
+          totalPercent: total,
+          items,
           isSaved: true,
           savedAt: serverTimestamp(),
-          savedBy: currentUser.email
+          savedBy: currentUser.email,
         };
 
-        const docId = `${currentUser.email}_${subjectId}`;
+        // ★ docId は subjectId で統一（教員によらず1つだけ）
+        await setDoc(doc(db, evalColName, currentSubjectId), payload, { merge: true });
 
-        await setDoc(doc(db, evalColName, docId), payload, { merge: true });
+        // 修正モードなら履歴を記録
+        if (
+          isEditingExistingCriteria &&
+          currentEditReason &&
+          historyBeforeCriteriaSnapshot
+        ) {
+          try {
+            const histCol = collection(db, "evaluationHistory");
+            const histRef = doc(histCol);
+            const afterSnapshot =
+              captureCurrentCriteriaSnapshot(currentSubjectId);
+
+            await setDoc(histRef, {
+              subjectId: currentSubjectId,
+              teacherEmail: currentUser.email,
+              teacherName: currentTeacherName || null,
+              reason: currentEditReason,
+              before: historyBeforeCriteriaSnapshot,
+              after: afterSnapshot,
+              editedAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error("履歴保存エラー:", e);
+          }
+        }
+
+        isEditingExistingCriteria = false;
+        currentEditReason = null;
+        historyBeforeCriteriaSnapshot = null;
 
         showToast("評価基準を保存しました。", "success");
-        lockUI();
+        setSavedUI(true);
       } catch (e) {
         console.error(e);
         showToast("保存に失敗しました。時間をおいて再度お試しください。", "error");
       }
     });
 
-    // ログアウト
+    // ================================
+    // ログアウト & ページ離脱
+    // ================================
     logoutBtn.addEventListener("click", async () => {
+      await releaseCurrentLock();
       await signOut(auth);
       window.location.href = "login.html";
     });
 
+    window.addEventListener("beforeunload", () => {
+      // ベストエフォートでロック解放（非同期だがOK）
+      releaseCurrentLock();
+    });
+
+    // ================================
     // 認証監視
-    console.log("Referrer:", document.referrer);
+    // ================================
     onAuthStateChanged(auth, async (user) => {
-      if (user === null) {
-        const referrer = document.referrer || "";
-        const fromSubjects = referrer.includes("subjects.html");
-        if (fromSubjects) {
-          return;
-        }
+      if (!user) {
         window.location.href = "login.html";
         return;
       }
       currentUser = user;
       await loadTeacherName();
-      userInfoDisplay.textContent = `ログイン中：${currentTeacherName || user.email}（${user.email}）`;
-      await loadTeacherSubjects();
+      userInfoDisplay.textContent =
+        `ログイン中：${currentTeacherName || user.email}（${user.email}）`;
 
-      // 初期評価方式の適用（新規時は編集モード）
+      await loadTeacherSubjects();
       applyCurrentScheme();
     });
   </script>
