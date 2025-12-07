@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="kindai.png">
+  <title>近大高専 成績システム｜メインメニュー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    header {
+      background: #004A99;
+      color: #fff;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+    header .user-info {
+      font-size: 12px;
+      text-align: right;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header button {
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    header button#logoutBtn {
+      background: #ffffff;
+      color: #004A99;
+    }
+
+    #userInfoArea {
+      max-width: 1100px;
+      margin: 4px auto 0;
+      padding: 0 20px;
+    }
+    #userInfoDisplay {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e3a8a;
+      text-align: right;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+    }
+
+    h2 {
+      font-size: 20px;
+      border-left: 4px solid #004A99;
+      padding-left: 10px;
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+
+    p.description {
+      font-size: 13px;
+      color: #4b5563;
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .card {
+      background: #f9fafb;
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card p {
+      font-size: 13px;
+      color: #4b5563;
+      margin: 0 0 12px;
+    }
+
+    .card button {
+      align-self: flex-start;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #004A99;
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    #statusMessage {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #4b5563;
+    }
+    #statusMessage strong {
+      color: #111827;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <img src="kindai.png" alt="校章" style="width:32px; height:32px;">
+      <h1>近大高専 成績システム｜メインメニュー</h1>
+    </div>
+    <div class="user-info">
+      <div id="headerUserDisplay">ログイン中：-</div>
+      <button id="logoutBtn">ログアウト</button>
+    </div>
+  </header>
+
+  
+  <main>
+    <h2>作業メニュー</h2>
+    <p class="description">
+      前回の続きから再開するか、新しい年度・科目の入力を開始してください。<br>
+      評価基準が未入力の科目がある場合は、途中再開から評価基準入力画面に遷移します。
+    </p>
+
+    <div class="cards">
+      <!-- 途中再開 -->
+      <div class="card">
+        <h3>🔵 途中再開</h3>
+        <p>
+          前回の続きから再開します。<br>
+          評価基準が未入力の科目がある場合は、評価基準入力画面から再開します。<br>
+          すべての科目の評価基準が確定済みの場合は、成績入力画面に遷移します。
+        </p>
+        <button id="continueBtn" class="btn-primary">途中再開する</button>
+      </div>
+
+      <!-- 新規入力 -->
+      <div class="card">
+        <h3>🟢 新規入力（科目登録から）</h3>
+        <p>
+          新年度の入力や、新たに担当する科目が増えた場合はこちらから開始します。<br>
+          科目登録 → 評価基準入力 → 成績入力の順に進みます。
+        </p>
+        <button id="newEntryBtn" class="btn-secondary">新規入力を開始</button>
+      </div>
+
+      <!-- 閲覧モード -->
+      <div class="card">
+        <h3>📄 閲覧モード</h3>
+        <p>
+          登録済みの評価基準や成績を確認するモードです。<br>
+          入力操作は行わず、閲覧のみを行いたい場合に利用します。
+        </p>
+        <button id="viewModeBtn" class="btn-secondary">閲覧モードを開く</button>
+      </div>
+    </div>
+
+    <div id="statusMessage"></div>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      collection,
+      getDocs,
+      query,
+      where
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    // ★ 既存の設定と同じ Firebase 設定を使用
+    const firebaseConfig = {
+      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
+      authDomain: "ktc-grade-system.firebaseapp.com",
+      projectId: "ktc-grade-system",
+      storageBucket: "ktc-grade-system.appspot.com",
+      messagingSenderId: "490169300362",
+      appId: "1:490169300362:web:7c6e7b47a394d68d514473"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const headerUserDisplay = document.getElementById("headerUserDisplay");
+    const userInfoDisplay = document.getElementById("userInfoDisplay");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const continueBtn = document.getElementById("continueBtn");
+    const newEntryBtn = document.getElementById("newEntryBtn");
+    const viewModeBtn = document.getElementById("viewModeBtn");
+    const statusMessage = document.getElementById("statusMessage");
+
+    const currentYear = new Date().getFullYear();
+    const teacherSubjectsCol = `teacherSubjects_${currentYear}`;
+    const evalCriteriaCol = `evaluationCriteria_${currentYear}`;
+
+    let currentUser = null;
+    let currentTeacherName = "";
+
+    // ---------------------------
+    // 教員名を取得（teachers コレクション）
+    // ---------------------------
+    async function loadTeacherName() {
+      if (!currentUser) return;
+      const ref = doc(db, "teachers", currentUser.email);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        currentTeacherName = snap.data().name || "";
+      } else {
+        currentTeacherName = "";
+      }
+    }
+
+    // ---------------------------
+    // 途中再開ロジック
+    //
+    // 1. 科目登録済みかチェック
+    // 2. 評価基準が未入力の科目があるかチェック
+    // 3. 成績入力に進むかどうかを決定
+    // ---------------------------
+    async function handleContinue() {
+      if (!currentUser) {
+        alert("ログイン情報が取得できません。再度ログインしてください。");
+        window.location.href = "index.html";
+        return;
+      }
+
+      statusMessage.textContent = "現在の登録状況を確認しています…";
+
+      // 1. 科目登録の有無を確認
+      const tsRef = doc(db, teacherSubjectsCol, currentUser.email);
+      const tsSnap = await getDoc(tsRef);
+
+      if (!tsSnap.exists() || !tsSnap.data().subjects || tsSnap.data().subjects.length === 0) {
+        statusMessage.innerHTML = "<strong>まだ担当科目が登録されていません。</strong> 科目登録画面へ移動します。";
+        setTimeout(() => {
+          window.location.href = "subjects.html";
+        }, 800);
+        return;
+      }
+
+      const subjects = tsSnap.data().subjects; // [{ subjectId, ... }, ...]
+      const subjectIds = subjects
+        .map(s => s.subjectId)
+        .filter(id => !!id);
+
+      if (subjectIds.length === 0) {
+        statusMessage.innerHTML = "<strong>担当科目の情報に不備があります。</strong> 科目登録画面で内容を確認してください。";
+        setTimeout(() => {
+          window.location.href = "subjects.html";
+        }, 1000);
+        return;
+      }
+
+      // 2. 評価基準の登録状況を確認
+      const evalRef = collection(db, evalCriteriaCol);
+      const q = query(evalRef, where("teacherEmail", "==", currentUser.email));
+      const evalSnap = await getDocs(q);
+
+      const evaluatedSubjectIds = [];
+      evalSnap.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data && data.subjectId) {
+          evaluatedSubjectIds.push(data.subjectId);
+        }
+      });
+
+      // 評価基準未入力の科目を抽出
+      const notEvaluated = subjectIds.filter(id => !evaluatedSubjectIds.includes(id));
+
+      if (notEvaluated.length > 0) {
+        // まだ評価基準が未入力の科目がある → 評価基準入力へ
+        statusMessage.innerHTML = "評価基準が未入力の科目があります。<strong>評価基準入力画面</strong>に移動します。";
+        setTimeout(() => {
+          window.location.href = "evaluation.html";
+        }, 800);
+        return;
+      }
+
+      // 3. 評価基準は全て入力済み → 成績入力へ
+      statusMessage.innerHTML = "すべての担当科目の評価基準が入力済みです。<strong>成績入力画面</strong>に移動します。";
+      setTimeout(() => {
+        window.location.href = "grades.html"; // 今後実装予定の成績入力画面
+      }, 800);
+    }
+
+    // ---------------------------
+    // イベントハンドラ設定
+    // ---------------------------
+    newEntryBtn.addEventListener("click", () => {
+      window.location.href = "subjects.html";
+    });
+
+    viewModeBtn.addEventListener("click", () => {
+      window.location.href = "view.html";
+    });
+
+    continueBtn.addEventListener("click", async () => {
+      try {
+        await handleContinue();
+      } catch (e) {
+        console.error("途中再開処理でエラー:", e);
+        alert("途中再開処理中にエラーが発生しました。時間をおいて再度お試しください。");
+        statusMessage.textContent = "";
+      }
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "index.html";
+    });
+
+    // ---------------------------
+    // 認証状態監視
+    // ---------------------------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        // 未ログイン → ログインページへ
+        window.location.href = "index.html";
+        return;
+      }
+
+      currentUser = user;
+      await loadTeacherName();
+
+      const displayName = currentTeacherName || user.email;
+      headerUserDisplay.textContent = `ログイン中：${displayName}`;
+      userInfoDisplay.textContent = `ログイン中：${displayName}（${user.email}）`;
+    });
+  </script>
+</body>
+</html>

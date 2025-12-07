@@ -70,6 +70,82 @@
     .btn-secondary { background: #e5e7eb; color: #111; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* ===== 削除モーダル ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: white;
+      width: 100%;
+      max-width: 360px;
+      padding: 24px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    .modal-content h3 {
+      margin-bottom: 10px;
+      color: #004A99;
+      font-size: 18px;
+    }
+
+    .modal-content p {
+      font-size: 14px;
+      color: #444;
+      margin-bottom: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .modal-btn.cancel {
+      background: #e5e7eb;
+      color: #333;
+    }
+
+    .modal-btn.ok {
+      background: #004A99;
+      color: white;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .delete-btn {
+      background: #fee2e2;
+      color: #b91c1c;
+      border-radius: 999px;
+      border: none;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
     .status { font-size: 13px; color: #6b7280; margin: 4px 0 10px; }
     .error { color: #b91c1c; font-size: 13px; margin-top: 4px; }
 
@@ -111,6 +187,25 @@
     }
     dialog::backdrop { background: rgba(0,0,0,0.25); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+      #registeredSubjectsArea {
+        background:#f8fafc;
+        padding:16px;
+        border-radius:12px;
+        border:1px solid #e2e8f0;
+      }
+  
+   #userInfoArea {
+  max-width: 1100px;
+   margin: 4px auto 0;
+   padding: 0 20px;
+ }
+ #userInfoDisplay {
+   font-size: 14px;
+   font-weight: 600;
+   color: #1e3a8a;
+   text-align: right;
+ }
+ 
   </style>
 </head>
 <body>
@@ -129,11 +224,24 @@
   </div>
 </header>
 
-<!-- ★ ログイン情報（帯の下に配置） -->
-<div id="userInfoDisplay"
-     style="font-size:14px; padding:10px 20px; color:#111827;">
-</div>
+ <!-- ▼ 削除確認モーダル -->
+ <div id="deleteModal" class="modal-overlay" style="display:none;">
+   <div class="modal-content">
+     <h3>科目の登録解除</h3>
+     <p>この科目を登録解除します。よろしいですか？</p>
+     <div class="modal-actions">
+       <button id="deleteCancelBtn" class="modal-btn cancel">キャンセル</button>
+       <button id="deleteOkBtn" class="modal-btn ok">OK</button>
+     </div>
+   </div>
+ </div>
 
+ <!-- ★ ログイン中の表示（evaluation.html と同形式） -->
+<div id="userInfoArea" style="max-width:1100px; margin:4px auto 0; padding:0 20px;">
+   <div id="userInfoDisplay"
+        style="font-size:14px; font-weight:600; color:#1e3a8a; text-align:right;">
+   </div>
+ </div>
 
   <!-- 成績入力期間外ブロック -->
   <div id="periodBlock" style="
@@ -202,6 +310,12 @@
 
     <div id="loadStatus" class="status"></div>
     <div id="loadError" class="error"></div>
+      <!-- ▼登録済み科目一覧（後で動的に描画） -->
+      <div id="registeredSubjectsArea" style="display:none; margin-top:20px;">
+        <h3 style="font-size:16px; margin-bottom:10px;">📘 登録済み科目一覧</h3>
+        <div id="registeredSubjectsList"></div>
+      </div>
+      <!-- ▲登録済み科目一覧 -->
 
     <!-- 科目一覧テーブル -->
     <div id="tableContainer">
@@ -477,6 +591,8 @@
         // 期間外：科目登録UIは表示しない（periodBlock が出ている）
         return;
       }
+
+      await loadTeacherSubjects();
     });
 
     // ログアウト
@@ -635,11 +751,148 @@
       return result;
     }
 
+    // ▼ 登録済み科目一覧を描画する（STEP2：表示のみ・削除機能なし）
+    function renderRegisteredSubjects(subjects) {
+      const area = document.getElementById("registeredSubjectsArea");
+      const list = document.getElementById("registeredSubjectsList");
+      if (!area || !list) return;
+
+      if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
+        area.style.display = "none";
+        list.innerHTML = "";
+        return;
+      }
+
+      area.style.display = "block";
+      list.innerHTML = "";
+
+      subjects.forEach((s) => {
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.alignItems = "center";
+        row.style.padding = "4px 0";
+        row.style.fontSize = "13px";
+        row.style.borderBottom = "1px solid #e5e7eb";
+
+        const label = document.createElement("div");
+        const grade = s.grade || "";
+        const course = s.course || "";
+        const semester = s.semester || "";
+        const name = s.name || s.subjectName || "";
+        label.textContent = `${grade}年 / ${course} / ${semester} / ${name}`;
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "🗑 削除";
+        delBtn.className = "delete-btn";
+
+        // ★ STEP3-3a：クリックで deleteSubject を呼び出すだけ
+        if (typeof openDeleteModal === "function" && s.subjectId) {
+          delBtn.addEventListener("click", () => {
+            openDeleteModal(s.subjectId);
+          });
+        }
+
+        row.appendChild(label);
+        row.appendChild(delBtn);
+        list.appendChild(row);
+      });
+    }
+
     function updateSelectedCount() {
       const selected = getSelectedSubjects();
       selectedCount.textContent = `選択中：${selected.length}件`;
       saveBtn.disabled = selected.length === 0;
     }
+
+    async function loadTeacherSubjects() {
+      if (!currentUser) return;
+      const year = new Date().getFullYear();
+      const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        renderRegisteredSubjects([]);
+        return;
+      }
+      const data = snap.data();
+      const subjects = data.subjects || [];
+      renderRegisteredSubjects(subjects);
+    }
+
+    let deleteTargetSubjectId = null;
+
+    function openDeleteModal(subjectId) {
+      deleteTargetSubjectId = subjectId;
+      const modal = document.getElementById("deleteModal");
+      if (modal) {
+        modal.style.display = "flex";
+      }
+    }
+
+    function closeDeleteModal() {
+      deleteTargetSubjectId = null;
+      const modal = document.getElementById("deleteModal");
+      if (modal) {
+        modal.style.display = "none";
+      }
+    }
+
+    const deleteOkBtn = document.getElementById("deleteOkBtn");
+    if (deleteOkBtn) {
+      deleteOkBtn.addEventListener("click", async () => {
+        if (deleteTargetSubjectId) {
+          await deleteSubject(deleteTargetSubjectId);
+        }
+        closeDeleteModal();
+      });
+    }
+
+    const deleteCancelBtn = document.getElementById("deleteCancelBtn");
+    if (deleteCancelBtn) {
+      deleteCancelBtn.addEventListener("click", () => {
+        closeDeleteModal();
+      });
+    }
+
+    // ▼ STEP3-2：科目削除（Firestore 更新のみ。UIとは未接続）
+    async function deleteSubject(subjectId) {
+      if (!currentUser) return;
+      // ★ STEP3-3b：評価基準が保存されている科目は削除禁止
+      const evalCol = `evaluationCriteria_${new Date().getFullYear()}`;
+      const evalDocId = `${currentUser.email}_${subjectId}`;
+      const evalRef = doc(db, evalCol, evalDocId);
+      const evalSnap = await getDoc(evalRef);
+
+      if (evalSnap.exists()) {
+        alert("この科目は「評価基準」が保存されているため削除できません。教務へ連絡してください。");
+        return;
+      }
+
+      const year = new Date().getFullYear();
+      const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) return;
+
+      // 現在の subjects 配列を取得
+      const subjects = snap.data().subjects || [];
+
+      // 指定の subjectId を除外
+      const newList = subjects.filter(s => s.subjectId !== subjectId);
+
+      // Firestore に保存
+      await setDoc(ref, { subjects: newList }, { merge: true });
+
+      // 削除後、最新状態を UI に反映させられるように描画関数を呼び出す
+      // （renderRegisteredSubjects は既存STEP2で実装済み）
+      renderRegisteredSubjects(newList);
+
+      // 「科目登録画面の科目選択部分」を最新にするため、既存関数を呼び出す
+      if (typeof loadTeacherSubjects === "function") {
+        loadTeacherSubjects();
+      }
+    }
+    // ▲ STEP3-2：科目削除関数
 
     // ===== 保存処理（teacherSubjects へ登録） =====
     saveBtn.addEventListener("click", () => {

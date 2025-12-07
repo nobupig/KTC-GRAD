@@ -1,198 +1,237 @@
-📘 **KTC 成績システム（Firebase版）
+📘 **近大高専 成績システム（Firebase 版）
 
-科目一覧インポート工程：完全引き継ぎ書（2025/12/04 最新版）**
+完全引き継ぎ書（最新版 / 2025-12-07）**
 
-🟦 1. 全体概要
+① システム全体構成
+🔹 1. 使用技術
 
-本工程では、KTCの「科目一覧スプレッドシート」を、
-Google Apps Script（GAS）を用いて Firestore に subjects コレクションとして取り込む仕組み を構築し、
-392 科目のうち数件をテストインポート → 本番全件インポートまで正常に完了した。
+Front-end：HTML / JS（ES Modules）
 
-本作業は、今後の「科目登録画面」「成績評価基準入力」「成績入力画面」を構築するための 基盤データ整備 の役割を持つ。
+Backend：Firebase Authentication / Firestore
 
-🟦 2. Firestore 構造（subjects コレクション）
+Hosting：Firebase Hosting
 
-Firestore に登録される1科目分のデータ構造は以下：
+Storage：今回の範囲では未使用（成績資料等は今後？）
 
-subjects/{docId} {
-  name: "測量学",
-  grade: "3",
-  course: "CC",                 // ★ C/CC/CA を区別して保存（重要）
-  semester: "前期",
+🔹 2. コレクション構造（現時点）
+teachers/               ← 教員名簿（name, email など）
+subjects/               ← 科目マスタ（年度共通）
+teacherSubjects_2025/   ← 教員ごとの担当科目（年度ごとに分割）
+settings/period         ← 成績入力期間
+notifications/          ← 教務連絡（Slack補完）
+evaluation/             ← （今後実装）成績評価基準
+evaluationHistory/      ← （今後実装）評価基準修正履歴
+drafts/                 ← （今後実装）自動保存用
 
-  required: true,                // 必修=真
-  useAdjustment: false,          // 調整点使用有無（〇 → false）
-  passRule: "fixed60",           // fixed60 / adjustment
-  fixedPassLine: 60,             // 合格基準（調整点使用しない科目）
+② subjects.html（科目登録）
+🔹 現状できていること
+1. ログイン＆認証
 
-  specialType: 0,                // 特別科目 1/2 の区別
-  isSkillLevel: false,           // 習熟度科目判定
+Firebase Auth（Googleログイン）
 
-  teacherList: [],               // まだ空（後の科目登録で使用）
+教員名は teachers コレクションから取得して表示
+　例：「ログイン中：安井宣仁（〜）」
 
-  createdAt: "timestamp"
-}
+2. 成績入力期間（前期 / 後期 / 期間外）の制御
 
-🔥 特記事項（超重要）
-✔ コース（course）は C/CC/CA を統合しない
+settings.period の4つの日付を読み取る
 
-C → 通常都市環境
+期間外は科目登録を非表示にし、閲覧モードだけ提供
 
-CC → 都市環境（クラスB）
+3. 科目読み込み
 
-CA → 都市環境（クラスA）
+学年・コースから subjects を検索
 
-成績入力で学生名簿の取り扱いが異なるため、
-元の値のまま Firestore に保存する必要がある。
+都市環境（C/CC/CA）は C_ALL として統合表示
 
-🟦 3. 科目一覧スプレッドシート（列構造）
-列番号	列名	説明
-0	科目名	例：数学Ⅰ
-1	開設学年	1〜5年
-2	組・コース	G, M, E, I, C, CC, CA
-3	開講期	前期 / 後期 / 通年
-4	履修区分	必修 or 選択
-5	調整点	〇 → 調整点なし（合格60固定）
-6	特別科目	1/2（成績処理方法が異なる）
-7	習熟度	〇（特殊扱い）
+前期/後期の条件も cross-check で制御
 
-この構造を完全に解析し、Firestore 用に正規化して保存。
+4. 科目登録（teacherSubjects_年度）
 
-🟦 4. Firestore セキュリティルール（現時点の運用版）
+新規登録では 上書きではなく追加
 
-以下ルールを設定し「公開（デプロイ）」済み。
+重複 subjectId は自動除去してユニーク化
 
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+例：
+　1年数学 → 追加
+　次に2年物理 → 上書きされず共存する
+（この仕様はあなたの希望通り）
 
-    // 1. teachers：ログイン済みユーザーは読み取り専用
-    match /teachers/{email} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
+5. 教務連絡
 
-    // 2. subjects：GAS（認証済み OAuth）とログインユーザーのみ read/write
-    match /subjects/{docId} {
-      allow read, write: if request.auth != null;
-    }
+科目が一覧にない場合の Slack 補完連絡
 
-    // 3. その他は拒否
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
+notifications へ記録（read: false）
 
-✔ セキュリティ上のポイント
+6. 評価基準入力ボタン
 
-teachers は書き換え不可（攻撃されても安全）
+科目読み込み横に設置（ヘッダー側のは削除済）
 
-subjects はログイン（Auth）済ユーザーのみ可
+押すと「担当科目一覧を表示するモーダル」が出る
 
-外部からの匿名アクセスは全て拒否
+OK を押すと evaluation.html に遷移
 
-🟦 5. GAS 側の設定（appsscript.json）
+登録科目0件なら「まず科目登録してください」
 
-Firestore 書き込みに必要な OAuth スコープを追加：
+③ evaluation.html（成績評価基準入力）
+🔹 現時点で実装済み
+1. 科目選択ドロップダウン
 
+subjects.html で登録した担当科目が一覧表示
+
+2. 評価方式の選択 UI（最新仕様）
+
+3種類：
+
+種類	内容
+① 考査のみ評価	期末考査100% 固定。項目編集不可。
+② 考査＋課題	期末考査（固定項目）＋課題を追加（%は自由入力）
+③ 実験・実習系課題作品	完全自由入力（複数可）
+
+※ UI は 横並び＋アイコン＋コンパクトなボックス に変更済。
+
+3. 評価項目 UI
+
+行追加（＋行追加）
+
+削除
+
+割合の自動サマリー表示（合計: 〜%）
+
+4. 考査のみの場合の制御
+
+期末考査 100% を自動生成
+
+削除ボタンも非表示
+
+行追加ボタンも非表示
+
+5. 考査＋課題 の場合
+
+「期末考査」行が自動で1行作成
+
+削除不可
+
+課題追加は自由
+
+6. 実験・実習系の場合
+
+行追加可能
+
+固定項目なし
+
+④ 今後実装すべき内容（あなたの指示ベースで確定）
+🔥 A：保存ロジック（必須）
+
+evaluation コレクションに保存形式は以下：
+
+evaluation/{subjectId}
 {
-  "timeZone": "Asia/Tokyo",
-  "dependencies": {},
-  "exceptionLogging": "STACKDRIVER",
-  "oauthScopes": [
-    "https://www.googleapis.com/auth/script.external_request",
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/datastore"   // ★FireStore書き込み用（必須）
-  ]
+  teacherEmail,
+  subjectId,
+  method,            // exam-only | exam-plus | practical
+  items: [
+    { label: "...", percent: 30 },
+    ...
+  ],
+  total,             // 自動計算
+  updatedAt,
+  updatedBy
 }
 
-✔ “auth/datastore” がないと Firestore 書き込み 403 になる
+🔥 B：評価基準の入力ルール（確定）
+1. 合計値チェック
 
-今回の失敗→成功はここがポイント。
+99〜101 まで許容（±1%誤差）
 
-🟦 6. GAS と Firebase プロジェクトの紐付け
+それ以外は保存不可
 
-Apps Script のプロジェクトは
-Firebaseプロジェクト（ktc-grade-system）へ接続（Google Cloud プロジェクト変更） した。
+2. 複数担当科目の場合
 
-これにより：
+evaluation に既に存在する場合 → 編集ロック
 
-Cloud Firestore API が有効
+画面上部に警告：
 
-OAuth トークンが「Firebaseプロジェクトとして有効」
+※ この科目は複数教員が登録しています。
+  評価基準は既に ○○先生 が入力済みです。
 
-になり、書き込み権限が整った。
 
-🟦 7. インポートスクリプトの完成版（重要部分のみ）
+（将来：修正依頼ボタンの追加も可能）
 
-以下の GAS コードにより科目を Firestore に投入。
+3. 特別科目のスキップ制御
 
-主なポイント：
+subjects.html で：
 
-C/CC/CA を normalize しない
+科目が special === true の場合
+→ evaluation.html をスキップして成績入力画面へ
 
-特別科目・習熟度・調整点を正確に解釈
+4. 途中保存
 
-Firestore ドキュメントIDは
-grade_course_semester_name
-形式で一意に生成
+将来：
 
-teacherList は空配列（後で科目登録画面から登録）
+drafts/{teacherEmail}/subjectId
 
-※コード全文は前チャット参照（有効確認済）
+⑤ UI に関する修正の方向性（評価方式のカード改善済）
+評価方式をもっとコンパクトに
 
-🟦 8. テストインポート → 本番インポートの流れ
+アイコン＋短い名称
 
-appsscript.json を修正
+折り返し防止
 
-GAS を再認証
+ラジオとアイコンの距離調整済
 
-インポート対象を 5 行だけに制限
+コンテナの height/border-radius/padding を調整済
 
-Firestore subjects に正しく追加されたか確認
+⑥ 現在の課題（あなたからの依頼）
 
-全件インポートへ切替
+ログイン中：〜 の位置が evaluation.html で崩れている
+　→ Copilot 指示書で再調整中
 
-392 科目中、全件正常に投入
+評価方式選択カードのさらなる微調整
+　→ フォント・余白の最適化
 
-🔥 結果：全て Firestore に正しく取り込み成功
+evaluation.html ← subjects.html 「戻る」ボタンの位置整理
+　→ こちらも微調整済だが最終整形が必要
 
-🟩 9. この段階での成果（非常に重要）
+保存機能はまだ未実装
+　→ 次チャットで実装予定
 
-Firestore に KTC版科目マスタが構築完了
+⑦ 次のステップ（保存関連整備）
 
-教員側の科目登録画面で利用するデータが揃った
+次チャットで以下を実装：
 
-成績評価基準入力・成績入力に必要なデータ構造が確定した
+🔥 ステップ①：評価基準の保存実装（evaluation コレクションへの write）
 
-これにより、
-次の工程「科目登録画面 subjects.html」へ進む準備が完全に整った。
+選択中科目の subjectId ごとに保存
 
-🟦 10. 次のステップ
+新規保存/上書き保存の区別
 
-次チャットでは以下のどれから開始するか選べます：
+±1%誤差チェック
 
-A. 科目登録画面（subjects.html）をスタイリッシュに実装
+入力方式ごとのバリデーション分岐
 
-学年→コース制御
+🔥 ステップ②：複数教員が1科目を扱う場合のロック
 
-都市環境 C/CC/CA 統合表示
+evaluation/{subjectId} が存在した場合
+　→ isLocked = true
+　→ 編集不可＋警告表示
 
-前期/後期/通年のフィルタ
+🔥 ステップ③：subjects.html → 特別科目の制御
 
-表から複数科目に✔選択登録
+詳細仕様に基づき、特別科目なら evaluation.html をスキップして
+　→ grades.html（成績入力画面）へ遷移
 
-確認モーダル
+📌 次チャットで必要なこと
 
-科目が見つからない場合 → 教務へメール
+あなたは「保存機能」をどうしたいかだけ選んでください。
 
-Firestore teacherSubjects への保存
+A方式：科目ごとに完全上書き
+B方式：draft（途中保存）+ publish（確定保存）
+C方式：年度別（2025→2026）、評価基準のコピーも継承
 
-B. UI ラフデザイン → 仕様書先に作成
-C. Firestore セキュリティルールの先行構築
-🎉 以上が「完全引き継ぎ書（最新版）」です。
+どれで実装したいですか？
 
-必要なら PDF 版も作成できます。
-次チャットでは 科目登録画面の実装 に進みましょう！
+必要であれば
+subjects.html / evaluation.html の最新版を再添付しての指示書生成 も可能です。
+
+次チャットで保存仕様に進むため「保存方式の選択」だけお願いします。
