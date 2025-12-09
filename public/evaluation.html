@@ -669,7 +669,6 @@
       if (scheme === "exam_only") setupSchemeExamOnly();
       else if (scheme === "exam_plus_assignments") setupSchemeExamPlusAssignments();
       else setupSchemePracticeOnly();
-      setupAddRowButton();
     }
 
     // 合計計算
@@ -845,9 +844,21 @@
     // 評価基準読み込み
     // ================================
     async function loadCriteria(subjectId, { editable } = { editable: true }) {
+      // ★ 科目切替時の完全 UI 初期化
+      resetEvaluationUI();
       criteriaTbody.innerHTML = "";
-      applyCurrentScheme(); // デフォルト生成
 
+    // ★ 評価方式タブの active 表示を完全リセット
+    function resetSchemeTabs(method) {
+      document.querySelectorAll(".scheme-tab").forEach((t) => {
+        t.classList.remove("active");
+      });
+      const tab = document.querySelector(`.scheme-tab[data-value="${method}"]`);
+      if (tab) tab.classList.add("active");
+
+      const radio = document.querySelector(`input[name="schemeType"][value="${method}"]`);
+      if (radio) radio.checked = true;
+    }
 
       if (!subjectId) return;
       const lockRef = doc(db, "evaluationLocks_2025", subjectId);
@@ -876,9 +887,8 @@
 
       const method = data.method || "exam_only";
       currentScheme = method;
-
-      const r = document.querySelector(`input[name="schemeType"][value="${method}"]`);
-      if (r) r.checked = true;
+      // ★ 評価方式タブとUIを正しく初期化
+      resetSchemeTabs(method);
       applyCurrentScheme();
 
       // 中身を上書き
@@ -910,6 +920,7 @@
 
       totalArea.textContent = `合計：${totalPercent}%`;
       updateTotal();
+      // ★ 行追加ボタンを科目切替ごとに再バインド
       setupAddRowButton();
 
       // 評価基準が「有効」と判断できるか
@@ -1032,7 +1043,6 @@
       currentSubjectId = subjectId;
 
       if (!subjectId) {
-        applyCurrentScheme();
         return;
       }
 
@@ -1052,8 +1062,6 @@
         // 他人がロック中 → 完全閲覧専用
         setSavedUI(false);
       }
-
-      setupAddRowButton();
     });
 
     // ================================

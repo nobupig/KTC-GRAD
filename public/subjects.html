@@ -1128,31 +1128,47 @@
       evalDialog.close();
     });
 
-    evalOkBtn.addEventListener("click", () => {
-      // ★ 評価基準の無いロックを削除（subjects 側）
-      const subjectId = (() => {
-        const list = document.querySelectorAll('#evalRegisteredList div');
-        if (list.length > 0) {
-          return (window.subjects && window.subjects[0] && window.subjects[0].subjectId) || null;
-        }
-        return null;
-      })();
+    evalOkBtn.addEventListener("click", async () => {
+      // ▼ 正しい subjectId を選択して評価基準画面に渡す処理
+      let subjectId = null;
+      const year = new Date().getFullYear();
+      const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
+      const snap = await getDoc(ref);
 
-      (async () => {
-        if (subjectId) {
-          const lockRef = doc(db, "evaluationLocks_2025", subjectId);
-          const lockSnap = await getDoc(lockRef);
-          const criteriaRef = doc(db, "evaluationCriteria_2025", subjectId);
-          const criteriaSnap = await getDoc(criteriaRef);
-          if (lockSnap.exists() && !criteriaSnap.exists()) {
-            console.log("subjects側 不要ロック削除:", subjectId);
-            await deleteDoc(lockRef);
-          }
-          location.href = `evaluation.html?subjectId=${subjectId}`;
-        } else {
-          location.href = "evaluation.html";
+      if (snap.exists() && snap.data().subjects) {
+        const subjects = snap.data().subjects;
+
+        // ① もし科目一覧でチェックが付いていればそれを優先
+        const checked = document.querySelector('#subjectsTbody input[type="checkbox"]:checked');
+        if (checked) {
+          const tr = checked.closest("tr");
+          subjectId = tr?.dataset.id || null;
         }
-      })();
+
+        // ② チェックが無い → 登録済み科目一覧の先頭を使用
+        if (!subjectId && subjects.length > 0) {
+          subjectId = subjects[0].subjectId;
+        }
+      }
+
+      // ▼ ロックの有無を確認し、不正なロックを削除
+      if (subjectId) {
+        const lockRef = doc(db, `evaluationLocks_${year}`, subjectId);
+        const criteriaRef = doc(db, `evaluationCriteria_${year}`, subjectId);
+        const lockSnap = await getDoc(lockRef);
+        const criteriaSnap = await getDoc(criteriaRef);
+
+        if (lockSnap.exists() && !criteriaSnap.exists()) {
+          await deleteDoc(lockRef);
+        }
+      }
+
+      // ▼ 評価基準入力画面へ subjectId を付けて遷移
+      if (subjectId) {
+        location.href = `evaluation.html?subjectId=${subjectId}`;
+      } else {
+        location.href = "evaluation.html";
+      }
     });
 
   </script>

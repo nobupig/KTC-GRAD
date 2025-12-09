@@ -167,14 +167,10 @@
   <section class="table-wrapper">
     <div style="margin-bottom:12px; font-size:14px; color:#374151;">成績一覧</div>
 
-    <table>
-      <thead id="scoreTableHead">
-        <tr>
-          <th>学籍番号</th>
-          <th>氏名</th>
-          <th>素点</th>
-          <th>調整点</th>
-          <th>最終成績</th>
+    <table id="scoreTable">
+      <thead>
+        <tr id="scoreHeaderRow">
+          <!-- JS で動的にヘッダを埋める -->
         </tr>
       </thead>
       <tbody id="scoreTableBody">
@@ -193,7 +189,6 @@
 <!-- Firebase scripts -->
 <!-- ============================== -->
 <script type="module">
-    let normalizedWeights = [];
   // ★ 重み（割合）を正規化する関数（合計99〜101% → 100%に丸める）
   function normalizeWeights(weights) {
     const safe = weights.map((w) => {
@@ -264,7 +259,6 @@
   const subjectNameEl = document.getElementById("subjectName");
   const subjectSelector = document.getElementById("subjectSelector");
   const scoreTableBody = document.getElementById("scoreTableBody");
-  const scoreTableHead = document.getElementById("scoreTableHead");
   const logoutBtn = document.getElementById("logoutBtn");
   const userInfoDisplay = document.getElementById("userInfoDisplay");
 
@@ -280,6 +274,20 @@
 
   const params = new URLSearchParams(window.location.search);
   let currentSubjectId = params.get("subjectId") || null;
+  
+    subjectSelector.addEventListener("change", async (e) => {
+      const newId = e.target.value;
+      currentSubjectId = newId;
+      const url = new URL(window.location.href);
+      url.searchParams.set("subjectId", newId);
+      window.history.replaceState(null, "", url.toString());
+      updateSubjectHeader();
+      // A-2-3: 評価基準→学生名簿→ヘッダ→行描画の順で必ず再描画
+      await loadCriteriaForSubject(currentSubjectId);
+      await loadStudents();
+      renderScoreHeader();
+      renderStudentRows();
+    });
 
   const year = new Date().getFullYear();
   const criteriaCollection = `evaluationCriteria_${year}`;
@@ -287,66 +295,162 @@
 
   let teacherSubjects = [];
   let currentUser = null;
+  let criteriaItems = [];
+  let normalizedWeights = [];
   let cachedStudents = [];
 
-  /* ===== 科目名整形 ===== */
-  function formatSubjectLabel(s) {
-    return `${s.grade}年 ${s.semester} ${s.name}（${s.course}）`;
+  function updateSubjectHeader() {
+    if (!subjectNameEl) return;
+
+    const target = Array.isArray(teacherSubjects)
+      ? teacherSubjects.find((s) => s.subjectId === currentSubjectId)
+      : null;
+
+    if (target) {
+      const label = `${target.grade ?? ""}年 / ${target.course ?? ""} / ${target.semester ?? ""} / ${target.name ?? ""}`;
+      subjectNameEl.textContent = label;
+    } else {
+      subjectNameEl.textContent = "科目未選択";
+    }
+
+    if (subjectSelector) {
+      if (Array.isArray(teacherSubjects) && teacherSubjects.length > 1) {
+        subjectSelector.style.display = "inline-block";
+      } else {
+        subjectSelector.style.display = "none";
+      }
+    }
   }
 
-  /* ===== 教員の担当科目を読み込む ===== */
   async function loadTeacherSubjects() {
-    const ref = doc(db, teacherSubjectsCollection, currentUser.email);
-    const snap = await getDoc(ref);
+    if (!currentUser) return;
 
-    if (!snap.exists() || !snap.data().subjects) {
-      subjectNameEl.textContent = "担当科目がありません";
+    teacherSubjects = [];
+
+    const tsRef = doc(db, teacherSubjectsCollection, currentUser.email);
+    const tsSnap = await getDoc(tsRef);
+
+    if (!tsSnap.exists()) {
+      teacherSubjects = [];
+      if (subjectSelector) {
+        subjectSelector.innerHTML = "";
+        subjectSelector.style.display = "none";
+      }
+      updateSubjectHeader();
       return;
     }
 
-    teacherSubjects = snap.data().subjects;
+    const data = tsSnap.data() || {};
+    const subjects = Array.isArray(data.subjects) ? data.subjects : [];
 
-    subjectSelector.innerHTML = "";
-
-    teacherSubjects.forEach((s) => {
-      const opt = document.createElement("option");
-      opt.value = s.subjectId;
-      opt.textContent = formatSubjectLabel(s);
-      subjectSelector.appendChild(opt);
-    });
-
-    if (teacherSubjects.length > 1) {
-      subjectSelector.style.display = "inline-block";
-    } else {
-      subjectSelector.style.display = "none";
+    const uniqueMap = new Map();
+    for (const s of subjects) {
+      if (!s || !s.subjectId) continue;
+      if (!uniqueMap.has(s.subjectId)) {
+        uniqueMap.set(s.subjectId, s);
+      }
     }
 
-    // URLにsubjectIdが無い → 先頭に合わせてリロード
-    if (!currentSubjectId && teacherSubjects.length > 0) {
-      currentSubjectId = teacherSubjects[0].subjectId;
-      const url = new URL(window.location.href);
-      url.searchParams.set("subjectId", currentSubjectId);
-      window.location.replace(url.toString());
+    const uniqueSubjects = Array.from(uniqueMap.values());
+    teacherSubjects = uniqueSubjects;
+
+    if (subjectSelector) {
+      subjectSelector.innerHTML = "";
+
+      uniqueSubjects.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s.subjectId;
+        opt.textContent = `${s.grade ?? ""}年 / ${s.course ?? ""} / ${s.semester ?? ""} / ${s.name ?? ""}`;
+        subjectSelector.appendChild(opt);
+      });
+
+      const existsInList = uniqueSubjects.some((s) => s.subjectId === currentSubjectId);
+      if (!existsInList) {
+        currentSubjectId = uniqueSubjects.length > 0 ? uniqueSubjects[0].subjectId : null;
+      }
+
+      if (currentSubjectId) {
+        subjectSelector.value = currentSubjectId;
+      }
+
+      if (uniqueSubjects.length > 1) {
+        subjectSelector.style.display = "inline-block";
+      } else {
+        subjectSelector.style.display = "none";
+      }
     }
 
     updateSubjectHeader();
   }
+  function renderStudentRows() {
+    if (!scoreTableBody || !Array.isArray(cachedStudents)) return;
 
-  function updateSubjectHeader() {
-    const target = teacherSubjects.find((s) => s.subjectId === currentSubjectId);
-    if (target) {
-      subjectNameEl.textContent = formatSubjectLabel(target);
-      subjectSelector.value = currentSubjectId;
+    scoreTableBody.innerHTML = "";
+
+    if (cachedStudents.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 20;
+      td.style.textAlign = "center";
+      td.textContent = "学生情報が登録されていません。";
+      tr.appendChild(td);
+      scoreTableBody.appendChild(tr);
+      return;
     }
-  }
 
-  /* ===== プルダウン科目変更 ===== */
-  subjectSelector.addEventListener("change", (e) => {
-    const newId = e.target.value;
-    const url = new URL(window.location.href);
-    url.searchParams.set("subjectId", newId);
-    window.location.href = url.toString();
-  });
+    const frag = document.createDocumentFragment();
+
+    cachedStudents.forEach((s, index) => {
+      const tr = document.createElement("tr");
+
+      const studentId = s.studentId ?? "";
+      const grade = s.grade ?? "";
+      const courseClass = s.courseClass ?? s.course ?? "";
+      const number = (s.number ?? "").toString();
+      const name = s.name ?? s.studentName ?? "";
+
+      const addCell = (text) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        tr.appendChild(td);
+      };
+
+      addCell(studentId);
+      addCell(grade);
+      addCell(courseClass);
+      addCell(number);
+      addCell(name);
+
+      // A-2-2: 評価基準に連動した入力欄
+      if (criteriaItems && criteriaItems.length > 0) {
+        criteriaItems.forEach((item, idx) => {
+          const td = document.createElement("td");
+          const input = document.createElement("input");
+          input.type = "number";
+          input.min = "0";
+          input.max = "100";
+          input.step = "0.1";
+          input.classList.add("score-input");
+          input.dataset.rowIndex = String(index);
+          input.dataset.criteriaIndex = String(idx);
+          td.appendChild(input);
+          tr.appendChild(td);
+        });
+      }
+
+      // 最終成績欄（編集不可）
+      const finalTd = document.createElement("td");
+      const finalSpan = document.createElement("span");
+      finalSpan.classList.add("final-score");
+      finalSpan.textContent = "";
+      finalTd.appendChild(finalSpan);
+      tr.appendChild(finalTd);
+
+      frag.appendChild(tr);
+    });
+
+    scoreTableBody.appendChild(frag);
+  }
 
   /* ===== 評価基準へ ===== */
   btnEvaluation.addEventListener("click", () => {
@@ -362,70 +466,69 @@
   });
 
   /* ===== 評価基準取得 ===== */
-  async function loadCriteria() {
+  async function loadCriteriaForSubject(subjectId) {
+    criteriaItems = [];
+    normalizedWeights = [];
 
-    const ref = doc(db, criteriaCollection, currentSubjectId);
+    if (!subjectId) {
+      renderScoreHeader();
+      return;
+    }
+
+    const year = new Date().getFullYear();
+    const colName = `evaluationCriteria_${year}`;
+    const ref = doc(db, colName, subjectId);
     const snap = await getDoc(ref);
 
     if (!snap.exists()) {
-      // ★ モーダルで警告表示（alert の代わり）
-      const modal = document.getElementById("criteriaErrorModal");
-      const okBtn = document.getElementById("criteriaErrorOkBtn");
-
-      modal.style.display = "flex";
-
-      okBtn.onclick = () => {
-        window.location.href = `evaluation.html?subjectId=${currentSubjectId}`;
-      };
-
+      renderScoreHeader();
       return;
     }
 
     const data = snap.data();
-    const items = data.items || [];
+    criteriaItems = Array.isArray(data.items) ? data.items : [];
 
-    // STEP2-2: 割合正規化
-    const weightList = items.map(i => parseFloat(i.percent) || 0);
-    normalizedWeights = normalizeWeights(weightList);
+    const rawWeights = criteriaItems.map((item) =>
+      typeof item.percent === "number"
+        ? item.percent
+        : parseFloat(item.percent ?? "0")
+    );
 
-    const total =
-      typeof data.totalPercent === "number"
-        ? data.totalPercent
-        : items.reduce((sum, i) => {
-            const p =
-              typeof i.percent === "number"
-                ? i.percent
-                : parseFloat(i.percent || "0");
-            return sum + (Number.isNaN(p) ? 0 : p);
-          }, 0);
+    normalizedWeights = rawWeights;
 
-    if (items.length === 0 || total < 99 || total > 101) {
-      const modal = document.getElementById("criteriaErrorModal");
-      const okBtn = document.getElementById("criteriaErrorOkBtn");
+    renderScoreHeader();
+  }
 
-      modal.style.display = "flex";
+  function renderScoreHeader() {
+    const headerRow = document.getElementById("scoreHeaderRow");
+    if (!headerRow) return;
+    // A-2-1: まず初期化
+    headerRow.innerHTML = "";
 
-      okBtn.onclick = () => {
-        window.location.href = `evaluation.html?subjectId=${currentSubjectId}`;
-      };
+    // 固定列
+    const addTh = (text) => {
+      const th = document.createElement("th");
+      th.textContent = text;
+      headerRow.appendChild(th);
+    };
+    addTh("学籍番号");
+    addTh("学年");
+    addTh("組・コース");
+    addTh("番号");
+    addTh("氏名");
 
-      return;
+    // 評価基準に連動した列
+    if (criteriaItems && criteriaItems.length > 0) {
+      for (const item of criteriaItems) {
+        const name = item.name ?? "";
+        const percent = item.percent ?? "";
+        const label = percent !== "" ? `${name} (${percent}%)` : name;
+        addTh(label);
+      }
     }
 
-    // 動的ヘッダー作成
-    scoreTableHead.innerHTML = "";
-    const tr = document.createElement("tr");
-    ["学籍番号", "氏名", "素点", "調整点", "最終成績"].forEach((v) => {
-      const th = document.createElement("th");
-      th.textContent = v;
-      tr.appendChild(th);
-    });
-    items.forEach((i) => {
-      const th = document.createElement("th");
-      th.textContent = i.name;
-      tr.appendChild(th);
-    });
-    scoreTableHead.appendChild(tr);
+    // 最終成績列
+    addTh("最終成績");
   }
 
   /* ===== 学生一覧 ===== */
@@ -434,72 +537,17 @@
     const list = [];
     snap.forEach((d) => list.push(d.data()));
 
-    list.sort((a, b) => (a.studentNumber || "").localeCompare(b.studentNumber || ""));
+    list.sort((a, b) => {
+      if (a.grade !== b.grade) return (a.grade || 0) - (b.grade || 0);
 
-    cachedStudents = list;
+      const courseA = a.courseClass || a.course || "";
+      const courseB = b.courseClass || b.course || "";
+      if (courseA !== courseB) return courseA.localeCompare(courseB);
 
-    renderStudentRows();
-  }
-
-  function renderStudentRows() {
-    scoreTableBody.innerHTML = "";
-    if (cachedStudents.length === 0) {
-      const tr = document.createElement("tr");
-      const td = document.createElement("td");
-      td.colSpan = 20;
-      td.style.textAlign = "center";
-      td.textContent = "学生情報が登録されていません。";
-      tr.appendChild(td);
-      scoreTableBody.appendChild(tr);
-      return;
-    }
-
-    const frag = document.createDocumentFragment();
-
-
-    cachedStudents.forEach((s) => {
-      const tr = document.createElement("tr");
-
-      // 学籍番号
-      const tdNum = document.createElement("td");
-      tdNum.textContent = s.studentNumber ?? "";
-      tr.appendChild(tdNum);
-
-      // 氏名
-      const tdName = document.createElement("td");
-      tdName.textContent = s.name ?? "";
-      tr.appendChild(tdName);
-
-      // 素点入力欄
-      const tdScore = document.createElement("td");
-      const inpScore = document.createElement("input");
-      inpScore.type = "number";
-      inpScore.classList.add("score-input");
-      inpScore.style.width = "60px";
-      inpScore.oninput = () => {
-        calculateTotalForRow(tr, normalizedWeights);
-      };
-      tdScore.appendChild(inpScore);
-      tr.appendChild(tdScore);
-
-      // 調整点（空欄）
-      const tdAdjust = document.createElement("td");
-      tdAdjust.textContent = "";
-      tr.appendChild(tdAdjust);
-
-      // 最終成績欄
-      const tdFinal = document.createElement("td");
-      tdFinal.className = "final-score";
-      tdFinal.textContent = "";
-      tr.appendChild(tdFinal);
-
-      // 初期計算（素点空欄時は0として処理）
-      calculateTotalForRow(tr, normalizedWeights);
-
-      frag.appendChild(tr);
+      return (a.number || 0) - (b.number || 0);
     });
 
-    scoreTableBody.appendChild(frag);
+    cachedStudents = list;
   }
 
   /* ===== メイン初期化 ===== */
@@ -525,8 +573,9 @@
     }
 
     await loadTeacherSubjects();
-    await loadCriteria();
+    await loadCriteriaForSubject(currentSubjectId);
     await loadStudents();
+    renderStudentRows();
   });
 
 </script>
