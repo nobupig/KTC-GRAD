@@ -1,0 +1,91 @@
+📘【Step B 詳細仕様書（全文）】
+Step B の目的
+
+score_input.html に 成績計算 UI の基盤 を完成させる。
+
+🔷 STEP B-1：ヘッダに評価基準（weight）を表示
+やること
+
+evaluationCriteria_{year}/{subjectId} を読み込む
+
+each item: { label, percent }
+
+ヘッダーに追加：
+
+例：
+
+<th>期末考査 (70%)</th>
+<th>課題① (30%)</th>
+<th>最終成績</th>
+
+必要な差分
+
+HTML：ヘッダー生成部分を動的にする
+
+JS：renderHeader() を作って反映
+
+🔷 STEP B-2：素点モード／自動換算モード 切替タブ
+UI
+
+タブ2種
+
+「素点モード」
+
+「自動換算モード（旧：換算モード）」
+
+動作
+
+currentMode = "raw" / "scaled"
+
+切替時は全 input の再計算を実行
+
+🔷 STEP B-3：入力規則バリデーション
+素点モード
+
+0〜weight
+
+小数点 OK
+
+マイナス NG
+
+貼り付け時も同じ規則で検証し、エラー時は alert
+
+自動換算モード
+
+0〜100
+
+小数点 OK
+
+マイナス NG
+
+🔷 STEP B-4：最終成績計算
+流れ
+
+weights[] を読み込み
+
+合計 99〜101 → normalize to 100
+
+各項目の計算
+
+合計値は Math.floor で切り捨て
+
+最終成績セルに反映
+
+素点モード
+itemScore * (weight / weightSum)
+
+自動換算モード
+(rawInput / 100) * weight
+
+🔷 STEP B-5：貼り付け入力機能（大量入力対応）
+形式
+学籍番号, score1, score2, ...
+学籍番号, score1, score2, ...
+
+処理
+
+貼り付けされた block を改行 split
+
+studentId で該当行を検索して反映
+
+バリデーション NG の場合 → alert → 全反映中止

@@ -4,3 +4,109 @@
 また、special type:1,2は成績入力画面でのUIによる表が一般科目とは異なる仕様になります。
 これに関しては、ある程度成績入力画面が完成してから実装していきます。
 
+
+
+📘 完全安全版 Copilot 指示書（score_input.html 用）
+
+※ そのままコピペして Copilot に貼れば自動で部分追加できます
+※ 既存コードの破壊禁止のため “差分追記のみ” の形式にしてあります
+
+🟦 Copilot 指示：評価基準未登録チェック（強制モーダル）
+
+これは score_input.html の改善作業 です。
+
+【目的】
+
+成績入力画面を開いた際、
+担当全科目の評価基準が未登録の科目がある場合は入力を禁止し、強制モーダルを表示 してください。
+
+【実装内容】
+🔹① 新しい関数を追加してください：
+async function checkAllCriteriaCompleted(currentUserEmail) { ... }
+
+🔹checkAllCriteriaCompleted() の仕様：
+
+teacherSubjects_2025/{email} を取得
+
+subjects 配列をループして
+evaluationCriteria_2025/{subjectId} を確認
+
+評価基準が 存在しない or items が空 の場合
+→ 未登録リストに追加
+
+返り値：
+
+{
+   ok: true | false,
+   missingSubjects: [
+      { subjectId, name, grade, course, semester }
+   ]
+}
+
+🔹② 成績入力画面の onAuthStateChanged 内に次を追記：
+const result = await checkAllCriteriaCompleted(user.email);
+if (!result.ok) {
+   showCriteriaAlertModal(result.missingSubjects);
+   disableScoreInputUI();
+   return;
+}
+
+🔹③ モーダル UI を新規追加（HTML 下部に追記）
+<div id="criteriaAlertModal" class="modal-backdrop" style="display:none;">
+  <div class="modal-box">
+     <h3>⚠ 評価基準が未登録です</h3>
+     <p>以下の科目は評価基準が未登録のため、成績入力を開始できません。</p>
+     <ul id="missingCriteriaList"></ul>
+     <button id="goCriteriaBtn">評価基準入力へ移動</button>
+  </div>
+</div>
+
+🔹④ モーダルを表示する関数を追加：
+function showCriteriaAlertModal(list) {
+   const modal = document.getElementById("criteriaAlertModal");
+   const ul = document.getElementById("missingCriteriaList");
+   ul.innerHTML = "";
+   list.forEach(s => {
+      const li = document.createElement("li");
+      li.textContent = `${s.grade}年 ${s.course}／${s.semester}／${s.name}`;
+      ul.appendChild(li);
+   });
+   modal.style.display = "flex";
+}
+
+🔹⑤ 成績入力 UI をロックする関数を追加：
+function disableScoreInputUI() {
+   const inputs = document.querySelectorAll("input, select, button");
+   inputs.forEach(el => {
+      el.disabled = true;
+   });
+   // モーダルだけ再度有効化
+   document.getElementById("goCriteriaBtn").disabled = false;
+}
+
+🔹⑥ 「評価基準入力へ移動」ボタンの動作：
+document.getElementById("goCriteriaBtn").onclick = () => {
+    window.location.href = "evaluation.html";
+};
+
+🚫【禁止事項】
+
+既存の renderStudentRows を上書きしない
+
+loadCriteria や loadStudents を改変しない
+
+Firestore 保存処理には触れない
+
+evaluation.html を編集しない
+
+HTML 全置換禁止、必要部分の追記のみとする
+
+🎉 この指示通りに実装されるとこうなる
+
+● 成績入力画面に遷移
+→ 担当全科目の評価基準チェック
+→ 未登録の科目があればモーダル強制表示
+→ 成績入力欄は完全ロック
+→ 評価基準入力へ誘導
+
+これにより “評価基準が未登録のまま成績入力する事故” が完全に防止できます。

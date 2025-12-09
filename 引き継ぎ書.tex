@@ -1,255 +1,169 @@
-📘 **KTC 成績処理システム（Firebase版）
+📘【完全引き継ぎ書（最新版）—全文】
 
-完全引き継ぎ書（2025/12/09 最新版）**
+（※ まずは全文を提示します。後でファイル化します）
 
-🔵 1. システム構成（確定）
+🔷 1. プロジェクト概要（score_input.html 中心）
 
-このプロジェクトは Firebase を利用した教務システム。
+本プロジェクトは以下を主目的としています：
 
-✔ 利用技術
+Firebase＋Firestore 基盤による成績処理 Webアプリ
 
-Firebase Authentication（Googleログイン）
+旧 GAS 版の再実装ではなく、Firebase 版として再構築
 
-Firestore（NoSQL）
+主に教員が扱う画面（subjects, evaluation, score_input）を段階実装
 
-Firebase Hosting
+とくに score_input.html は最も複雑な画面であり、次の機能搭載を目的とする
 
-HTML + Vanilla JavaScript
+🔷 2. score_input.html の最終目標機能一覧
+❶ 成績評価基準の反映
 
-Tailwind風CSS（独自カスタム）
+evaluationCriteria_yyyy/{subjectId} を読み取り
 
-Firestore Security Rules（高セキュリティ）
+項目名＋割合(%) をヘッダに出す（期末考査(70%) など）
 
-✔ 認証仕様
+❷ 科目に応じた名簿フィルタ
 
-@ktc.ac.jp 教員のみログイン可能
+年度、学年、コース、科目名から適切な学生一覧を表示
 
-Firestore の teachers コレクションの email を基準に判定
+CA → C と A 学生両方
 
-学生 / 外部メールは完全拒否
+CC → C のみ
 
-🔵 2. Firestore 構造（確定）
-✔ teachers/{email}
+CA → A のみ
 
-教員マスタ
+共通科目（specialType=0）は「M → E → I → C → A」の順で並ぶ
 
-✔ subjects/{subjectId}
+その他コース科目は grade と courseClass で絞って並び替える
 
-科目マスタ
+最終並び順は grade → coursePriority → number
 
-✔ teacherSubjects_2025/{email}
+❸ 評価基準未登録科目が存在すると成績入力不可（強制モーダル）
 
-教員×科目の担当割り当て
+1 科目でも評価基準未登録 → score_input の UI をロックし
 
-✔ evaluationCriteria_2025/{subjectId}
+「評価基準を入力してください」モーダルを表示
 
-科目ごとの今年度の評価基準（1科目1レコード）
+evaluation.html に強制遷移 OR モーダル閉じ不可
 
-項目例
+❹ 成績入力モード
 
-method（評価方式：考査のみ／考査＋課題／実験）
+素点モード
 
-items[]（評価項目の配列）
+換算モード（自動換算モードという名称に変更予定）
 
-totalPercent（合計割合）
+❺ 入力規則・バリデーション（モードごと）
 
-isSaved（UI 用フラグ）
+素点モード：
 
-✔ evaluationLocks_2025/{subjectId}
+各項目の満点は評価基準の「割合値」
+例：期末考査70% → 入力可能値は 0～70
 
-編集ロック（排他制御）
+小数点は可
 
-✔ evaluationHistory/{id}
+マイナス不可
 
-評価基準の修正履歴（before/after/理由/編集者など）
+換算モード：
 
-✔ drafts/{id}
+0～100 の値を入力（小数点可）
 
-成績入力の途中保存（後で使用）
+内部で weight% を乗算して合計を自動計算
 
-🔵 3. 各画面の役割（確定）
-✔ index.html
+weight を 100 に正規化 (±1% 許容)
 
-ログイン→自動遷移ハブ
+❻ 最終成績は常に小数点切り捨て
+❼ Excel（xlsx）出力（旧版踏襲）
+❽ 超過学生管理（後半 STEP）
 
-✔ start.html
+モーダルで overHours 入力
 
-ホーム画面
-（ログイン後のメインメニュー）
+over(超過) → 色付け
 
-✔ subjects.html
+failing(赤点) → 色付け
 
-担当科目登録
+両方 → 別色
 
-科目読込
+🔷 3. Step A〜D の進捗整理
+✔ STEP A：完了（名簿表示まで）
 
-追加 / 削除
+進捗：
 
-評価基準入力画面へ遷移
+evaluation 判定
 
-✔ evaluation.html
+科目情報読み込み
 
-評価基準入力
+名簿表示（grade, courseClass → 科目ルールに応じたフィルタ）
 
-評価方式選択
+並び：grade → coursePriority → number の適切表示
 
-行追加 / 削除
+CC / CA / C / A の特別ルール実装
 
-合計100±1%チェック
+共通科目順（M→E→I→C→A）実装済
 
-保存 → Firestore
+→ 名簿表示は完全完了
 
-修正履歴
+✔ STEP B：いまから実装すべき領域（最重要）
+STEP B-1
 
-ロック制御
+評価基準の割合を score_input ヘッダに反映
+例：
+期末考査 (70%)
+課題① (30%)
 
-成績入力画面への遷移ボタン（今回の修正対象）
+STEP B-2
 
-✔ score_input.html
+素点モード／換算モード（正式名称：自動換算モード）切替タブ
 
-成績入力画面
-（現在 Step1〜2 の UI まで完了。今後本実装）
+STEP B-3
 
-✔ view.html
+入力規則バリデーション
 
-教員用の成績閲覧・管理画面（後日）
+素点モード：0〜weight
 
-🔵 4. 直近の致命的バグの修正状況
-✔ subjects.html → evaluation.html → score_input.html
+自動換算：0〜100
 
-遷移ロジックの破損 → 修正済
+貼り付けでも同様に検証し、違反時は alert → 反映拒否
 
-✔ Copilot 介入により evaluation.html UI が崩壊
+STEP B-4
 
-→ 復旧済（最新評価基準UIが適用されている）
+最終成績計算
 
-✔ ログイン状態が消える問題
+normalize（99〜101% → 100）
 
-→ 修正済（遷移ロジックを統一）
+計算後、小数点切り捨て
 
-✔ 成績入力画面で全学生が表示されてしまう
+STEP B-5
 
-→ Step1–2 の段階のため、まだフィルタ実装前
-（これは仕様どおり）
+貼り付け入力（複数行対応）
+例：
 
-🔵 5. 現在の 未解決課題（今回発覚した重要ポイント）
-❗ 評価基準が保存されているのに、
-「途中再開 → 成績入力画面に遷移しない」問題
+9220001, 50, 30  
+9220002, 40, 50  
 
-原因：
-evaluation.html の ready 判定が data.isSaved に依存しているため、
-保存されていても UI側の条件と合わずボタンが非表示になる。
 
-→ 今回 Stepごとの安全分割指示書にて修正した。
+→ studentId で対応行を検索して反映
 
-🔵 6. 今回の修正対象（evaluation.html）
-🎯 目的
+✔ STEP C：後で（超過学生・赤点判定）
+✔ STEP D：最後（Excel 出力 + UI 仕上げ）
+🔷 4. 名簿ロジック再整理（最終版）
+科目 specialType（仮）
 
-評価基準が正しく登録されている科目の場合のみ、
-「成績入力へ」ボタンを表示して score_input.html に飛べるようにする
+specialType=0 → 共通 → 全学年共通 + M, E, I, C, A 全員
+specialType≠0 → 専門科目
 
-🔵 7. 完全安全版 Copilot 分割指示書（確定版）
+専門科目の course ルール
 
-以下をコピペして次チャットへ渡す。
+C → C + A
 
-🧩 STEP1（HTMLの確認とミニ修正）
-【STEP1：evaluation.html の科目選択エリアに「成績入力へ」ボタンがあることを確認してください】
+CC → C のみ
 
-1. evaluation.html を開いてください。
-2. 「担当科目を選択」の <select id="subjectSelect"> を探してください。
-3. その直後の <div id="subjectStatus"> の下に、
-   以下のボタンが存在することを確認してください。
+CA → A のみ
 
-   <button id="goScoreBtn" class="mini-nav-btn" style="display:none;">成績入力へ</button>
+M/E/I → 当該コースのみ
 
-4. 無ければ追加してください。
-5. HTMLの他部分（スタイル・ヘッダー等）は変更しないでください。
+並び順
 
-🧩 STEP2（DOM参照の確認）
-【STEP2：goScoreBtn の DOM参照が script 内に存在するか確認】
+grade（昇順）
 
-1. script の先頭付近で次を探してください：
+coursePriority（M→E→I→C→A）
 
-   const goScoreBtn = document.getElementById("goScoreBtn");
-
-2. 無ければ saveBtn の参照直後に追加してください。
-3. その他の参照を変更しないこと。
-
-🧩 STEP3（ready 判定ロジックの修正）※最重要
-【STEP3：評価基準の「準備完了」判定ロジックを修正】
-
-1. loadCriteria 関数を開いてください。
-2. 次のようなブロックを探してください。
-
-   const ready =
-     !!data.isSaved &&
-     !!data.method &&
-     totalPercent >= 99 &&
-     totalPercent <= 101;
-
-3. この部分のみ次の内容に置き換えてください。
-
-   const ready =
-     !!data.method &&
-     totalPercent >= 99 &&
-     totalPercent <= 101;
-
-4. if (goScoreBtn) { ... } ブロックはそのまま残し、
-   onclick 部分も変更しないでください。
-
-5. その他の処理（updateTotal など）は変更しないでください。
-
-🧩 STEP4（科目変更時の初期化処理は残す）
-【STEP4：科目変更時に goScoreBtn を隠す処理を削除しないでください】
-
-1. subjectSelect.addEventListener("change", ...) の中に、
-   goScoreBtn.style.display = "none"; が存在します。
-2. これは削除・変更しないでください。
-
-🧩 STEP5（保存処理の編集禁止）
-【STEP5：保存処理を編集しない】
-
-1. setDoc で isSaved を付けている部分はそのまま残してください。
-2. 保存処理（payload）には手を加えないでください。
-3. ready 判定だけ STEP3 の変更で実現します。
-
-🔵 8. これで修正後の動作はこうなる
-状況	挙動
-評価方式が未選択	成績入力ボタン非表示
-合計割合が99〜101%	成績入力ボタン表示
-未保存（isSaved=falseでもOK）	表示（今回の修正でOKにした）
-修正中（total崩壊）	非表示
-クリック	score_input.html?subjectId=… へ遷移
-🔵 9. 今後の開発ステップ（全体計画）
-
-この後進むべき順番は：
-
-成績入力画面（score_input.html）の本実装
-
-選択科目のフィルタ処理
-
-超過学生のUI実装
-
-調整点／赤点／色付け〜CSV出力
-
-drafts 保存ロジック
-
-Firestoreへの最終成績書き込み
-
-Cloud Functions によるロック自動解除
-
-教務用閲覧画面（view.html）
-
-🔵 10. 引き継ぎ書の使い方
-
-この全文をそのまま次チャットの最初に貼る
-
-その後 Copilot へ **「安全分割指示書 STEP1 から順に適用してください」**と伝える
-
-evaluation.html の修正が完了する
-
-📌 以上が、完全引き継ぎ書（最新版）です
-
-次のチャットでも この引き継ぎ書をそのまま貼るだけ でプロジェクトを確実に継続できます。
-
-必要なら、今回の内容を PDF 化してお渡しすることも可能です。
+number（昇順）
