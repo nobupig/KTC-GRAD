@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="kindai.png">
+  <title>成績入力｜近大高専</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Yu Gothic UI", system-ui, sans-serif;
+      background: #f5f5f7;
+      color: #111;
+    }
+
+    header {
+      background: #004a99;
+      color: #fff;
+      padding: 16px 24px;
+    }
+    header .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .home-btn {
+      background: #0066cc;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px 32px;
+    }
+
+    .subject-box {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+      margin-bottom: 22px;
+    }
+
+    .subject-title {
+      font-weight: 700;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    .subject-links {
+      margin-top: 10px;
+      display: flex;
+      gap: 16px;
+    }
+    .subject-link-btn {
+      color: #004a99;
+      font-size: 14px;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .table-wrapper {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px 12px;
+    }
+    th {
+      text-align: left;
+      color: #4b5563;
+      font-weight: 600;
+      background: #f9fafb;
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-save {
+      background: #004a99;
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      background: #e5e7eb;
+      color: #111;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1>近大高専 成績システム｜成績入力</h1>
+    <button id="logoutBtn" class="home-btn" style="background:#d97706;">ログアウト</button>
+  </div>
+</header>
+
+<div id="userInfoArea" style="max-width:1100px; margin:4px auto 0; padding:0 20px;">
+  <div id="userInfoDisplay" style="font-size:14px; font-weight:600; color:#1e3a8a; text-align:right;"></div>
+</div>
+
+<main>
+
+  <div style="max-width:1100px; margin:8px auto; padding:0 16px;">
+    <button class="btn btn-secondary" onclick="location.href='start.html'" style="font-size:13px;">
+      🏠 ホームへ戻る
+    </button>
+  </div>
+
+  <!-- ===== 対象科目ボックス ===== -->
+  <section class="subject-box">
+    <div class="subject-title">
+      対象科目： <span id="subjectName">科目未選択</span>
+    </div>
+
+    <!-- 科目切り替えプルダウン -->
+    <select id="subjectSelector"
+      style="padding:6px 10px; border-radius:8px; border:1px solid #d1d5db; font-size:13px; display:none;">
+    </select>
+
+    <!-- 評価基準へ / 科目登録へ -->
+    <div class="subject-links">
+      <span id="btnEvaluation" class="subject-link-btn">評価基準へ</span>
+      <span id="btnSubjects" class="subject-link-btn">科目登録へ</span>
+    </div>
+  </section>
+
+  <!-- ===== 成績一覧テーブル ===== -->
+  <section class="table-wrapper">
+    <div style="margin-bottom:12px; font-size:14px; color:#374151;">成績一覧</div>
+
+    <table>
+      <thead id="scoreTableHead">
+        <tr>
+          <th>学籍番号</th>
+          <th>氏名</th>
+          <th>素点</th>
+          <th>調整点</th>
+          <th>最終成績</th>
+        </tr>
+      </thead>
+      <tbody id="scoreTableBody">
+        <!-- 学生行がここに表示される -->
+      </tbody>
+    </table>
+
+    <div class="actions">
+      <button class="btn-save">保存する</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============================== -->
+<!-- Firebase scripts -->
+<!-- ============================== -->
+<script type="module">
+    let normalizedWeights = [];
+  // ★ 重み（割合）を正規化する関数（合計99〜101% → 100%に丸める）
+  function normalizeWeights(weights) {
+    const safe = weights.map((w) => {
+      const n = typeof w === "number" ? w : parseFloat(w || "0");
+      return Number.isNaN(n) ? 0 : n;
+    });
+
+    const sum = safe.reduce((a, b) => a + b, 0);
+
+    if (sum >= 99 && sum <= 101 && sum > 0) {
+      return safe.map((w) => (w / sum) * 100);
+    }
+
+    return safe;
+  }
+
+  // ★ 1行分の合計点を計算する（素点モード）
+  function calculateTotalForRow(rowElem, normalizedWeights) {
+    const inputs = rowElem.querySelectorAll("input.score-input");
+    let total = 0;
+
+    inputs.forEach((inp, idx) => {
+      const raw = parseFloat(inp.value || "0");
+      if (Number.isNaN(raw)) return;
+
+      const weight = normalizedWeights[idx] || 0;
+      total += raw * (weight / 100);
+    });
+
+    // 小数点1桁まで
+    total = Math.round(total * 10) / 10;
+
+    // 最終成績セルへ反映
+    const totalCell = rowElem.querySelector(".final-score");
+    if (totalCell) {
+      totalCell.textContent = total || "";
+    }
+  }
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    getDocs,
+    doc,
+    getDoc
+  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  import {
+    getAuth,
+    onAuthStateChanged,
+    signOut
+  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+  /* ===== Firebase 初期化 ===== */
+  const firebaseConfig = {
+    apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
+    authDomain: "ktc-grade-system.firebaseapp.com",
+    projectId: "ktc-grade-system",
+    storageBucket: "ktc-grade-system.appspot.com",
+    messagingSenderId: "490169300362",
+    appId: "1:490169300362:web:7c6e7b47a394d68d514473",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  /* ===== DOM ===== */
+  const subjectNameEl = document.getElementById("subjectName");
+  const subjectSelector = document.getElementById("subjectSelector");
+  const scoreTableBody = document.getElementById("scoreTableBody");
+  const scoreTableHead = document.getElementById("scoreTableHead");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const userInfoDisplay = document.getElementById("userInfoDisplay");
+
+  const btnEvaluation = document.getElementById("btnEvaluation");
+  const btnSubjects = document.getElementById("btnSubjects");
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "index.html";
+    });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  let currentSubjectId = params.get("subjectId") || null;
+
+  const year = new Date().getFullYear();
+  const criteriaCollection = `evaluationCriteria_${year}`;
+  const teacherSubjectsCollection = `teacherSubjects_${year}`;
+
+  let teacherSubjects = [];
+  let currentUser = null;
+  let cachedStudents = [];
+
+  /* ===== 科目名整形 ===== */
+  function formatSubjectLabel(s) {
+    return `${s.grade}年 ${s.semester} ${s.name}（${s.course}）`;
+  }
+
+  /* ===== 教員の担当科目を読み込む ===== */
+  async function loadTeacherSubjects() {
+    const ref = doc(db, teacherSubjectsCollection, currentUser.email);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists() || !snap.data().subjects) {
+      subjectNameEl.textContent = "担当科目がありません";
+      return;
+    }
+
+    teacherSubjects = snap.data().subjects;
+
+    subjectSelector.innerHTML = "";
+
+    teacherSubjects.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.subjectId;
+      opt.textContent = formatSubjectLabel(s);
+      subjectSelector.appendChild(opt);
+    });
+
+    if (teacherSubjects.length > 1) {
+      subjectSelector.style.display = "inline-block";
+    } else {
+      subjectSelector.style.display = "none";
+    }
+
+    // URLにsubjectIdが無い → 先頭に合わせてリロード
+    if (!currentSubjectId && teacherSubjects.length > 0) {
+      currentSubjectId = teacherSubjects[0].subjectId;
+      const url = new URL(window.location.href);
+      url.searchParams.set("subjectId", currentSubjectId);
+      window.location.replace(url.toString());
+    }
+
+    updateSubjectHeader();
+  }
+
+  function updateSubjectHeader() {
+    const target = teacherSubjects.find((s) => s.subjectId === currentSubjectId);
+    if (target) {
+      subjectNameEl.textContent = formatSubjectLabel(target);
+      subjectSelector.value = currentSubjectId;
+    }
+  }
+
+  /* ===== プルダウン科目変更 ===== */
+  subjectSelector.addEventListener("change", (e) => {
+    const newId = e.target.value;
+    const url = new URL(window.location.href);
+    url.searchParams.set("subjectId", newId);
+    window.location.href = url.toString();
+  });
+
+  /* ===== 評価基準へ ===== */
+  btnEvaluation.addEventListener("click", () => {
+    if (currentSubjectId) {
+      const sid = encodeURIComponent(currentSubjectId);
+      window.location.href = `evaluation.html?subjectId=${sid}`;
+    }
+  });
+
+  /* ===== 科目登録へ ===== */
+  btnSubjects.addEventListener("click", () => {
+    window.location.href = "subjects.html";
+  });
+
+  /* ===== 評価基準取得 ===== */
+  async function loadCriteria() {
+
+    const ref = doc(db, criteriaCollection, currentSubjectId);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) {
+      // ★ モーダルで警告表示（alert の代わり）
+      const modal = document.getElementById("criteriaErrorModal");
+      const okBtn = document.getElementById("criteriaErrorOkBtn");
+
+      modal.style.display = "flex";
+
+      okBtn.onclick = () => {
+        window.location.href = `evaluation.html?subjectId=${currentSubjectId}`;
+      };
+
+      return;
+    }
+
+    const data = snap.data();
+    const items = data.items || [];
+
+    // STEP2-2: 割合正規化
+    const weightList = items.map(i => parseFloat(i.percent) || 0);
+    normalizedWeights = normalizeWeights(weightList);
+
+    const total =
+      typeof data.totalPercent === "number"
+        ? data.totalPercent
+        : items.reduce((sum, i) => {
+            const p =
+              typeof i.percent === "number"
+                ? i.percent
+                : parseFloat(i.percent || "0");
+            return sum + (Number.isNaN(p) ? 0 : p);
+          }, 0);
+
+    if (items.length === 0 || total < 99 || total > 101) {
+      const modal = document.getElementById("criteriaErrorModal");
+      const okBtn = document.getElementById("criteriaErrorOkBtn");
+
+      modal.style.display = "flex";
+
+      okBtn.onclick = () => {
+        window.location.href = `evaluation.html?subjectId=${currentSubjectId}`;
+      };
+
+      return;
+    }
+
+    // 動的ヘッダー作成
+    scoreTableHead.innerHTML = "";
+    const tr = document.createElement("tr");
+    ["学籍番号", "氏名", "素点", "調整点", "最終成績"].forEach((v) => {
+      const th = document.createElement("th");
+      th.textContent = v;
+      tr.appendChild(th);
+    });
+    items.forEach((i) => {
+      const th = document.createElement("th");
+      th.textContent = i.name;
+      tr.appendChild(th);
+    });
+    scoreTableHead.appendChild(tr);
+  }
+
+  /* ===== 学生一覧 ===== */
+  async function loadStudents() {
+    const snap = await getDocs(collection(db, "students"));
+    const list = [];
+    snap.forEach((d) => list.push(d.data()));
+
+    list.sort((a, b) => (a.studentNumber || "").localeCompare(b.studentNumber || ""));
+
+    cachedStudents = list;
+
+    renderStudentRows();
+  }
+
+  function renderStudentRows() {
+    scoreTableBody.innerHTML = "";
+    if (cachedStudents.length === 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 20;
+      td.style.textAlign = "center";
+      td.textContent = "学生情報が登録されていません。";
+      tr.appendChild(td);
+      scoreTableBody.appendChild(tr);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+
+
+    cachedStudents.forEach((s) => {
+      const tr = document.createElement("tr");
+
+      // 学籍番号
+      const tdNum = document.createElement("td");
+      tdNum.textContent = s.studentNumber ?? "";
+      tr.appendChild(tdNum);
+
+      // 氏名
+      const tdName = document.createElement("td");
+      tdName.textContent = s.name ?? "";
+      tr.appendChild(tdName);
+
+      // 素点入力欄
+      const tdScore = document.createElement("td");
+      const inpScore = document.createElement("input");
+      inpScore.type = "number";
+      inpScore.classList.add("score-input");
+      inpScore.style.width = "60px";
+      inpScore.oninput = () => {
+        calculateTotalForRow(tr, normalizedWeights);
+      };
+      tdScore.appendChild(inpScore);
+      tr.appendChild(tdScore);
+
+      // 調整点（空欄）
+      const tdAdjust = document.createElement("td");
+      tdAdjust.textContent = "";
+      tr.appendChild(tdAdjust);
+
+      // 最終成績欄
+      const tdFinal = document.createElement("td");
+      tdFinal.className = "final-score";
+      tdFinal.textContent = "";
+      tr.appendChild(tdFinal);
+
+      // 初期計算（素点空欄時は0として処理）
+      calculateTotalForRow(tr, normalizedWeights);
+
+      frag.appendChild(tr);
+    });
+
+    scoreTableBody.appendChild(frag);
+  }
+
+  /* ===== メイン初期化 ===== */
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      window.location.href = "index.html";
+      return;
+    }
+    currentUser = user;
+
+    const teacherRef = doc(db, "teachers", user.email);
+    const teacherSnap = await getDoc(teacherRef);
+    if (!teacherSnap.exists()) {
+      alert("教員情報が確認できませんでした。ログインし直してください。");
+      await signOut(auth);
+      window.location.href = "index.html";
+      return;
+    }
+    const teacherName = teacherSnap.data()?.name || "";
+    if (userInfoDisplay) {
+      userInfoDisplay.textContent =
+        `ログイン中：${teacherName || user.email}（${user.email}）`;
+    }
+
+    await loadTeacherSubjects();
+    await loadCriteria();
+    await loadStudents();
+  });
+
+</script>
+
+</body>
+<!-- 評価基準未登録エラーモーダル -->
+<div id="criteriaErrorModal" style="
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+">
+  <div style="
+    background: white;
+    padding: 24px 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    max-width: 360px;
+    text-align: center;
+  ">
+    <div style="font-size: 32px; color: #dc2626; margin-bottom: 10px;">⚠️</div>
+    <div style="font-size: 16px; font-weight: 600; margin-bottom: 20px;">
+      評価基準が登録されていません。
+    </div>
+    <button id="criteriaErrorOkBtn" class="btn btn-primary" style="width: 120px;">
+      OK
+    </button>
+  </div>
+</div>
+</html>

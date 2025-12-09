@@ -215,14 +215,15 @@
   <h1>近大高専 成績システム｜科目登録</h1>
 
   <div class="user-info" style="display:flex; align-items:center; gap:10px;">
-    <button id="viewModeBtn" class="btn btn-secondary" style="font-size:12px;"
-      onclick="location.href='view.html'">
-      📄 閲覧モード
-    </button>
-
     <button id="logoutBtn">ログアウト</button>
   </div>
 </header>
+
+<div style="max-width:1100px; margin:10px auto; padding:0 20px;">
+  <button class="btn btn-secondary" style="font-size:12px;" onclick="location.href='start.html'">
+    🏠 ホームへ戻る
+  </button>
+</div>
 
  <!-- ▼ 削除確認モーダル -->
  <div id="deleteModal" class="modal-overlay" style="display:none;">
@@ -577,7 +578,7 @@
     // ==== ログイン状態監視 ====
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        window.location.href = "login.html";
+        window.location.href = "index.html";
         return;
       }
       currentUser = user;
@@ -599,7 +600,7 @@
     // ログアウト
     logoutBtn.addEventListener("click", async () => {
       await signOut(auth);
-      window.location.href = "login.html";
+      window.location.href = "index.html";
     });
 
     // ★ 学年変更時にコース自動制御（1・2年はG固定）
@@ -978,6 +979,10 @@
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+
+    // ★ 登録後に最新の担当科目一覧を再読み込み
+    await loadTeacherSubjects();
+
     saveStatus.textContent = "担当科目を登録しました。";
     saveError.textContent = "";
 
@@ -1124,7 +1129,30 @@
     });
 
     evalOkBtn.addEventListener("click", () => {
-      location.href = "evaluation.html";
+      // ★ 評価基準の無いロックを削除（subjects 側）
+      const subjectId = (() => {
+        const list = document.querySelectorAll('#evalRegisteredList div');
+        if (list.length > 0) {
+          return (window.subjects && window.subjects[0] && window.subjects[0].subjectId) || null;
+        }
+        return null;
+      })();
+
+      (async () => {
+        if (subjectId) {
+          const lockRef = doc(db, "evaluationLocks_2025", subjectId);
+          const lockSnap = await getDoc(lockRef);
+          const criteriaRef = doc(db, "evaluationCriteria_2025", subjectId);
+          const criteriaSnap = await getDoc(criteriaRef);
+          if (lockSnap.exists() && !criteriaSnap.exists()) {
+            console.log("subjects側 不要ロック削除:", subjectId);
+            await deleteDoc(lockRef);
+          }
+          location.href = `evaluation.html?subjectId=${subjectId}`;
+        } else {
+          location.href = "evaluation.html";
+        }
+      })();
     });
 
   </script>

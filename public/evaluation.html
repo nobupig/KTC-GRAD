@@ -164,7 +164,10 @@
     </div>
   </header>
 
-  <div style="max-width:1100px; margin:10px auto 0; padding:0 20px;">
+  <div style="max-width:1100px; margin:10px auto 0; padding:0 20px; display:flex; gap:8px;">
+    <button class="btn btn-secondary" style="font-size:12px;" onclick="location.href='start.html'">
+      🏠 ホームへ戻る
+    </button>
     <button id="backToSubjectsBtn" class="btn btn-secondary" style="font-size:12px;">
       ◀ 科目登録に戻る
     </button>
@@ -243,6 +246,9 @@
 
     <div style="margin-top:20px; display:flex; gap:8px;">
       <button id="saveBtn" class="btn btn-primary">保存する</button>
+      <button id="goScoreBtn" class="btn btn-secondary" style="display:none;">
+        成績入力へ
+      </button>
     </div>
 
   </main>
@@ -280,8 +286,13 @@
       setDoc,
       collection,
       getDocs,
-      serverTimestamp
+      serverTimestamp,
+      deleteDoc
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    // URL パラメータから初期 subjectId を取得
+    const evalParams = new URLSearchParams(window.location.search);
+    const initialSubjectId = evalParams.get("subjectId") || "";
 
     // ================================
     // Firebase 設定
@@ -311,9 +322,10 @@
 
     const schemeRadios = document.querySelectorAll('input[name="schemeType"]');
     const criteriaTbody = document.getElementById("criteriaTbody");
-    const addRowBtn = document.getElementById("addRowBtn");
+    let addRowBtn = document.getElementById("addRowBtn");
     const totalArea = document.getElementById("totalArea");
-    const saveBtn = document.getElementById("saveBtn");
+      const saveBtn = document.getElementById("saveBtn");
+      const goScoreBtn = document.getElementById("goScoreBtn");
 
     const multiTeacherWarning = document.getElementById("multiTeacherWarning");
     const toastContainer = document.getElementById("toastContainer");
@@ -434,6 +446,33 @@
         subjectStatus.textContent =
           "この教員が担当する科目はすべて『評価基準入力不要の特別科目』として登録されています。成績入力画面から直接入力してください。";
       }
+
+      // URL の subjectId が有効なら自動選択
+      if (initialSubjectId) {
+        const opt = Array.from(subjectSelect.options).find(
+          (o) => o.value === initialSubjectId && !o.disabled
+        );
+        if (opt) {
+          subjectSelect.value = initialSubjectId;
+          subjectSelect.dispatchEvent(new Event("change"));
+        }
+      }
+
+        // ★ 不要ロック全体のクリーンアップ（評価基準が無いもののみ削除）
+        // ★ 不要ロックのクリーンアップ（evaluationCriteria に無いものだけ削除）
+        const locksRef = collection(db, "evaluationLocks_2025");
+        const allLocks = await getDocs(locksRef);
+
+        for (const lock of allLocks.docs) {
+          const sid = lock.id;
+          const criteriaRef = doc(db, "evaluationCriteria_2025", sid);
+          const criteriaSnap = await getDoc(criteriaRef);
+
+          if (!criteriaSnap.exists()) {
+            console.log("不要ロック削除:", sid);
+            await deleteDoc(lock.ref);
+          }
+        }
     }
 
     // ================================
@@ -630,6 +669,7 @@
       if (scheme === "exam_only") setupSchemeExamOnly();
       else if (scheme === "exam_plus_assignments") setupSchemeExamPlusAssignments();
       else setupSchemePracticeOnly();
+      setupAddRowButton();
     }
 
     // 合計計算
@@ -655,6 +695,24 @@
         totalArea.style.color = "#b91c1c";
         if (saveBtn.dataset.mode !== "locked") saveBtn.disabled = true;
       }
+    }
+
+    function setupAddRowButton() {
+      if (!addRowBtn) return;
+
+      const wasDisabled = addRowBtn.disabled;
+      const newBtn = addRowBtn.cloneNode(true);
+      addRowBtn.parentNode.replaceChild(newBtn, addRowBtn);
+      addRowBtn = newBtn;
+      addRowBtn.disabled = wasDisabled;
+
+      addRowBtn.addEventListener("click", () => {
+        if (currentScheme === "exam_only") {
+          return;
+        }
+        addCriteriaRow("", "", { allowDelete: true });
+        updateTotal();
+      });
     }
 
     // 履歴用スナップショット
@@ -717,7 +775,15 @@
         editBtn.className = "btn btn-secondary";
         editBtn.style.marginLeft = "8px";
         editBtn.textContent = "修正する";
-        saveBtn.parentNode.appendChild(editBtn);
+
+        const parent = saveBtn.parentNode;
+        const scoreBtn = document.getElementById("goScoreBtn");
+        if (scoreBtn) {
+          // 保存 → 修正する → 成績入力へ の順になるように、成績入力ボタンの手前に差し込む
+          parent.insertBefore(editBtn, scoreBtn);
+        } else {
+          parent.appendChild(editBtn);
+        }
       }
       editBtn.style.display = "inline-block";
 
@@ -782,12 +848,32 @@
       criteriaTbody.innerHTML = "";
       applyCurrentScheme(); // デフォルト生成
 
+
       if (!subjectId) return;
+      const lockRef = doc(db, "evaluationLocks_2025", subjectId);
+      const lockSnap = await getDoc(lockRef);
+      // ★ 評価基準が存在しないロックは自動削除（安全版）
+      const criteriaRef = doc(db, "evaluationCriteria_2025", subjectId);
+      const criteriaSnap = await getDoc(criteriaRef);
+      const criteriaExists = criteriaSnap.exists();
+
+      if (lockSnap.exists() && !criteriaExists) {
+        console.log("評価基準の無いロックを削除:", subjectId);
+        await deleteDoc(lockRef);
+      }
+
       const ref = doc(db, evalColName, subjectId);
       const snap = await getDoc(ref);
       if (!snap.exists()) return;
 
+
       const data = snap.data();
+
+      // ★ Firestore にデータがある場合は初期状態を「保存済み」に設定
+      if (data && (data.items?.length ?? 0) > 0) {
+        setSavedUI(true);
+      }
+
       const method = data.method || "exam_only";
       currentScheme = method;
 
@@ -805,12 +891,40 @@
         });
       });
 
-      const totalPercent = data.totalPercent || 0;
+
+      // totalPercent が未保存の古いデータにも対応する
+      let totalPercent;
+
+      if (typeof data.totalPercent === "number") {
+        totalPercent = data.totalPercent;
+      } else {
+        totalPercent = (data.items || []).reduce((sum, item) => {
+          const raw = item?.percent;
+          const p =
+            typeof raw === "number"
+              ? raw
+              : parseFloat(raw ?? "");
+          return sum + (Number.isNaN(p) ? 0 : p);
+        }, 0);
+      }
+
       totalArea.textContent = `合計：${totalPercent}%`;
       updateTotal();
+      setupAddRowButton();
 
-      if (data.isSaved) {
-        setSavedUI(editable); // ロック取得者だけ編集ボタン表示
+      // 評価基準が「有効」と判断できるか
+      // ★ 合計割合と評価方式が揃っていれば成績入力画面へ進める
+      const ready =
+        !!data?.method &&
+        totalPercent >= 99 &&
+        totalPercent <= 101;
+
+      if (goScoreBtn) {
+        goScoreBtn.style.display = ready ? "inline-flex" : "none";
+        goScoreBtn.onclick = () => {
+          const id = encodeURIComponent(subjectId);
+          window.location.href = `score_input.html?subjectId=${id}`;
+        };
       }
     }
 
@@ -908,7 +1022,9 @@
       // 以前のロックを解放
       await releaseCurrentLock();
 
+
       resetEvaluationUI();
+      if (goScoreBtn) goScoreBtn.style.display = "none";
 
       const opt = subjectSelect.options[subjectSelect.selectedIndex];
       const subjectId = opt ? opt.value : "";
@@ -936,6 +1052,8 @@
         // 他人がロック中 → 完全閲覧専用
         setSavedUI(false);
       }
+
+      setupAddRowButton();
     });
 
     // ================================
@@ -1014,6 +1132,9 @@
         // ★ docId は subjectId で統一（教員によらず1つだけ）
         await setDoc(doc(db, evalColName, currentSubjectId), payload, { merge: true });
 
+  // ★ 保存完了後に最新の評価基準を再読み込みしてボタン表示を反映
+  await loadCriteria(currentSubjectId, { editable: false });
+
         // 修正モードなら履歴を記録
         if (
           isEditingExistingCriteria &&
@@ -1058,7 +1179,7 @@
     logoutBtn.addEventListener("click", async () => {
       await releaseCurrentLock();
       await signOut(auth);
-      window.location.href = "login.html";
+      window.location.href = "index.html";
     });
 
     window.addEventListener("beforeunload", () => {
@@ -1071,7 +1192,7 @@
     // ================================
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        window.location.href = "login.html";
+        window.location.href = "index.html";
         return;
       }
       currentUser = user;

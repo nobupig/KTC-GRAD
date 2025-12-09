@@ -151,7 +151,6 @@
     </div>
   </header>
 
-  
   <main>
     <h2>作業メニュー</h2>
     <p class="description">
@@ -207,12 +206,10 @@
       doc,
       getDoc,
       collection,
-      getDocs,
-      query,
-      where
+      getDocs
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-    // ★ 既存の設定と同じ Firebase 設定を使用
+    // Firebase 設定
     const firebaseConfig = {
       apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
       authDomain: "ktc-grade-system.firebaseapp.com",
@@ -228,8 +225,8 @@
 
     const headerUserDisplay = document.getElementById("headerUserDisplay");
     const userInfoDisplay = document.getElementById("userInfoDisplay");
-    const logoutBtn = document.getElementById("logoutBtn");
 
+    const logoutBtn = document.getElementById("logoutBtn");
     const continueBtn = document.getElementById("continueBtn");
     const newEntryBtn = document.getElementById("newEntryBtn");
     const viewModeBtn = document.getElementById("viewModeBtn");
@@ -237,32 +234,34 @@
 
     const currentYear = new Date().getFullYear();
     const teacherSubjectsCol = `teacherSubjects_${currentYear}`;
-    const evalCriteriaCol = `evaluationCriteria_${currentYear}`;
 
     let currentUser = null;
     let currentTeacherName = "";
 
-    // ---------------------------
-    // 教員名を取得（teachers コレクション）
-    // ---------------------------
+    // 教員名取得
     async function loadTeacherName() {
       if (!currentUser) return;
       const ref = doc(db, "teachers", currentUser.email);
       const snap = await getDoc(ref);
-      if (snap.exists()) {
-        currentTeacherName = snap.data().name || "";
-      } else {
-        currentTeacherName = "";
-      }
+      currentTeacherName = snap.exists() ? snap.data().name || "" : "";
     }
 
-    // ---------------------------
-    // 途中再開ロジック
-    //
-    // 1. 科目登録済みかチェック
-    // 2. 評価基準が未入力の科目があるかチェック
-    // 3. 成績入力に進むかどうかを決定
-    // ---------------------------
+    // 評価基準の完了判定
+    async function isCriteriaCompleted(subjectId) {
+      const ref = doc(db, `evaluationCriteria_${currentYear}`, subjectId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return false;
+
+      const data = snap.data();
+      if (!data.items || data.items.length === 0) return false;
+
+      const total = data.totalPercent ??
+        data.items.reduce((sum, i) => sum + (i.percent || 0), 0);
+
+      return (total >= 99 && total <= 101);
+    }
+
+    // 途中再開処理
     async function handleContinue() {
       if (!currentUser) {
         alert("ログイン情報が取得できません。再度ログインしてください。");
@@ -272,66 +271,38 @@
 
       statusMessage.textContent = "現在の登録状況を確認しています…";
 
-      // 1. 科目登録の有無を確認
       const tsRef = doc(db, teacherSubjectsCol, currentUser.email);
       const tsSnap = await getDoc(tsRef);
 
       if (!tsSnap.exists() || !tsSnap.data().subjects || tsSnap.data().subjects.length === 0) {
-        statusMessage.innerHTML = "<strong>まだ担当科目が登録されていません。</strong> 科目登録画面へ移動します。";
+        statusMessage.innerHTML =
+          "<strong>まだ担当科目が登録されていません。</strong> 科目登録画面へ移動します。";
         setTimeout(() => {
           window.location.href = "subjects.html";
         }, 800);
         return;
       }
 
-      const subjects = tsSnap.data().subjects; // [{ subjectId, ... }, ...]
-      const subjectIds = subjects
-        .map(s => s.subjectId)
-        .filter(id => !!id);
+      const subjects = tsSnap.data().subjects;
+      const notCompleted = [];
 
-      if (subjectIds.length === 0) {
-        statusMessage.innerHTML = "<strong>担当科目の情報に不備があります。</strong> 科目登録画面で内容を確認してください。";
-        setTimeout(() => {
-          window.location.href = "subjects.html";
-        }, 1000);
-        return;
-      }
-
-      // 2. 評価基準の登録状況を確認
-      const evalRef = collection(db, evalCriteriaCol);
-      const q = query(evalRef, where("teacherEmail", "==", currentUser.email));
-      const evalSnap = await getDocs(q);
-
-      const evaluatedSubjectIds = [];
-      evalSnap.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data && data.subjectId) {
-          evaluatedSubjectIds.push(data.subjectId);
+      for (const subj of subjects) {
+        const completed = await isCriteriaCompleted(subj.subjectId);
+        if (!completed) {
+          notCompleted.push(subj.subjectId);
         }
-      });
-
-      // 評価基準未入力の科目を抽出
-      const notEvaluated = subjectIds.filter(id => !evaluatedSubjectIds.includes(id));
-
-      if (notEvaluated.length > 0) {
-        // まだ評価基準が未入力の科目がある → 評価基準入力へ
-        statusMessage.innerHTML = "評価基準が未入力の科目があります。<strong>評価基準入力画面</strong>に移動します。";
-        setTimeout(() => {
-          window.location.href = "evaluation.html";
-        }, 800);
-        return;
       }
 
-      // 3. 評価基準は全て入力済み → 成績入力へ
-      statusMessage.innerHTML = "すべての担当科目の評価基準が入力済みです。<strong>成績入力画面</strong>に移動します。";
-      setTimeout(() => {
-        window.location.href = "grades.html"; // 今後実装予定の成績入力画面
-      }, 800);
+      if (notCompleted.length === 0) {
+        const sid = encodeURIComponent(subjects[0].subjectId);
+        window.location.href = `score_input.html?subjectId=${sid}`;
+      } else {
+        const sid = encodeURIComponent(notCompleted[0]);
+        window.location.href = `evaluation.html?subjectId=${sid}`;
+      }
     }
 
-    // ---------------------------
-    // イベントハンドラ設定
-    // ---------------------------
+    // イベントハンドラ
     newEntryBtn.addEventListener("click", () => {
       window.location.href = "subjects.html";
     });
@@ -345,7 +316,7 @@
         await handleContinue();
       } catch (e) {
         console.error("途中再開処理でエラー:", e);
-        alert("途中再開処理中にエラーが発生しました。時間をおいて再度お試しください。");
+        alert("途中再開処理中にエラーが発生しました。");
         statusMessage.textContent = "";
       }
     });
@@ -355,12 +326,9 @@
       window.location.href = "index.html";
     });
 
-    // ---------------------------
-    // 認証状態監視
-    // ---------------------------
+    // 認証監視
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        // 未ログイン → ログインページへ
         window.location.href = "index.html";
         return;
       }
@@ -369,8 +337,15 @@
       await loadTeacherName();
 
       const displayName = currentTeacherName || user.email;
-      headerUserDisplay.textContent = `ログイン中：${displayName}`;
-      userInfoDisplay.textContent = `ログイン中：${displayName}（${user.email}）`;
+
+      // ★ null 安全対策を追加
+      if (headerUserDisplay) {
+        headerUserDisplay.textContent = `ログイン中：${displayName}`;
+      }
+      if (userInfoDisplay) {
+        userInfoDisplay.textContent =
+          `ログイン中：${displayName}（${user.email}）`;
+      }
     });
   </script>
 </body>

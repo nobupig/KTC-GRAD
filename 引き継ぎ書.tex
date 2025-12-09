@@ -1,292 +1,255 @@
 📘 **KTC 成績処理システム（Firebase版）
 
-完全引き継ぎ書（2025/12/08 最新版）**
+完全引き継ぎ書（2025/12/09 最新版）**
 
-🔵 1. システム全体構成（Firebase 完全移行）
+🔵 1. システム構成（確定）
 
-本システムは GAS 版→Firebase 版へ全面移行した新しい成績処理プラットフォーム。
+このプロジェクトは Firebase を利用した教務システム。
 
-採用技術：
+✔ 利用技術
 
-Firebase Authentication（Google ログイン）
+Firebase Authentication（Googleログイン）
 
 Firestore（NoSQL）
 
 Firebase Hosting
 
-HTML + Vanilla JavaScript (ES Modules)
+HTML + Vanilla JavaScript
 
-Firestore Security Rules（高度セキュリティ）
+Tailwind風CSS（独自カスタム）
 
-認証：
+Firestore Security Rules（高セキュリティ）
 
-@ktc.ac.jp の教員のみログイン可能
+✔ 認証仕様
 
-students / external は正規表現で拒否
+@ktc.ac.jp 教員のみログイン可能
 
-teachers コレクション登録済メールのみ通過
+Firestore の teachers コレクションの email を基準に判定
 
-🔵 2. Firestore データ構造（確定版）
-✔ teachers / {email}
+学生 / 外部メールは完全拒否
 
-教員名簿（ログイン許可の基準）
+🔵 2. Firestore 構造（確定）
+✔ teachers/{email}
 
-✔ teacherSubjects_2025 / {email}
+教員マスタ
 
-その教員が担当する科目の一覧
-（担当解除＝ここから削除）
+✔ subjects/{subjectId}
 
-✔ subjects / {subjectId}
+科目マスタ
 
-科目マスタ（学年・コース・教科名などをまとめた ID）
+✔ teacherSubjects_2025/{email}
 
-✔ evaluationCriteria_2025 / {subjectId}
+教員×科目の担当割り当て
 
-📌 今年度の「科目の評価基準」（subjectId 一意）
+✔ evaluationCriteria_2025/{subjectId}
 
-もはや「教員×科目」のデータではない
+科目ごとの今年度の評価基準（1科目1レコード）
 
-科目に対して1つだけ存在
+項目例
 
-教員が変わっても評価基準は科目に属する
+method（評価方式：考査のみ／考査＋課題／実験）
 
-修正理由必須
+items[]（評価項目の配列）
 
-合計値 100 ±1% チェック
+totalPercent（合計割合）
 
-評価方式（考査のみ / 考査＋課題 / 実験）と項目行の管理
+isSaved（UI 用フラグ）
 
-✔ evaluationLocks_2025 / {subjectId}
+✔ evaluationLocks_2025/{subjectId}
 
-評価基準の編集排他制御
+編集ロック（排他制御）
 
-編集開始時 → lock
+✔ evaluationHistory/{id}
 
-科目切替/ページ離脱時 → unlock
+評価基準の修正履歴（before/after/理由/編集者など）
 
-他教員が編集中の場合 → 編集不可（閲覧のみ）
+✔ drafts/{id}
 
-✔ evaluationHistory / {autoId}
+成績入力の途中保存（後で使用）
 
-評価基準の修正履歴
+🔵 3. 各画面の役割（確定）
+✔ index.html
 
-before / after
+ログイン→自動遷移ハブ
 
-編集者 email
+✔ start.html
 
-修正理由
+ホーム画面
+（ログイン後のメインメニュー）
 
-時刻
-※ オーナー・管理用ログとして残す
+✔ subjects.html
 
-✔ drafts / {id}
+担当科目登録
 
-成績入力画面側で利用予定
+科目読込
 
-✔ settings / evaluationPeriod
+追加 / 削除
 
-評価基準入力期間・成績入力期間を後で実装可能
+評価基準入力画面へ遷移
 
-🔵 3. subjects.html（担当科目管理）の仕様（最新版）
-✔ 科目登録
+✔ evaluation.html
 
-学年・コース選択→科目読込→担当科目として登録
+評価基準入力
 
-Firestore: teacherSubjects_2025/{email}
+評価方式選択
 
-✔ 科目削除（超重要）
+行追加 / 削除
 
-確定仕様：担当者が 0 人になったら「評価基準を削除」する
+合計100±1%チェック
 
-状況	削除される？
-A先生だけが誤登録 → 評価基準入力 → 削除	✔ subjectId の evaluationCriteria を削除
-A先生が削除したが、B先生が同科目を担当している	❌ 削除しない（科目として有効）
-全教員が担当解除した	✔ 評価基準を削除（正しい）
-
-これにより：
-
-誤登録→誤評価基準入力→削除
-→ 評価基準が自動クリア
-
-正しい教員が後から登録しても
-→ 評価基準が真っさら（混乱ゼロ）
-
-✔ 履歴（evaluationHistory）は削除しない
-
-科目の修正履歴として残すのが正しい
-
-基準削除と履歴削除は別の責務
-
-✔ UI（削除時の警告）は変更済み
-
-「教務へ連絡してください」は削除
-「担当解除されます」に変更可能
-
-🔵 4. evaluation.html（評価基準入力画面）
-✔ 新仕様
-
-評価基準は subjectId 一意で管理
-
-✔ 主機能
-
-科目選択
-
-評価方式選択（UI タブ形式推奨）
-
-項目行追加/削除
-
-100% チェック
-
-保存（Firestore 書き込み）
-
-保存後はロックしたまま UI を編集不可
-
-「修正する」押下でロック更新→再編集
-
-修正理由必須
-
-修正履歴を保存
-
-ロック解放はページ離脱/科目切替など
-
-✔ UI
-
-ログイン表示
-
-評価方式タブ（折り返し無し）
-
-スタイリッシュなバナー（複数教員担当の注意表示）
-
-保存、修正、警告色など改善済み
-
-🔵 5. 評価基準削除ロジック（今回確定した新仕様）
-
-deleteSubject(subjectId) の流れ：
-
-教員 A が担当解除 → teacherSubjects_2025/{A} から subjectId を削除
-
-teacherSubjects_2025 全教員を走査して
-
-subjectId を持つ教員数をカウント
-
-count === 0 の場合のみ
-→ evaluationCriteria_2025/{subjectId} を削除
-
-履歴（evaluationHistory）は残す
-
-他教員の担当がある場合は評価基準は残す（正しい動作）
-
-🔵 6. Firestore Security Rules（現在の要点）
-
-teachers に存在する email のみ read/write
-
-subjectId 一意の構造に対応済み
-
-evaluationCriteria_2025 と evaluationLocks_2025 は write 許可
-
-students / 無関係ユーザーは全部拒否
-
-🔵 7. テストアカウント
-
-学内メール以外でも temporarily allow 設定可能（テスト期間中のみ）
-→ 本番移行時に除去
-
-🔵 8. 現状までで実装済み・完全動作が確認できたもの
-
-ログイン（Auth）
-
-教員名簿チェック
-
-科目登録 UI
-
-科目削除（担当解除＋担当0人時の基準自動削除）
-
-評価基準入力画面（subjectId 一意）
-
-ロック制御
+保存 → Firestore
 
 修正履歴
 
-UI の改善
+ロック制御
 
-全ページ連動のログイン中表示
+成績入力画面への遷移ボタン（今回の修正対象）
 
-評価方式の機能・UI
+✔ score_input.html
 
-100% チェック
+成績入力画面
+（現在 Step1〜2 の UI まで完了。今後本実装）
 
-教員が誤登録した評価基準の自動クリア（今回の新仕様）
+✔ view.html
 
-🔵 9. 次に進むべきステップ（あなたのプロジェクトの現状から最適ルート）
+教員用の成績閲覧・管理画面（後日）
 
-ここからの開発は以下の順番が最も安全で効率的です：
+🔵 4. 直近の致命的バグの修正状況
+✔ subjects.html → evaluation.html → score_input.html
 
-⭐ STEP 1：成績入力画面の設計（最重要）
+遷移ロジックの破損 → 修正済
 
-いよいよ本丸。
+✔ Copilot 介入により evaluation.html UI が崩壊
 
-evaluationCriteria_2025 に基づき入力フォーム自動生成
+→ 復旧済（最新評価基準UIが適用されている）
 
-行の項目名＋割合に従って成績欄生成
+✔ ログイン状態が消える問題
 
-drafts（途中保存）
+→ 修正済（遷移ロジックを統一）
 
-保存済ステータス
+✔ 成績入力画面で全学生が表示されてしまう
 
-ロック
+→ Step1–2 の段階のため、まだフィルタ実装前
+（これは仕様どおり）
 
-最終送信
+🔵 5. 現在の 未解決課題（今回発覚した重要ポイント）
+❗ 評価基準が保存されているのに、
+「途中再開 → 成績入力画面に遷移しない」問題
 
-科目切替と UI リセット
+原因：
+evaluation.html の ready 判定が data.isSaved に依存しているため、
+保存されていても UI側の条件と合わずボタンが非表示になる。
 
-正しい書式（成績一覧のサマリも含む）
+→ 今回 Stepごとの安全分割指示書にて修正した。
 
-次チャットでこの設計を開始するのが最適。
+🔵 6. 今回の修正対象（evaluation.html）
+🎯 目的
 
-⭐ STEP 2：成績期間（期末評価期間）ロック
+評価基準が正しく登録されている科目の場合のみ、
+「成績入力へ」ボタンを表示して score_input.html に飛べるようにする
 
-settings の evaluationPeriod に基づき
+🔵 7. 完全安全版 Copilot 分割指示書（確定版）
 
-期間外は入力不可
+以下をコピペして次チャットへ渡す。
 
-修正不可
+🧩 STEP1（HTMLの確認とミニ修正）
+【STEP1：evaluation.html の科目選択エリアに「成績入力へ」ボタンがあることを確認してください】
 
-閲覧のみ
+1. evaluation.html を開いてください。
+2. 「担当科目を選択」の <select id="subjectSelect"> を探してください。
+3. その直後の <div id="subjectStatus"> の下に、
+   以下のボタンが存在することを確認してください。
 
-⭐ STEP 3：教務用管理画面（未入力科目一覧）
+   <button id="goScoreBtn" class="mini-nav-btn" style="display:none;">成績入力へ</button>
 
-“評価基準未入力の科目一覧”
+4. 無ければ追加してください。
+5. HTMLの他部分（スタイル・ヘッダー等）は変更しないでください。
 
-“成績未入力の科目一覧”
+🧩 STEP2（DOM参照の確認）
+【STEP2：goScoreBtn の DOM参照が script 内に存在するか確認】
 
-授業担当全体の進捗確認
+1. script の先頭付近で次を探してください：
 
-運用上、必ず必要になる。
+   const goScoreBtn = document.getElementById("goScoreBtn");
 
-⭐ STEP 4：成績の PDF エクスポート
+2. 無ければ saveBtn の参照直後に追加してください。
+3. その他の参照を変更しないこと。
 
-教務が教員に「評価基準 PDF 出して」と言われるケースが多い
+🧩 STEP3（ready 判定ロジックの修正）※最重要
+【STEP3：評価基準の「準備完了」判定ロジックを修正】
 
-ロジック自体は簡単（Firestore → HTML → jsPDF）
+1. loadCriteria 関数を開いてください。
+2. 次のようなブロックを探してください。
 
-⭐ STEP 5：ロック自動解除（Cloud Functions）
+   const ready =
+     !!data.isSaved &&
+     !!data.method &&
+     totalPercent >= 99 &&
+     totalPercent <= 101;
 
-24時間以上残ったロックを削除
+3. この部分のみ次の内容に置き換えてください。
 
-事故防止
+   const ready =
+     !!data.method &&
+     totalPercent >= 99 &&
+     totalPercent <= 101;
 
-無料枠で運用可能
+4. if (goScoreBtn) { ... } ブロックはそのまま残し、
+   onclick 部分も変更しないでください。
+
+5. その他の処理（updateTotal など）は変更しないでください。
+
+🧩 STEP4（科目変更時の初期化処理は残す）
+【STEP4：科目変更時に goScoreBtn を隠す処理を削除しないでください】
+
+1. subjectSelect.addEventListener("change", ...) の中に、
+   goScoreBtn.style.display = "none"; が存在します。
+2. これは削除・変更しないでください。
+
+🧩 STEP5（保存処理の編集禁止）
+【STEP5：保存処理を編集しない】
+
+1. setDoc で isSaved を付けている部分はそのまま残してください。
+2. 保存処理（payload）には手を加えないでください。
+3. ready 判定だけ STEP3 の変更で実現します。
+
+🔵 8. これで修正後の動作はこうなる
+状況	挙動
+評価方式が未選択	成績入力ボタン非表示
+合計割合が99〜101%	成績入力ボタン表示
+未保存（isSaved=falseでもOK）	表示（今回の修正でOKにした）
+修正中（total崩壊）	非表示
+クリック	score_input.html?subjectId=… へ遷移
+🔵 9. 今後の開発ステップ（全体計画）
+
+この後進むべき順番は：
+
+成績入力画面（score_input.html）の本実装
+
+選択科目のフィルタ処理
+
+超過学生のUI実装
+
+調整点／赤点／色付け〜CSV出力
+
+drafts 保存ロジック
+
+Firestoreへの最終成績書き込み
+
+Cloud Functions によるロック自動解除
+
+教務用閲覧画面（view.html）
 
 🔵 10. 引き継ぎ書の使い方
 
-次チャットにこのまま貼るだけで：
+この全文をそのまま次チャットの最初に貼る
 
-現状を 100% 継承できる
+その後 Copilot へ **「安全分割指示書 STEP1 から順に適用してください」**と伝える
 
-仕様の誤解が防げる
+evaluation.html の修正が完了する
 
-次ステップの設計に即入れる
+📌 以上が、完全引き継ぎ書（最新版）です
 
-作業漏れを防止できる
+次のチャットでも この引き継ぎ書をそのまま貼るだけ でプロジェクトを確実に継続できます。
 
-あなたのプロジェクト全体を完全に再構築できる内容になっています。
+必要なら、今回の内容を PDF 化してお渡しすることも可能です。
