@@ -1,0 +1,339 @@
+/* ================================
+   ベース
+================================= */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* ================================
+   ヘッダー（共通）
+================================= */
+header {
+  background: #004A99;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+header .user-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+header .user-area button {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  background: #fff;
+  color: #004A99;
+  font-weight: 600;
+}
+
+/* ================================
+   ログインユーザ表示帯（共通）
+================================= */
+#userInfoArea {
+  background: #e5efff;
+  border-bottom: 1px solid #dbeafe;
+}
+
+#userInfoDisplay {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 6px 20px;
+  font-size: 12px;
+  color: #1e40af;
+}
+
+/* ================================
+   メインカード
+================================= */
+main {
+  max-width: 1100px;
+  margin: 20px auto 40px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+  padding: 20px 24px 24px;
+}
+
+/* ================================
+   上部コントロール
+================================= */
+.top-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.top-controls label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#subjectSelect {
+  min-width: 320px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  background: #fff;
+}
+
+/* ホームへ戻るボタン位置 */
+.top-home-btn {
+  margin-left: auto;
+}
+
+/* 関連リンク */
+.link-row {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.link-row a {
+  color: #004A99;
+  text-decoration: none;
+  margin-right: 16px;
+}
+.link-row a:hover {
+  text-decoration: underline;
+}
+
+/* ================================
+   見出し・メッセージ
+================================= */
+h2 {
+  font-size: 18px;
+  margin: 16px 0 8px;
+  border-left: 4px solid #004A99;
+  padding-left: 10px;
+}
+
+.info-message {
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 8px;
+}
+.info-message strong {
+  color: #111827;
+}
+
+/* ================================
+   モードタブ（素点 / 自動換算）
+   ※ ボタンの色は JS からも上書きされますが、
+      ここでベースのスタイルを定義
+================================= */
+.score-mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.score-mode-tabs button {
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #374151;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.score-mode-tabs button:hover {
+  box-shadow: 0 0 0 1px #bfdbfe;
+}
+
+/* ================================
+   テーブル
+================================= */
+.table-wrapper {
+  margin-top: 12px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  background: #fff;
+}
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead {
+  background: #f9fafb;
+}
+
+th, td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+td input[type="number"] {
+  width: 80px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+}
+
+/* 最終成績セル */
+.final-score {
+  font-weight: 600;
+  text-align: right;
+  color: #111827;
+}
+
+/* データがないときの行 */
+.no-data {
+  padding: 16px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* ================================
+   フッター操作部
+================================= */
+.footer-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-actions .note {
+  font-size: 12px;
+  color: #6b7280;
+  margin-right: auto;
+}
+
+/* ボタン共通 */
+.btn-primary {
+  background: #004A99;
+  color: #fff;
+  border-radius: 999px;
+  border: none;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 予備：サブボタンが必要になったとき用 */
+.btn-secondary {
+  background: #ffffff;
+  color: #004A99;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+/* バッジ用（必要なら） */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  margin-left: 8px;
+}
+
+.highlight {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+/* ================================
+   レスポンシブ
+================================= */
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  #userInfoDisplay {
+    padding: 6px 12px;
+  }
+
+  main {
+    margin: 12px;
+    padding: 14px 12px 18px;
+  }
+
+  .top-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #subjectSelect {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .top-home-btn {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+
+  .table-wrapper {
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 700px; /* 横スクロール許可 */
+  }
+}
+/* score_input では 2段目のログイン帯を非表示にする */
+#userInfoArea {
+  display: none;
+}

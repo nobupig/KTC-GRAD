@@ -6,730 +6,99 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" type="image/png" href="kindai.png">
 
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      margin: 0;
-      background: #f3f4f6;
-      color: #111827;
-    }
-
-    header {
-      background: #004A99;
-      color: #fff;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
-    }
-    header .user-area {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 13px;
-    }
-    header .user-area button {
-      border: none;
-      border-radius: 999px;
-      padding: 6px 14px;
-      cursor: pointer;
-      font-size: 12px;
-      background: #fff;
-      color: #004A99;
-      font-weight: 600;
-    }
-
-    main {
-      max-width: 1100px;
-      margin: 20px auto 40px;
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.06);
-      padding: 20px 24px 24px;
-    }
-
-    .top-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .top-controls label {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    #subjectSelect {
-      min-width: 320px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-      font-size: 14px;
-    }
-
-    .link-row {
-      margin-top: 4px;
-      font-size: 13px;
-    }
-    .link-row a {
-      color: #004A99;
-      text-decoration: none;
-      margin-right: 16px;
-    }
-    .link-row a:hover {
-      text-decoration: underline;
-    }
-
-    h2 {
-      font-size: 18px;
-      margin: 0 0 8px;
-      border-left: 4px solid #004A99;
-      padding-left: 10px;
-    }
-
-    .info-message {
-      font-size: 13px;
-      color: #4b5563;
-      margin-bottom: 12px;
-    }
-    .info-message strong {
-      color: #111827;
-    }
-
-    .table-wrapper {
-      margin-top: 12px;
-      border-radius: 12px;
-      border: 1px solid #e5e7eb;
-      overflow: hidden;
-      background: #fff;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    thead {
-      background: #f9fafb;
-    }
-    th, td {
-      padding: 6px 8px;
-      border-bottom: 1px solid #e5e7eb;
-      text-align: left;
-      white-space: nowrap;
-    }
-    th {
-      font-weight: 600;
-      font-size: 12px;
-    }
-    td input[type="number"] {
-      width: 80px;
-      padding: 4px 6px;
-      border-radius: 6px;
-      border: 1px solid #d1d5db;
-      font-size: 13px;
-    }
-    td .final-score {
-      font-weight: 600;
-      text-align: right;
-    }
-
-    .no-data {
-      padding: 16px;
-      text-align: center;
-      color: #6b7280;
-      font-size: 13px;
-    }
-
-    .footer-actions {
-      margin-top: 14px;
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 12px;
-    }
-    .footer-actions .note {
-      font-size: 12px;
-      color: #6b7280;
-      margin-right: auto;
-    }
-    .btn-primary {
-      background: #004A99;
-      color: #fff;
-      border-radius: 999px;
-      border: none;
-      padding: 8px 20px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 2px 8px;
-      font-size: 11px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      border: 1px solid #bfdbfe;
-      margin-left: 8px;
-    }
-
-    .highlight {
-      font-weight: 600;
-      color: #1d4ed8;
-    }
-  </style>
+  <!-- あなたのフォルダ構造に合わせた CSS 読み込み -->
+  <link rel="stylesheet" href="./app/score_input.css">
 </head>
+
 <body>
+  <!-- ========================================= -->
+  <!--  共通ヘッダー（start / subjects / eval と統一） -->
+  <!-- ========================================= -->
   <header>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <img src="kindai.png" alt="校章" style="width:30px;height:30px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <img src="kindai.png" alt="校章" style="width:32px; height:32px;">
       <h1>近大高専 成績システム｜成績入力</h1>
     </div>
     <div class="user-area">
       <div id="headerUserDisplay">ログイン中：-</div>
-      <button id="logoutBtn">ログアウト</button>
+      <button id="logoutBtn" type="button">ログアウト</button>
     </div>
   </header>
 
+  <!-- ========================================= -->
+  <!-- ログインユーザ表示帯（共通 UI） -->
+  <!-- ========================================= -->
+  <div id="userInfoArea">
+    <div id="userInfoDisplay">ログイン中：-</div>
+  </div>
+
+  <!-- ========================================= -->
+  <!--  メインカード -->
+  <!-- ========================================= -->
   <main>
+    <!-- 上部操作エリア -->
     <div class="top-controls">
       <label for="subjectSelect">対象科目：</label>
       <select id="subjectSelect"></select>
-      <button id="backHomeBtn" type="button" class="btn-primary" style="padding:6px 14px;font-size:12px;">
+
+      <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
         ホームへ戻る
       </button>
     </div>
+
+    <!-- 関連ページへのリンク -->
     <div class="link-row">
       <a id="toEvaluationLink" href="#">評価基準へ</a>
       <a id="toSubjectsLink" href="subjects.html">科目登録へ</a>
     </div>
 
     <h2>成績一覧</h2>
+
+    <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
     <div id="infoMessage" class="info-message">
-      対象科目と評価基準を読み込み中です…
+      成績を入力してください。（モード：自動換算モードがデフォルトです）
     </div>
 
+    <!-- テーブル部分 -->
     <div class="table-wrapper">
-      <table>
+      <table id="scoreTable">
         <thead>
           <tr id="scoreHeaderRow">
-            <!-- ヘッダは JS で動的生成 -->
+            <th>学籍番号</th>
+            <th>学年</th>
+            <th>組・コース</th>
+            <th>番号</th>
+            <th>氏名</th>
+            <!-- 評価基準ヘッダは criteria.js が動的に追加 -->
+            <th>最終成績</th>
           </tr>
         </thead>
+
         <tbody id="scoreTableBody">
-          <tr><td class="no-data" colspan="6">学生情報を読み込み中です…</td></tr>
+          <!-- 学生行は students.js で動的生成 -->
         </tbody>
       </table>
     </div>
 
+    <!-- 保存ボタン（将来の実装） -->
     <div class="footer-actions">
       <div class="note">
         ※ 現時点では「名簿表示」と「最終成績の自動計算」のみ実装済みです。<br>
         &nbsp;&nbsp;Firestore への本保存はこのあと段階的に実装していきます。
       </div>
-      <button id="saveBtn" class="btn-primary" type="button" disabled>保存する</button>
+
+      <button id="saveBtn" class="btn-primary" type="button" disabled>
+        保存する
+      </button>
     </div>
   </main>
 
+  <!-- ========================================= -->
+  <!-- JS 読み込み（あなたの public/js 構造に合わせたもの） -->
+  <!-- ========================================= -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import {
-      getAuth,
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import {
-      getFirestore,
-      doc,
-      getDoc,
-      collection,
-      getDocs
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-    /* ===== Firebase 初期化 ===== */
-    const firebaseConfig = {
-      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
-      authDomain: "ktc-grade-system.firebaseapp.com",
-      projectId: "ktc-grade-system",
-      storageBucket: "ktc-grade-system.appspot.com",
-      messagingSenderId: "490169300362",
-      appId: "1:490169300362:web:7c6e7b47a394d68d514473",
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db   = getFirestore(app);
-
-    /* ===== DOM 要素 ===== */
-    const headerUserDisplay = document.getElementById("headerUserDisplay");
-    const logoutBtn         = document.getElementById("logoutBtn");
-    const backHomeBtn       = document.getElementById("backHomeBtn");
-    const subjectSelect     = document.getElementById("subjectSelect");
-    const infoMessage       = document.getElementById("infoMessage");
-    const scoreHeaderRow    = document.getElementById("scoreHeaderRow");
-    const scoreTableBody    = document.getElementById("scoreTableBody");
-    const saveBtn           = document.getElementById("saveBtn");
-    const toEvaluationLink  = document.getElementById("toEvaluationLink");
-    const toSubjectsLink    = document.getElementById("toSubjectsLink");
-
-    /* ===== グローバル状態 ===== */
-    const CURRENT_YEAR = new Date().getFullYear();
-    let currentUser = null;
-    let teacherSubjects = [];   // teacherSubjects_YYYY の subjects 配列
-    let allStudents = [];       // students コレクション全件
-    let currentSubject = null;  // subjects 配列の 1 要素
-    let criteriaItems = [];     // 評価基準 items[]
-    let normalizedWeights = []; // 評価基準の正規化済み割合（合計100）
-    let currentStudents = [];   // 対象科目用にフィルタ＋ソートした学生リスト
-
-    /* ==========================
-       ユーティリティ
-    ========================== */
-
-    function getQueryParam(name) {
-      const params = new URLSearchParams(window.location.search);
-      return params.get(name);
-    }
-
-    function buildSubjectLabel(s) {
-      // 「2年 / G / 後期 / 国語2b（G）」のような形式
-      const grade = s.grade ?? "";
-      const course = s.course ?? "";
-      const semester = s.semester ?? "";
-      const name = s.name ?? "";
-      return `${grade}年 / ${course} / ${semester} / ${name}`;
-    }
-
-    function normalizeWeights(weights) {
-      const total = weights.reduce((sum, v) => sum + (Number(v) || 0), 0);
-      if (total === 0) return weights.map(() => 0);
-      if (total >= 99 && total <= 101) {
-        const factor = 100 / total;
-        return weights.map(v => (Number(v) || 0) * factor);
-      }
-      return weights;
-    }
-
-    // 共通科目の並び順 M→E→I→C→A
-    function getCoursePriority(courseClass) {
-      const c = String(courseClass || "").toUpperCase();
-      const priority = { "M": 1, "E": 2, "I": 3, "C": 4, "A": 5 };
-      return priority[c] ?? 99;
-    }
-
-    /* ==========================
-       生徒フィルタ・ソート
-       仕様：
-       - 1,2年：学年全員（コース問わず）
-       - 3〜5年：
-         ・course=G（共通）：その学年の全員
-         ・course=C ：C と A の両方
-         ・course=CC：C のみ
-         ・course=CA：A のみ
-         ・その他(M/E/I/C/A)：そのコースのみ
-       - 並び順：
-         ・共通：M→E→I→C→A のコース順 → 番号
-         ・C＋A の混在：C→A → 番号
-         ・単一コース：番号順
-    ========================== */
-    function filterAndSortStudentsForSubject(subject) {
-      if (!subject) return [];
-
-      const targetGrade  = String(subject.grade ?? "");
-      const subjectCourse = String(subject.course ?? "").toUpperCase();
-
-      const byGrade = allStudents.filter(s => String(s.grade ?? "") === targetGrade);
-
-      // 1・2年は学年全体
-      if (targetGrade === "1" || targetGrade === "2") {
-        return byGrade.slice().sort((a, b) => {
-          const ca = getCoursePriority(a.courseClass);
-          const cb = getCoursePriority(b.courseClass);
-          if (ca !== cb) return ca - cb;
-          return (a.number || 0) - (b.number || 0);
-        });
-      }
-
-      // 3〜5年
-      const commonLike = !subjectCourse || subjectCourse === "G" || subjectCourse === "COMMON";
-
-      if (commonLike) {
-        // 共通科目：全コース
-        return byGrade.slice().sort((a, b) => {
-          const ca = getCoursePriority(a.courseClass);
-          const cb = getCoursePriority(b.courseClass);
-          if (ca !== cb) return ca - cb;
-          return (a.number || 0) - (b.number || 0);
-        });
-      }
-
-      if (subjectCourse === "C") {
-        // C科目：C + A
-        const target = byGrade.filter(s => {
-          const c = String(s.courseClass || "").toUpperCase();
-          return c === "C" || c === "A";
-        });
-        const courseOrder = { "C": 1, "A": 2 };
-        return target.sort((a, b) => {
-          const ca = courseOrder[String(a.courseClass || "").toUpperCase()] ?? 99;
-          const cb = courseOrder[String(b.courseClass || "").toUpperCase()] ?? 99;
-          if (ca !== cb) return ca - cb;
-          return (a.number || 0) - (b.number || 0);
-        });
-      }
-
-      if (subjectCourse === "CC") {
-        // CC：C のみ
-        const target = byGrade.filter(
-          s => String(s.courseClass || "").toUpperCase() === "C"
-        );
-        return target.sort((a, b) => (a.number || 0) - (b.number || 0));
-      }
-
-      if (subjectCourse === "CA") {
-        // CA：A のみ
-        const target = byGrade.filter(
-          s => String(s.courseClass || "").toUpperCase() === "A"
-        );
-        return target.sort((a, b) => (a.number || 0) - (b.number || 0));
-      }
-
-      // 一般：単一コース（M/E/I/C/A など）
-      const target = byGrade.filter(
-        s => String(s.courseClass || "").toUpperCase() === subjectCourse
-      );
-      return target.sort((a, b) => (a.number || 0) - (b.number || 0));
-    }
-
-    /* ==========================
-       表のレンダリング
-    ========================== */
-    function renderTableHeader() {
-      scoreHeaderRow.innerHTML = "";
-
-      const ths = [];
-
-      function addTh(label) {
-        const th = document.createElement("th");
-        th.textContent = label;
-        ths.push(th);
-      }
-
-      addTh("学籍番号");
-      addTh("学年");
-      addTh("組・コース");
-      addTh("番号");
-      addTh("氏名");
-
-      if (criteriaItems.length === 0) {
-        addTh("評価項目");
-      } else {
-        for (const item of criteriaItems) {
-          const name = item.name || "";
-          const percent = item.percent ?? 0;
-          const th = document.createElement("th");
-          th.textContent = `${name} (${percent}%)`;
-          ths.push(th);
-        }
-      }
-
-      addTh("最終成績");
-
-      ths.forEach(th => scoreHeaderRow.appendChild(th));
-    }
-
-    function renderStudentRows() {
-      scoreTableBody.innerHTML = "";
-
-      if (!currentSubject) {
-        const tr = document.createElement("tr");
-        const td = document.createElement("td");
-        td.colSpan = 6;
-        td.className = "no-data";
-        td.textContent = "科目が選択されていません。";
-        tr.appendChild(td);
-        scoreTableBody.appendChild(tr);
-        return;
-      }
-
-      if (currentStudents.length === 0) {
-        const tr = document.createElement("tr");
-        const td = document.createElement("td");
-        td.colSpan = 6;
-        td.className = "no-data";
-        td.textContent = "学生情報が登録されていません。";
-        tr.appendChild(td);
-        scoreTableBody.appendChild(tr);
-        return;
-      }
-
-      for (const stu of currentStudents) {
-        const tr = document.createElement("tr");
-        tr.dataset.studentId = stu.studentId;
-
-        function addCell(text) {
-          const td = document.createElement("td");
-          td.textContent = text;
-          tr.appendChild(td);
-          return td;
-        }
-
-        addCell(stu.studentId || "");
-        addCell(stu.grade ?? "");
-        addCell(stu.courseClass ?? "");
-        addCell(stu.number ?? "");
-        addCell(stu.name ?? "");
-
-        if (criteriaItems.length === 0) {
-          const td = document.createElement("td");
-          td.textContent = "-";
-          tr.appendChild(td);
-        } else {
-          criteriaItems.forEach((item, index) => {
-            const td = document.createElement("td");
-            const input = document.createElement("input");
-            input.type = "number";
-            input.min = "0";
-            input.max = "100";
-            input.step = "0.1";
-            input.dataset.index = String(index);
-            input.addEventListener("input", () => {
-              updateFinalScoreForRow(tr);
-            });
-            td.appendChild(input);
-            tr.appendChild(td);
-          });
-        }
-
-        const finalTd = document.createElement("td");
-        finalTd.className = "final-score";
-        finalTd.textContent = "";
-        tr.appendChild(finalTd);
-
-        scoreTableBody.appendChild(tr);
-      }
-    }
-
-    function updateFinalScoreForRow(tr) {
-      if (!criteriaItems.length || !normalizedWeights.length) return;
-
-      const inputs = tr.querySelectorAll("input[type='number']");
-      let total = 0;
-
-      inputs.forEach(input => {
-        const idx = Number(input.dataset.index || "0");
-        const raw = Number(input.value || "0");
-        const w = normalizedWeights[idx] ?? 0;
-        total += raw * w / 100;
-      });
-
-      const finalCell = tr.querySelector(".final-score");
-      if (finalCell) {
-        finalCell.textContent = Number.isFinite(total)
-          ? Math.floor(total).toString()
-          : "";
-      }
-    }
-
-    function updateAllFinalScores() {
-      const rows = scoreTableBody.querySelectorAll("tr");
-      rows.forEach(tr => updateFinalScoreForRow(tr));
-    }
-
-    /* ==========================
-       Firestore 読み込み
-    ========================== */
-    async function loadTeacherSubjects(email) {
-      const colName = `teacherSubjects_${CURRENT_YEAR}`;
-      const ref = doc(db, colName, email);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        teacherSubjects = [];
-        return;
-      }
-      const data = snap.data() || {};
-      teacherSubjects = data.subjects || [];
-      teacherSubjects.sort((a, b) => {
-        const ga = Number(a.grade || 0);
-        const gb = Number(b.grade || 0);
-        if (ga !== gb) return ga - gb;
-        const ca = String(a.course || "");
-        const cb = String(b.course || "");
-        if (ca !== cb) return ca.localeCompare(cb, "ja");
-        const sa = String(a.semester || "");
-        const sb = String(b.semester || "");
-        if (sa !== sb) return sa.localeCompare(sb, "ja");
-        return String(a.name || "").localeCompare(String(b.name || ""), "ja");
-      });
-    }
-
-    async function loadAllStudents() {
-      const snap = await getDocs(collection(db, "students"));
-      allStudents = snap.docs.map(d => d.data() || []);
-    }
-
-    async function loadCriteria(subjectId) {
-      criteriaItems = [];
-      normalizedWeights = [];
-
-      if (!subjectId) return;
-
-      const colName = `evaluationCriteria_${CURRENT_YEAR}`;
-      const ref = doc(db, colName, subjectId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-
-      const data = snap.data() || {};
-      const items = data.items || [];
-      criteriaItems = items.map(it => ({
-        name: it.name || "",
-        percent: Number(it.percent || 0),
-      }));
-      normalizedWeights = normalizeWeights(criteriaItems.map(it => it.percent));
-    }
-
-    /* ==========================
-       画面初期化
-    ========================== */
-    function populateSubjectSelect() {
-      subjectSelect.innerHTML = "";
-
-      if (!teacherSubjects.length) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "担当科目が登録されていません";
-        subjectSelect.appendChild(opt);
-        subjectSelect.disabled = true;
-        return;
-      }
-
-      teacherSubjects.forEach(s => {
-        const opt = document.createElement("option");
-        opt.value = s.subjectId;
-        opt.textContent = buildSubjectLabel(s);
-        subjectSelect.appendChild(opt);
-      });
-
-      subjectSelect.disabled = false;
-    }
-
-    function findSubjectById(subjectId) {
-      return teacherSubjects.find(s => s.subjectId === subjectId) || null;
-    }
-
-    async function changeSubject(subjectId) {
-      const subject = findSubjectById(subjectId);
-      currentSubject = subject;
-
-      if (!subject) {
-        infoMessage.textContent = "科目情報が取得できませんでした。";
-        renderTableHeader();
-        renderStudentRows();
-        return;
-      }
-
-      // 評価基準ページへのリンク
-      toEvaluationLink.href = `evaluation.html?subjectId=${encodeURIComponent(subject.subjectId)}`;
-
-      infoMessage.innerHTML = `
-        対象科目：<span class="highlight">${buildSubjectLabel(subject)}</span>
-        <span class="badge">名簿＆評価基準読み込み済み</span>
-      `;
-
-      await loadCriteria(subject.subjectId);
-      currentStudents = filterAndSortStudentsForSubject(subject);
-
-      renderTableHeader();
-      renderStudentRows();
-      updateAllFinalScores();
-
-      // まだ保存ロジックは未実装なのでボタンは無効のまま
-      saveBtn.disabled = true;
-    }
-
-    async function initForUser(user) {
-      await Promise.all([
-        loadTeacherSubjects(user.email),
-        loadAllStudents(),
-      ]);
-
-      populateSubjectSelect();
-
-      if (!teacherSubjects.length) {
-        infoMessage.textContent = "担当科目が登録されていません。科目登録画面から登録してください。";
-        renderTableHeader();
-        renderStudentRows();
-        return;
-      }
-
-      const urlSubjectId = getQueryParam("subjectId");
-      let initialSubjectId = urlSubjectId;
-
-      if (!initialSubjectId || !findSubjectById(initialSubjectId)) {
-        initialSubjectId = teacherSubjects[0].subjectId;
-      }
-
-      subjectSelect.value = initialSubjectId;
-      await changeSubject(initialSubjectId);
-    }
-
-    /* ==========================
-       イベント設定
-    ========================== */
-    subjectSelect.addEventListener("change", async () => {
-      const id = subjectSelect.value;
-      await changeSubject(id);
-    });
-
-    logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "index.html";
-    });
-
-    backHomeBtn.addEventListener("click", () => {
-      window.location.href = "start.html";
-    });
-
-    saveBtn.addEventListener("click", () => {
-      // ここは後で STEP C 以降で実装予定
-      alert("成績の本保存処理は、後続ステップで実装します（現在は名簿表示＋計算のみ）");
-    });
-
-    /* ==========================
-       認証状態監視
-    ========================== */
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.href = "index.html";
-        return;
-      }
-      currentUser = user;
-      const displayName = user.displayName || user.email;
-      headerUserDisplay.textContent = `ログイン中：${displayName}`;
-
-      try {
-        await initForUser(user);
-      } catch (err) {
-        console.error("成績入力画面 初期化エラー:", err);
-        infoMessage.textContent = "成績入力画面の初期化中にエラーが発生しました。時間をおいて再度お試しください。";
-      }
-    });
+    import { initScoreInput } from "./js/score_input_loader.js";
+    initScoreInput();
   </script>
-
-<script type="module" src="js/score_input_loader.js"></script>
-
 </body>
 </html>
