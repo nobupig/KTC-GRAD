@@ -37,6 +37,7 @@ import {
   getFirestore,
   doc,
   getDoc,
+  setDoc,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 
@@ -168,6 +169,93 @@ function findSubjectById(subjectId) {
   return teacherSubjects.find((s) => s.subjectId === subjectId) || null;
 }
 
+// 新規追加: 選択科目の登録情報を取得
+async function ensureElectiveRegistrationLoaded(subject) {
+  if (!subject || !subject.subjectId) return;
+
+  // "required: false" 以外なら何もしない
+  if (subject.required !== false) return;
+
+  const colName = `electiveRegistrations_${currentYear}`;
+  const regRef = doc(db, colName, subject.subjectId);
+  const snap = await getDoc(regRef);
+
+  if (snap.exists()) {
+    const data = snap.data() || {};
+    const students = Array.isArray(data.students) ? data.students : [];
+    studentState.electiveStudents = students;
+  } else {
+    studentState.electiveStudents = [];
+  }
+}
+
+// 新規追加: 選択科目受講者登録モーダル
+async function openElectiveRegistrationModal(subject) {
+  const modal = document.getElementById("electiveModal");
+  const listEl = document.getElementById("electiveStudentList");
+  const cancelBtn = document.getElementById("electiveCancelBtn");
+  const registerBtn = document.getElementById("electiveRegisterBtn");
+
+  if (!modal || !listEl) return;
+
+  // すでに登録済みならモーダルは出さない
+  if (studentState.electiveStudents && studentState.electiveStudents.length > 0) {
+    return;
+  }
+
+  // 学年一致の全学生表示
+  const grade = String(subject.grade);
+  const candidates = studentState.allStudents.filter(s => String(s.grade) === grade);
+
+  listEl.innerHTML = "";
+  candidates.forEach(stu => {
+    const row = document.createElement("div");
+    row.className = "ktc-student-item";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.dataset.studentId = stu.studentId;
+
+    const label = document.createElement("label");
+    label.textContent = `${stu.studentId} / ${stu.courseClass} / ${stu.number} / ${stu.name}`;
+
+    row.appendChild(cb);
+    row.appendChild(label);
+    listEl.appendChild(row);
+  });
+
+  modal.style.display = "flex";
+
+  cancelBtn.onclick = () => {
+    modal.style.display = "none";
+  };
+
+  registerBtn.onclick = async () => {
+    const checked = Array.from(listEl.querySelectorAll("input[type='checkbox']:checked"))
+      .map(cb => cb.dataset.studentId);
+
+    if (checked.length === 0) {
+      alert("少なくとも1名を選択してください。");
+      return;
+    }
+
+    const selected = studentState.allStudents.filter(s => checked.includes(s.studentId));
+
+    const colName = `electiveRegistrations_${currentYear}`;
+    const regRef = doc(db, colName, subject.subjectId);
+
+    await setDoc(regRef, {
+      subjectId: subject.subjectId,
+      students: selected,
+      updatedAt: new Date(),
+    });
+
+    studentState.electiveStudents = selected;
+
+    modal.style.display = "none";
+    await handleSubjectChange(subject.subjectId);
+  };
+}
 
 // ================================
 // 科目選択時の処理
@@ -185,6 +273,8 @@ async function handleSubjectChange(subjectId) {
   }
 
   const subject = findSubjectById(subjectId);
+  await ensureElectiveRegistrationLoaded(subject);
+  if (subject && subject.required === false) { await openElectiveRegistrationModal(subject); }
   if (!subject) {
     setInfoMessage("選択された科目情報が見つかりません。");
     headerRow.innerHTML = "";
@@ -210,11 +300,25 @@ async function handleSubjectChange(subjectId) {
   // 科目に応じて学生フィルタ＆ソート
   const students = filterAndSortStudentsForSubject(subject, studentState);
 
+  // ▼ 選択科目(required=false)の場合は、electiveStudents でさらに絞り込む
+  let displayStudents = students;
+  if (subject.required === false) {
+    const list = studentState.electiveStudents || [];
+    if (list.length > 0) {
+      const allowedIds = new Set(list.map(s => s.studentId));
+      displayStudents = students.filter(s => allowedIds.has(s.studentId));
+    } else {
+      displayStudents = []; // 登録が無い場合は0名
+    }
+  } else {
+    displayStudents = students;
+  }
+
   // 学生行描画（入力時にその行の最終成績を計算）
   renderStudentRows(
     tbody,
     subject,
-    students,
+    displayStudents,
     criteriaState.items,
     (tr) => {
       updateFinalScoreForRow(tr, criteriaState, modeState);

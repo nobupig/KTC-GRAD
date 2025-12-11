@@ -1,3 +1,47 @@
+/* 選択科目モーダル・学生リスト用CSS */
+.ktc-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.ktc-modal-content {
+  background: #fff;
+  padding: 20px;
+  width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 8px;
+}
+
+.ktc-student-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.ktc-student-item {
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.ktc-student-item label {
+  margin-left: 6px;
+}
+
+.ktc-modal-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
 /* ================================
    ベース
 ================================= */

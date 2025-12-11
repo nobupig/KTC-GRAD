@@ -15,6 +15,7 @@ export function createStudentState() {
   return {
     allStudents: [],
     currentStudents: [],
+    electiveStudents: [],   // 選択科目用（追加するだけ）
   };
 }
 
