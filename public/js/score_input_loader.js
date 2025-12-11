@@ -20,10 +20,14 @@ import {
   createModeState,
   initModeTabs,
   updateFinalScoreForRow,
+  updateAllFinalScores,   // ★これを追加！
 } from "./score_input_modes.js";
 
+
 // Firebase SDK
+import {applyPastedScores} from "./score_input_paste.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+
 import {
   getAuth,
   onAuthStateChanged,
@@ -34,6 +38,7 @@ import {
   doc,
   getDoc,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
 
 
 // ================================
@@ -80,6 +85,7 @@ let subjectIdFromURL = urlParams.get("subjectId") || null;
 const criteriaState = createCriteriaState();
 const studentState = createStudentState();
 const modeState = createModeState();
+let pasteInitialized = false;
 
 const currentYear = new Date().getFullYear();
 let teacherSubjects = []; // 教員の担当科目リスト（teacherSubjects_YYYY の subjects 配列）
@@ -215,6 +221,24 @@ async function handleSubjectChange(subjectId) {
     }
   );
 
+  // ▼ 貼り付け処理の接続（初回だけ）
+  if (!pasteInitialized) {
+    tbody.addEventListener("paste", (ev) => {
+      ev.preventDefault();
+      const text = ev.clipboardData?.getData("text/plain") ?? "";
+      if (!text) return;
+
+      applyPastedScores(
+        text,
+        tbody,
+        criteriaState,
+        modeState,
+        (msg) => window.alert(msg)
+      );
+    });
+    pasteInitialized = true;
+  }
+
   // 評価基準がない場合は注意メッセージ
   if (!criteriaState.items.length) {
     setInfoMessage(
@@ -231,12 +255,100 @@ async function handleSubjectChange(subjectId) {
     )}`;
   }
 
+// STEP C：フィルタ UI を生成
+renderGroupOrCourseFilter(subject);
+
+
   // 保存ボタンはまだ本保存未実装なので disable のまま
   if (saveBtn) {
     saveBtn.disabled = true;
   }
 }
 
+// ================================
+// ★ STEP C：共通科目フィルタ UI 生成
+// ================================
+function renderGroupOrCourseFilter(subject) {
+  const area = document.getElementById("groupFilterArea");
+  if (!area) return;
+
+  area.innerHTML = ""; // クリア
+
+  const grade = String(subject.grade || "");
+  const course = String(subject.course || "").toUpperCase();
+
+  const isCommon = (!course || course === "G" || course === "COMMON");
+
+  if (!isCommon) {
+    // 共通科目でなければ非表示
+    return;
+  }
+
+  let filters = [];
+
+  if (grade === "1" || grade === "2") {
+    // 1～2年は組フィルタ（1〜5組）
+    filters = ["all", "1", "2", "3", "4", "5"];
+  } else {
+    // 3年以上はコースフィルタ（M/E/I/CA）
+    filters = ["all", "M", "E", "I", "CA"];
+  }
+
+  const container = document.createElement("div");
+  container.className = "filter-button-group";
+
+  filters.forEach(key => {
+    const btn = document.createElement("button");
+    btn.className = "filter-btn";
+    btn.dataset.filterKey = key;
+    btn.textContent = (key === "all") ? "全員" : key;
+
+    // 初期状態は「全員」をアクティブに
+    if (key === "all") {
+      btn.classList.add("active");
+    }
+
+    btn.addEventListener("click", () => {
+      // いったん全ボタンの active を外す
+      container.querySelectorAll(".filter-btn").forEach(b => {
+        b.classList.remove("active");
+      });
+      // 自分だけ active
+      btn.classList.add("active");
+
+      // フィルタ適用
+      applyGroupOrCourseFilter(subject, key);
+    });
+
+    container.appendChild(btn);
+  });
+
+  area.appendChild(container);
+}
+
+// ================================
+// STEP C：フィルタ処理本体
+// ================================
+function applyGroupOrCourseFilter(subject, filterKey) {
+  // baseList = 科目ごとの初期並び済リスト（共通科目なら全学生）
+  const baseList = studentState.currentStudents.slice();
+
+  import("./score_input_students.js").then(({ filterStudentsByGroupOrCourse }) => {
+    const filtered = filterStudentsByGroupOrCourse(subject, baseList, filterKey);
+
+    // tbody 再描画
+    renderStudentRows(
+      tbody,
+      subject,
+      filtered,
+      criteriaState.items,
+      (tr) => updateFinalScoreForRow(tr, criteriaState, modeState)
+    );
+
+    // 再計算
+    updateAllFinalScores(tbody, criteriaState, modeState);
+  });
+}
 
 // ================================
 // 初期化

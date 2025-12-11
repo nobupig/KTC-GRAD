@@ -254,19 +254,29 @@ export function renderStudentRows(
       criteriaItems.forEach((item, index) => {
         const td = document.createElement("td");
         const input = document.createElement("input");
+          // ▼ 評価項目の満点（percent）を data に保持（素点モードの最大値判定に必要）
+          input.dataset.weightPercent = String(item.percent ?? 0);
+
         input.type = "number";
         input.min = "0";
         input.max = "100";
         input.step = "0.1";
         input.dataset.index = String(index);
         input.dataset.itemName = item.name || "";
+        input.addEventListener("paste", (ev) => ev.preventDefault());
         input.addEventListener("input", () => {
           if (typeof onScoreInputChange === "function") {
             onScoreInputChange(tr);
           }
         });
         td.appendChild(input);
-        tr.appendChild(td);
+        // ▼ 内部換算点表示用の <span>
+          const span = document.createElement("span");
+          span.className = "converted-score";
+          span.style.marginLeft = "4px";
+          span.textContent = "";  // 初期は空
+          td.appendChild(span);
+          tr.appendChild(td);
       });
     }
 
@@ -277,4 +287,33 @@ export function renderStudentRows(
 
     tbody.appendChild(tr);
   }
+}
+// =============================================
+// STEP C：組/コースフィルタ関数
+// =============================================
+export function filterStudentsByGroupOrCourse(subject, baseList, filterKey) {
+  if (!subject || !Array.isArray(baseList)) return baseList;
+
+  filterKey = String(filterKey || "").toUpperCase();
+  if (filterKey === "ALL") return baseList;
+
+  const grade = String(subject.grade || "");
+
+  if (grade === "1" || grade === "2") {
+    // 1〜2年 → 組フィルタ
+    return baseList.filter(stu => String(stu.classGroup || stu.courseClass || "") === filterKey);
+  }
+
+  // 3年以上 → コースフィルタ
+  if (filterKey === "CA") {
+    return baseList.filter(stu => {
+      const c = String(stu.courseClass || "").toUpperCase();
+      return c === "C" || c === "A";
+    });
+  }
+
+  return baseList.filter(stu => {
+    const c = String(stu.courseClass || "").toUpperCase();
+    return c === filterKey;
+  });
 }

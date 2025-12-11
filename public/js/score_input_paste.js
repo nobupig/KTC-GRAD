@@ -1,125 +1,114 @@
 // js/score_input_paste.js
-// STEP B-5：貼り付け入力ロジック
+// ★あなた専用・完全版：Excel貼付け最適化版★
 
 import { updateFinalScoreForRow } from "./score_input_modes.js";
 
 /**
- * 貼り付けテキストをパースして 2次元配列にする
- *
- * 例:
- *  91905011,50,30
- *  91905012,45,35.5
- *
- * @param {string} text
- * @returns {string[][]}
+ * Excel などの貼り付けテキストを 2次元配列に変換
+ * 空行は "すべて空セル" として扱い、後でスキップ判定する
  */
-function parsePastedText(text) {
+function parsePasted(text) {
   return text
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => line.split(/[,\t]/).map((s) => s.trim()));
+    .map(line => line.split(/\t|,/).map(v => v.trim()));
 }
 
 /**
- * 貼り付けされたスコアを tbody に反映する
+ * 貼り付け開始列を取得
+ * @param {HTMLElement} activeElement
+ * @returns {number|null}
+ */
+function getStartCol(activeElement) {
+  if (!activeElement) return null;
+  const idx = activeElement.dataset.index;
+  if (idx == null) return null;
+  return Number(idx);
+}
+
+/**
+ * メイン処理：
+ * Excel 貼付け → 行列方向に学生表へ反映
  *
  * @param {string} pastedText
  * @param {HTMLTableSectionElement} tbody
  * @param {{ items:any[], normalizedWeights:number[] }} criteriaState
  * @param {{ currentMode:string }} modeState
- * @param {(msg:string)=>void} [showAlert]
- * @returns {boolean}  成功時 true, 失敗時 false
  */
-export function applyPastedScores(
-  pastedText,
-  tbody,
-  criteriaState,
-  modeState,
-  showAlert
-) {
-  const alertFn =
-    showAlert ||
-    ((msg) => {
-      window.alert(msg);
-    });
-
-  const rowsData = parsePastedText(pastedText);
-  if (!rowsData.length) {
-    alertFn("貼り付けデータが空です。");
+export function applyPastedScores(pastedText, tbody, criteriaState, modeState) {
+  const rows = parsePasted(pastedText);
+  if (!rows.length) {
+    alert("貼り付けデータが読み取れません。");
     return false;
   }
 
-  const expectedItemCount = criteriaState.items?.length ?? 0;
-  if (!expectedItemCount) {
-    alertFn("評価項目が設定されていないため、貼り付けできません。");
+  // 貼付け開始位置（現在フォーカス中のセル）
+  const active = document.activeElement;
+  const startCol = getStartCol(active);
+
+  if (startCol == null) {
+    alert("貼り付け対象のセルを選択してから貼り付けしてください。");
     return false;
   }
 
-  // 1行目で列数チェック
-  const first = rowsData[0];
-  if (first.length !== expectedItemCount + 1) {
-    alertFn(
-      `列数が一致しません。先頭列に学籍番号、その後ろに ${expectedItemCount} 個のスコアを並べてください。`
-    );
+  const studentRows = Array.from(tbody.querySelectorAll("tr"));
+  const studentCount = studentRows.length;
+
+  // 1行目で横方向の列数を確認（Excel側で貼られた列数）
+  const pasteColCount = rows[0].length;
+  if (pasteColCount === 0) {
+    alert("貼り付けデータが空です。");
     return false;
   }
 
-  // 事前に tbody 内の行を studentId → tr にマッピング
-  const trMap = new Map();
-  tbody.querySelectorAll("tr").forEach((tr) => {
-    const id = tr.dataset.studentId;
-    if (id) trMap.set(String(id), tr);
-  });
+  // Web 側の評価項目数
+  const itemCount = criteriaState.items.length;
 
-  // 1回検証用の領域（破壊的変更は最後まで行わない）
-  const patchPlan = [];
-
-  for (const cols of rowsData) {
-    const [studentId, ...scoresRaw] = cols;
-    const tr = trMap.get(studentId);
-    if (!tr) {
-      alertFn(`学籍番号 ${studentId} に対応する行が見つかりません。`);
-      return false;
-    }
-
-    if (scoresRaw.length !== expectedItemCount) {
-      alertFn(
-        `学籍番号 ${studentId} の列数が不正です。期待列数: ${expectedItemCount} 件`
-      );
-      return false;
-    }
-
-    const inputs = tr.querySelectorAll("input[type='number']");
-    if (inputs.length !== expectedItemCount) {
-      alertFn(
-        `学籍番号 ${studentId} の入力欄数が評価項目数と一致しません。`
-      );
-      return false;
-    }
-
-    const numericValues = scoresRaw.map((v) => Number(v || "0"));
-    if (numericValues.some((v) => !Number.isFinite(v))) {
-      alertFn(
-        `学籍番号 ${studentId} に数値以外の値が含まれています。`
-      );
-      return false;
-    }
-
-    patchPlan.push({
-      tr,
-      values: numericValues,
-    });
+  // startCol から itemCount を超えないかチェック
+  if (startCol + pasteColCount > itemCount) {
+    alert("貼り付け列数が評価項目数を超えています。");
+    return false;
   }
 
-  // ここまで来たら、一括で反映
-  patchPlan.forEach(({ tr, values }) => {
-    const inputs = tr.querySelectorAll("input[type='number']");
-    inputs.forEach((input, idx) => {
-      input.value = String(values[idx] ?? "");
-    });
-    updateFinalScoreForRow(tr, criteriaState, modeState, alertFn);
-  });
+  // 貼り付け開始行：学生の最初の行 or 現在の学生行（Excel 行とずらす運用はしない設計）
+  let webRowIndex = studentRows.findIndex(tr => tr.contains(active));
+  if (webRowIndex === -1) webRowIndex = 0;
+
+  let pasteRowIndex = 0;
+
+  while (pasteRowIndex < rows.length && webRowIndex < studentCount) {
+    const vals = rows[pasteRowIndex];
+
+    // 空行判定（すべて空セルの行 → スキップ）
+    const isEmptyRow = vals.every(v => v === "");
+    if (!isEmptyRow) {
+      const tr = studentRows[webRowIndex];
+      const inputs = tr.querySelectorAll("input[type='number']");
+
+      for (let c = 0; c < pasteColCount; c++) {
+        const cellValue = vals[c];
+
+        // 空セルの場合 → スキップ（上書きしない）
+        if (cellValue === "") continue;
+
+        const col = startCol + c;
+        const input = inputs[col];
+        if (!input) continue;
+
+        const num = Number(cellValue);
+        if (!Number.isFinite(num)) {
+          alert(`数値ではない値が含まれています（${cellValue}）。`);
+          return false;
+        }
+
+        input.value = String(num);
+      }
+
+      updateFinalScoreForRow(tr, criteriaState, modeState);
+    }
+
+    pasteRowIndex++;
+    webRowIndex++;
+  }
 
   return true;
 }

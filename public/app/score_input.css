@@ -147,6 +147,33 @@ h2 {
   margin: 6px 0 10px;
 }
 
+/* ================================
+   評価項目ごとのモードボタン（raw / scaled）
+   ※ criteria.js が付与する .crit-mode-btn に適用
+================================= */
+.crit-mode-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-size: 11px;
+  cursor: pointer;
+  margin-right: 4px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.crit-mode-btn:hover {
+  border-color: #60a5fa;
+}
+
+.crit-mode-btn.active {
+  background: #004A99;
+  color: #ffffff;
+  border-color: #004A99;
+  font-weight: 600;
+}
+
 .score-mode-tabs button {
   border-radius: 999px;
   border: 1px solid #d1d5db;
@@ -336,4 +363,54 @@ td input[type="number"] {
 /* score_input では 2段目のログイン帯を非表示にする */
 #userInfoArea {
   display: none;
+}
+
+/* 成績入力：エラーセル強調（B3 仕様・KTC安全版） */
+.ktc-input-error {
+  border: 2px solid #e53935 !important;  /* 赤枠（やや太め） */
+  background-color: #fdecea;             /* 薄い赤背景 */
+  box-sizing: border-box;
+}
+
+/* ============================
+   STEP C：フィルタボタン強調版
+   ============================ */
+
+.filter-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-btn {
+  padding: 6px 16px;
+  border-radius: 9999px;
+  border: 1px solid #004A99;
+  background: #ffffff;
+  color: #004A99;
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.75; /* 非選択はやや薄く */
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s,
+    opacity 0.2s,
+    transform 0.1s;
+}
+
+.filter-btn:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+/* ★ 選択中のボタンを強く強調する */
+.filter-btn.active {
+  background-color: #004A99;
+  color: white;
+  font-weight: 600;
+  opacity: 1;
+  border-color: #003570;
+  box-shadow: 0 0 0 3px rgba(0, 74, 153, 0.25);
+  transform: translateY(-1px);
 }
