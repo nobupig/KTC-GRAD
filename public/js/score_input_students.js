@@ -1,3 +1,26 @@
+/**
+ * 習熟度・コース・番号・ID順でソート
+ * @param {any[]} students
+ * @param {Object} skillLevelsMap
+ * @returns {any[]}
+ */
+export function sortStudentsBySkillLevel(students, skillLevelsMap) {
+  const skillOrder = { S: 1, A1: 2, A2: 3, A3: 4, "": 5 };
+  return students.slice().sort((a, b) => {
+    const sa = (skillLevelsMap?.[a.studentId] ?? "").toUpperCase();
+    const sb = (skillLevelsMap?.[b.studentId] ?? "").toUpperCase();
+    const o1 = skillOrder[sa] ?? 99;
+    const o2 = skillOrder[sb] ?? 99;
+    if (o1 !== o2) return o1 - o2;
+    const ca = Number(a.courseClass) || 0;
+    const cb = Number(b.courseClass) || 0;
+    if (ca !== cb) return ca - cb;
+    const na = Number(a.number) || 0;
+    const nb = Number(b.number) || 0;
+    if (na !== nb) return na - nb;
+    return String(a.studentId).localeCompare(String(b.studentId));
+  });
+}
 // js/score_input_students.js
 // STEP A：学生名簿の取得・フィルタ・テーブル行レンダリング専用モジュール
 
@@ -78,16 +101,22 @@ export function filterAndSortStudentsForSubject(subject, studentState) {
   );
 
   // 1・2年は学年全体
-  if (targetGrade === "1" || targetGrade === "2") {
-    const result = byGrade.slice().sort((a, b) => {
-      const ca = getCoursePriority(a.courseClass);
-      const cb = getCoursePriority(b.courseClass);
-      if (ca !== cb) return ca - cb;
-      return (a.number || 0) - (b.number || 0);
-    });
-    studentState.currentStudents = result;
-    return result;
-  }
+  // 1・2年は学年全体 → 組（1〜5）→番号 順で並べる（KTC仕様）
+if (targetGrade === "1" || targetGrade === "2") {
+  const result = byGrade.slice().sort((a, b) => {
+    const classA = Number(a.courseClass || a.classGroup || 0);
+    const classB = Number(b.courseClass || b.classGroup || 0);
+    if (classA !== classB) return classA - classB;
+
+    const numA = Number(a.number || 0);
+    const numB = Number(b.number || 0);
+    return numA - numB;
+  });
+
+  studentState.currentStudents = result;
+  return result;
+}
+
 
   // 3〜5年
   const commonLike =
@@ -241,6 +270,42 @@ export function renderStudentRows(
       return td;
     };
 
+    // isSkillLevel===true の場合のみ、先頭にinput[type=text]セルを追加
+    if (subject && subject.isSkillLevel === true) {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "skill-level-input skill-input";
+      input.maxLength = 2;
+      input.dataset.studentId = String(stu.studentId);
+      input.readOnly = false;
+      input.disabled = false;
+      // ★ 手入力：途中入力を許可（A を消さない）→ blur で確定チェック
+      const FINAL_ALLOWED = ["", "S", "A1", "A2", "A3"];
+      const LIVE_ALLOWED  = ["", "S", "A", "A1", "A2", "A3"];
+      input.addEventListener("input", () => {
+        let v = input.value
+          .toUpperCase()
+          .replace(/　/g, "")
+          .replace(/\s+/g, "");
+        // 途中入力は許可（A もOK）
+        if (LIVE_ALLOWED.includes(v)) {
+          input.value = v;
+          return;
+        }
+        // それ以外は空にする
+        input.value = "";
+      });
+      input.addEventListener("blur", () => {
+        // blur 時は完成形のみ許可（A 単体は消す）
+        if (!FINAL_ALLOWED.includes(input.value)) {
+          input.value = "";
+        }
+      });
+      td.appendChild(input);
+      tr.appendChild(td);
+    }
+
     addCell(stu.studentId || "");
     addCell(stu.grade ?? "");
     addCell(stu.courseClass ?? "");
@@ -316,5 +381,41 @@ export function filterStudentsByGroupOrCourse(subject, baseList, filterKey) {
   return baseList.filter(stu => {
     const c = String(stu.courseClass || "").toUpperCase();
     return c === filterKey;
+  });
+}
+// =============================================
+// 共通ソート関数（受講者モーダル用）
+// =============================================
+export function sortStudents(list) {
+  if (!Array.isArray(list)) return [];
+
+  return list.slice().sort((a, b) => {
+    const ga = Number(a.grade || 0);
+    const gb = Number(b.grade || 0);
+    if (ga !== gb) return ga - gb;
+
+    // 1〜2年 → 組（1〜5）→ 番号 の順（成績一覧と同じ）
+    if (ga <= 2) {
+      const classA = Number(a.courseClass || a.classGroup || 0);
+      const classB = Number(b.courseClass || b.classGroup || 0);
+      if (classA !== classB) return classA - classB;
+
+      const numA = Number(a.number || 0);
+      const numB = Number(b.number || 0);
+      return numA - numB;
+    }
+
+    // 3年以降 → コース M/E/I/C/A → 番号 の順
+    const coursePriority = { M: 1, E: 2, I: 3, C: 4, A: 5 };
+    const pa =
+      coursePriority[String(a.courseClass || "").toUpperCase()] ?? 99;
+    const pb =
+      coursePriority[String(b.courseClass || "").toUpperCase()] ?? 99;
+
+    if (pa !== pb) return pa - pb;
+
+    const numA = Number(a.number || 0);
+    const numB = Number(b.number || 0);
+    return numA - numB;
   });
 }

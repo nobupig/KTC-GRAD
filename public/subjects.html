@@ -680,7 +680,9 @@
             semester: data.semester ?? "",
             required: data.required === true,
             // ★ 特別科目フラグ（未設定は false）
-            specialType: data.specialType === true
+            specialType: data.specialType === true,
+            // ★ 習熟度科目フラグ（未設定は false）
+            isSkillLevel: data.isSkillLevel === true
           });
         });
 
@@ -689,6 +691,7 @@
           const tr = document.createElement("tr");
           tr.dataset.id = s.id;
           tr.dataset.specialType = s.specialType ? "1" : "0";
+          tr.dataset.isSkillLevel = s.isSkillLevel === true ? "1" : "0";
 
           const tdCheck = document.createElement("td");
           const checkbox = document.createElement("input");
@@ -732,26 +735,32 @@
       }
     }
 
-    function getSelectedSubjects() {
-      const result = [];
-      const trs = subjectsTbody.querySelectorAll("tr");
-      trs.forEach((tr) => {
-        const check = tr.querySelector("input[type='checkbox']");
-        if (check && check.checked) {
-          const tds = tr.querySelectorAll("td");
-          result.push({
-            id: tr.dataset.id,
-            name: tds[1].textContent,
-            grade: tds[2].textContent.replace("年", ""),
-            course: tds[3].textContent,
-            semester: tds[4].textContent,
-            // ★ data-special-type を boolean に変換
-            specialType: tr.dataset.specialType === "1"
-          });
-        }
+function getSelectedSubjects() {
+  const result = [];
+  const trs = subjectsTbody.querySelectorAll("tr");
+  trs.forEach((tr) => {
+    const check = tr.querySelector("input[type='checkbox']");
+    if (check && check.checked) {
+      const tds = tr.querySelectorAll("td");
+      result.push({
+        id: tr.dataset.id,
+        name: tds[1].textContent,
+        grade: tds[2].textContent.replace("年", ""),
+        course: tds[3].textContent,
+        semester: tds[4].textContent,
+        // ★ 必修/選択 のバッジ表示から required を判定
+        // tds[5] には「必修」「選択」の文字が入っています
+        required: tds[5].textContent.includes("必修"),
+        // ★ data-special-type を boolean に変換
+        specialType: tr.dataset.specialType === "1",
+        // ★ 追加：習熟度フラグを保持
+        isSkillLevel: tr.dataset.isSkillLevel === "1"
       });
-      return result;
     }
+  });
+  return result;
+}
+
 
     // ▼ 登録済み科目一覧を描画する（STEP2：表示のみ・削除機能なし）
     function renderRegisteredSubjects(subjects) {
@@ -956,21 +965,30 @@
         oldSubjects = existingSnap.data().subjects || [];
       }
 
-      const newSubjects = selected.map((s) => ({
-        subjectId: s.id,
-        name: s.name,
-        grade: s.grade,
-        course: s.course,
-        semester: s.semester,
-        // ★ 追加：特別科目フラグ
-        specialType: s.specialType === true
-      }));
 
-      const merged = [...oldSubjects, ...newSubjects];
+  const newSubjects = selected.map((s) => ({
+    subjectId: s.id,
+    name: s.name,
+    grade: s.grade,
+    course: s.course,
+    semester: s.semester,
+    // ★ 必修/選択フラグ（なければ必修 true 扱い）
+    required: s.required === false ? false : true,
+    // ★ 追加：特別科目フラグ
+    specialType: s.specialType === true,
+    // ★ 追加：習熟度科目フラグ（未定義は false）
+    isSkillLevel: s.isSkillLevel === true
+  }));
+
+
+
+      const merged = [...newSubjects, ...oldSubjects];
       const unique = merged.filter(
         (item, index, self) =>
           index === self.findIndex((t) => t.subjectId === item.subjectId)
       );
+
+      console.log("[DEBUG] unique before save =", JSON.stringify(unique, null, 2));
 
       await setDoc(ref, {
         teacherEmail: currentUser.email,

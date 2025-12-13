@@ -1,8 +1,3 @@
-// ================================
-// score_input_loader.js（完全版）
-// STEP A + STEP B-1〜B-4 統合
-// ================================
-
 import {
   createCriteriaState,
   loadCriteria,
@@ -14,20 +9,19 @@ import {
   loadAllStudents,
   filterAndSortStudentsForSubject,
   renderStudentRows,
+  sortStudents,
+  sortStudentsBySkillLevel
 } from "./score_input_students.js";
 
 import {
   createModeState,
   initModeTabs,
   updateFinalScoreForRow,
-  updateAllFinalScores,   // ★これを追加！
+  updateAllFinalScores,
 } from "./score_input_modes.js";
 
-
-// Firebase SDK
-import {applyPastedScores} from "./score_input_paste.js";
+import { applyPastedScores } from "./score_input_paste.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-
 import {
   getAuth,
   onAuthStateChanged,
@@ -38,9 +32,96 @@ import {
   doc,
   getDoc,
   setDoc,
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+// ================================
+// ★ 科目マスタ（subjects）を正本として取得
+// ================================
+async function loadSubjectMaster(subjectId) {
+  if (!subjectId) return null;
+  const ref = doc(db, "subjects", subjectId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  return snap.data();
+}
+// ================================
+// 新規追加: 習熟度フィルタUI生成
+// ================================
+function renderSkillLevelFilter(subject) {
+  const area = document.getElementById("groupFilterArea");
+  if (!area) return;
+  area.innerHTML = "";
+  const filterDefs = [
+    { key: "all", label: "全員" },
+    { key: "S", label: "S" },
+    { key: "A1", label: "A1" },
+    { key: "A2", label: "A2" },
+    { key: "A3", label: "A3" },
+    { key: "unset", label: "未設定" }
+  ];
+  const container = document.createElement("div");
+  container.className = "filter-button-group";
+  filterDefs.forEach(def => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = def.label;
+    btn.className = "btn btn-secondary";
+    btn.onclick = () => applySkillLevelFilter(subject, def.key);
+    container.appendChild(btn);
+  });
+  area.appendChild(container);
+}
 
+// ================================
+// 新規追加: 習熟度フィルタ適用
+// ================================
+function applySkillLevelFilter(subject, key) {
+  const baseList = studentState.currentStudents.slice();
+  const levelsMap = studentState.skillLevelsMap || {};
+  let filtered = baseList;
+  if (key === "all") {
+    // すべて
+    filtered = baseList;
+  } else if (["S","A1","A2","A3"].includes(key)) {
+    filtered = baseList.filter(stu => (levelsMap[stu.studentId] || "") === key);
+  } else if (key === "unset") {
+    filtered = baseList.filter(stu => !levelsMap[stu.studentId] || levelsMap[stu.studentId] === "");
+  }
+  renderStudentRows(
+    tbody,
+    subject,
+    filtered,
+    criteriaState.items,
+    (tr) => {
+      updateFinalScoreForRow(tr, criteriaState, modeState);
+    }
+  );
+  // 習熟度値の反映
+  if (currentIsSkillLevel && studentState.skillLevelsMap) {
+    const inputs = tbody.querySelectorAll('input.skill-level-input');
+    inputs.forEach(input => {
+      const sid = input.dataset.studentId;
+      input.value = studentState.skillLevelsMap[sid] || "";
+    });
+  }
+  updateStudentCountDisplay(filtered.length);
+  updateAllFinalScores();
+}
+// ================================
+// 新規追加: 習熟度データを取得
+// ================================
+async function ensureSkillLevelsLoaded(subject) {
+  if (!subject || subject.isSkillLevel !== true) return;
+  const ref = doc(db, `skillLevels_${currentYear}`, subject.subjectId);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const data = snap.data() || {};
+    studentState.skillLevelsMap = data.levels || {};
+  } else {
+    studentState.skillLevelsMap = {};
+  }
+}
 
 // ================================
 // Firebase 初期化
@@ -69,6 +150,7 @@ const infoMessageEl = document.getElementById("infoMessage");
 const headerRow = document.getElementById("scoreHeaderRow");
 const tbody = document.getElementById("scoreTableBody");
 const saveBtn = document.getElementById("saveBtn");
+const skillSaveBtn = document.getElementById("skillSaveBtn");
 const backHomeBtn = document.getElementById("backHomeBtn");
 const toEvaluationLink = document.getElementById("toEvaluationLink");
 
@@ -90,6 +172,7 @@ let pasteInitialized = false;
 
 const currentYear = new Date().getFullYear();
 let teacherSubjects = []; // 教員の担当科目リスト（teacherSubjects_YYYY の subjects 配列）
+let currentIsSkillLevel = false;
 
 // ================================
 // 共通：メッセージ表示ヘルパ
@@ -192,7 +275,7 @@ async function ensureElectiveRegistrationLoaded(subject) {
 // 新規追加: 選択科目受講者登録モーダル
 async function openElectiveRegistrationModal(subject) {
   const modal = document.getElementById("electiveModal");
-  const listEl = document.getElementById("electiveStudentList");
+  const listEl = document.getElementById("elective-table-body");
   const cancelBtn = document.getElementById("electiveCancelBtn");
   const registerBtn = document.getElementById("electiveRegisterBtn");
 
@@ -203,25 +286,67 @@ async function openElectiveRegistrationModal(subject) {
     return;
   }
 
+
   // 学年一致の全学生表示
   const grade = String(subject.grade);
-  const candidates = studentState.allStudents.filter(s => String(s.grade) === grade);
+  const students = studentState.allStudents.filter(s => String(s.grade) === grade);
+  // 並び順を成績入力画面と揃える
+  const sortedStudents = sortStudents(students);
 
+// ===== モーダル内フィルタ用：元データ保持 =====
+const modalBaseStudents = sortedStudents.slice();
+
+// ===== モーダル内：組フィルタ処理 =====
+
+const filterButtons = modal.querySelectorAll(".eg-btn");
+
+filterButtons.forEach(btn => {
+  btn.onclick = () => {
+    // active 切替
+    filterButtons.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    const key = btn.dataset.group;
+
+    // 絞り込み
+    const filtered =
+      key === "all"
+        ? modalBaseStudents
+        : modalBaseStudents.filter(
+            s => String(s.courseClass) === String(key)
+          );
+
+    // 再描画（今ある描画ロジックをそのまま使う）
+    listEl.innerHTML = "";
+    filtered.forEach(s => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input type="checkbox" data-studentid="${s.studentId}" /></td>
+        <td>${s.studentId}</td>
+        <td>${s.grade}</td>
+        <td>${s.courseClass ?? ""}</td>
+        <td>${s.number ?? ""}</td>
+        <td>${s.name}</td>
+      `;
+      listEl.appendChild(tr);
+    });
+  };
+});
+
+
+  
   listEl.innerHTML = "";
-  candidates.forEach(stu => {
-    const row = document.createElement("div");
-    row.className = "ktc-student-item";
-
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.dataset.studentId = stu.studentId;
-
-    const label = document.createElement("label");
-    label.textContent = `${stu.studentId} / ${stu.courseClass} / ${stu.number} / ${stu.name}`;
-
-    row.appendChild(cb);
-    row.appendChild(label);
-    listEl.appendChild(row);
+  sortedStudents.forEach(s => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="checkbox" data-studentid="${s.studentId}" /></td>
+      <td>${s.studentId}</td>
+      <td>${s.grade}</td>
+      <td>${s.courseClass ?? ""}</td>
+      <td>${s.number ?? ""}</td>
+      <td>${s.name}</td>
+    `;
+    listEl.appendChild(tr);
   });
 
   modal.style.display = "flex";
@@ -232,7 +357,7 @@ async function openElectiveRegistrationModal(subject) {
 
   registerBtn.onclick = async () => {
     const checked = Array.from(listEl.querySelectorAll("input[type='checkbox']:checked"))
-      .map(cb => cb.dataset.studentId);
+      .map(cb => cb.dataset.studentid);
 
     if (checked.length === 0) {
       alert("少なくとも1名を選択してください。");
@@ -258,6 +383,20 @@ async function openElectiveRegistrationModal(subject) {
 }
 
 // ================================
+// 受講者人数表示を更新
+// ================================
+function updateStudentCountDisplay(count) {
+  const el = document.getElementById("studentCountDisplay");
+  if (!el) return;
+
+  if (count === 0) {
+    el.textContent = "受講者人数：0名";
+  } else {
+    el.textContent = `受講者人数：${count}名`;
+  }
+}
+
+// ================================
 // 科目選択時の処理
 // ================================
 async function handleSubjectChange(subjectId) {
@@ -273,7 +412,31 @@ async function handleSubjectChange(subjectId) {
   }
 
   const subject = findSubjectById(subjectId);
+  // ★ subjects 正本を参照
+  const subjectMaster = await loadSubjectMaster(subjectId);
+  // ★ isSkillLevel は subjects 正本だけを見る
+  const isSkillLevel = subjectMaster?.isSkillLevel === true;
+  // ★ downstream 安定化：subject にも注入しておく（teacherSubjects が欠けてても動く）
+  if (subject) subject.isSkillLevel = isSkillLevel;
+  currentIsSkillLevel = isSkillLevel;
+
+  console.log("[DEBUG subjectMaster]", subjectMaster);
+  console.log("[DEBUG isSkillLevel]", currentIsSkillLevel);
+  console.log(
+    "[DEBUG subject]",
+    {
+      subjectId: subject?.subjectId,
+      name: subject?.name,
+      isSkillLevel: currentIsSkillLevel,
+      required: subject?.required
+    }
+  );
   await ensureElectiveRegistrationLoaded(subject);
+  if (currentIsSkillLevel) {
+    console.log("[SKILL LEVEL MODE] enabled");
+  } else {
+    console.log("[SKILL LEVEL MODE] disabled");
+  }
   if (subject && subject.required === false) { await openElectiveRegistrationModal(subject); }
   if (!subject) {
     setInfoMessage("選択された科目情報が見つかりません。");
@@ -290,7 +453,14 @@ async function handleSubjectChange(subjectId) {
 
   // 評価基準読み込み → ヘッダ生成
   await loadCriteria(db, currentYear, subjectId, criteriaState);
+
   renderTableHeader(headerRow, criteriaState);
+  // currentIsSkillLevel===true の場合のみ「習熟度」thを先頭に追加
+  if (currentIsSkillLevel) {
+    const th = document.createElement("th");
+    th.textContent = "習熟度";
+    headerRow.insertBefore(th, headerRow.firstChild);
+  }
 
   // 学生全件ロード（まだなら）
   if (!studentState.allStudents.length) {
@@ -314,6 +484,17 @@ async function handleSubjectChange(subjectId) {
     displayStudents = students;
   }
 
+// ★ STEP C フィルタ用：現在の表示学生を保持
+studentState.currentStudents = displayStudents.slice();
+
+  console.log('[DEBUG] subject:', subject);
+  console.log('[DEBUG] displayStudents(before sort):', displayStudents);
+  // 習熟度ソート（currentIsSkillLevel===true時のみ）
+  if (currentIsSkillLevel) {
+    displayStudents = sortStudentsBySkillLevel(displayStudents, studentState.skillLevelsMap);
+    console.log('[DEBUG] displayStudents(after skill sort):', displayStudents);
+  }
+  console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
   // 学生行描画（入力時にその行の最終成績を計算）
   renderStudentRows(
     tbody,
@@ -324,6 +505,42 @@ async function handleSubjectChange(subjectId) {
       updateFinalScoreForRow(tr, criteriaState, modeState);
     }
   );
+  // --- 新規追加: 習熟度値の反映 ---
+  if (currentIsSkillLevel && studentState.skillLevelsMap) {
+    const inputs = tbody.querySelectorAll('input.skill-level-input');
+    inputs.forEach(input => {
+      const sid = input.dataset.studentId;
+      input.value = studentState.skillLevelsMap[sid] || "";
+    });
+  }
+  updateStudentCountDisplay(displayStudents.length);
+
+  // --- 習熟度保存ボタンの表示切替 ---
+  if (skillSaveBtn) {
+    if (currentIsSkillLevel) {
+      skillSaveBtn.style.display = "inline-block";
+    } else {
+      skillSaveBtn.style.display = "none";
+    }
+  }
+  // --- 習熟度保存ボタンのonclick ---
+  if (skillSaveBtn) {
+    skillSaveBtn.onclick = async () => {
+      if (!currentIsSkillLevel) return;
+      const inputs = tbody.querySelectorAll('input.skill-level-input');
+      const levelsMap = {};
+      inputs.forEach(input => {
+        const sid = input.dataset.studentId;
+        levelsMap[sid] = input.value || "";
+      });
+      const ref = doc(db, `skillLevels_${currentYear}`, subject.subjectId);
+      await setDoc(ref, {
+        levels: levelsMap,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      setInfoMessage("習熟度を保存しました");
+    };
+  }
 
   // ▼ 貼り付け処理の接続（初回だけ）
   if (!pasteInitialized) {
@@ -332,6 +549,28 @@ async function handleSubjectChange(subjectId) {
       const text = ev.clipboardData?.getData("text/plain") ?? "";
       if (!text) return;
 
+      // skill-level-inputにフォーカス中なら縦貼り
+      const active = document.activeElement;
+      if (active && active.classList && active.classList.contains("skill-level-input")) {
+        const lines = text.split(/\r?\n/);
+        const allow = ["", "S", "A1", "A2", "A3"];
+        // tbody内のすべてのskill-level-inputを配列で取得
+        const inputs = Array.from(tbody.querySelectorAll(".skill-level-input"));
+        // 現在のinputのindexを特定
+        const startIdx = inputs.indexOf(active);
+        let i = 0;
+        for (; i < lines.length && (startIdx + i) < inputs.length; i++) {
+          let v = lines[i].toUpperCase();
+          if (!allow.includes(v)) v = "";
+          inputs[startIdx + i].value = v;
+          // inputイベントも発火させる（他ロジック連動用）
+          const event = new Event("input", { bubbles: true });
+          inputs[startIdx + i].dispatchEvent(event);
+        }
+        return;
+      }
+
+      // それ以外は既存の点数貼り付けロジック
       applyPastedScores(
         text,
         tbody,
@@ -360,7 +599,11 @@ async function handleSubjectChange(subjectId) {
   }
 
 // STEP C：フィルタ UI を生成
-renderGroupOrCourseFilter(subject);
+if (currentIsSkillLevel) {
+  renderSkillLevelFilter(subject);
+} else {
+  renderGroupOrCourseFilter(subject);
+}
 
 
   // 保存ボタンはまだ本保存未実装なので disable のまま
@@ -448,6 +691,7 @@ function applyGroupOrCourseFilter(subject, filterKey) {
       criteriaState.items,
       (tr) => updateFinalScoreForRow(tr, criteriaState, modeState)
     );
+    updateStudentCountDisplay(filtered.length);
 
     // 再計算
     updateAllFinalScores(tbody, criteriaState, modeState);

@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -----------------------------------------
+    // 教員認証
+    // -----------------------------------------
+    function isTeacher() {
+      return request.auth != null &&
+        (
+          // 本番
+          exists(/databases/$(database)/documents/teachers/$(request.auth.token.email))
+          // テスト用（必要な場合のみ）
+          || request.auth.token.email == "nobupig@gmail.com"
+        );
+    }
+
+    // -----------------------------------------
+    // teachers（教員マスタ）
+    // -----------------------------------------
+    match /teachers/{email} {
+      allow read: if isTeacher();
+      allow write: if false;
+    }
+
+    // -----------------------------------------
+    // subjects（科目マスタ）
+    // ※ 教員は参照のみ
+    // -----------------------------------------
+    match /subjects/{id} {
+      allow read: if isTeacher();
+      allow write: if false;
+    }
+
+    // -----------------------------------------
+    // teacherSubjects_YYYY（教員担当科目）
+    // -----------------------------------------
+    match /{col}/{email} {
+      allow read: if
+        isTeacher() &&
+        col.matches('teacherSubjects_\\d{4}');
+
+      allow write: if
+        isTeacher() &&
+        col.matches('teacherSubjects_\\d{4}') &&
+        request.auth.token.email == email;
+    }
+
+    // -----------------------------------------
+    // notifications（教務連絡）
+    // -----------------------------------------
+    match /notifications/{id} {
+      allow create: if isTeacher();
+      allow read, update, delete: if false;
+    }
+
+    // -----------------------------------------
+    // settings（成績期間設定）
+    // -----------------------------------------
+    match /settings/{doc} {
+      allow read: if isTeacher();
+      allow write: if false;
+    }
+
+    // -----------------------------------------
+    // 成績・選択科目・習熟度（年度別）
+    // evaluation / elective / skill 系を完全統合
+    // -----------------------------------------
+    match /{col}/{docId} {
+      allow read, write: if
+        isTeacher() &&
+        (
+          col.matches('evaluationCriteria_\\d{4}') ||
+          col.matches('evaluationLocks_\\d{4}') ||
+          col.matches('electiveRegistrations_\\d{4}') ||
+          col.matches('skillLevels_\\d{4}')
+        );
+    }
+
+    // -----------------------------------------
+    // evaluationHistory（修正履歴）
+    // -----------------------------------------
+    match /evaluationHistory/{id} {
+      allow read, write: if isTeacher();
+    }
+
+    // -----------------------------------------
+    // drafts（途中保存）
+    // -----------------------------------------
+    match /drafts/{id} {
+      allow read, write: if isTeacher();
+    }
+
+    // -----------------------------------------
+    // students（学生マスタ）
+    // ※ 読み取りのみ
+    // -----------------------------------------
+    match /students/{id} {
+      allow read: if isTeacher();
+      allow write: if false;
+    }
+  }
+}

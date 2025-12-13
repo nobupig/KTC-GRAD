@@ -54,6 +54,15 @@
 
     <h2>成績一覧</h2>
 
+    <div class="subheader-row">
+      <div id="studentCountDisplay" class="student-count">受講者人数：0名</div>
+
+      <!-- ★ 保存ボタンを上に移動（idはそのまま） -->
+      <button id="saveBtn" class="btn-primary" type="button" disabled>
+        保存する
+      </button>
+    </div>
+
     <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
     <div id="infoMessage" class="info-message">
       成績を入力してください。（モード：自動換算モードがデフォルトです）
@@ -83,17 +92,14 @@
       </table>
     </div>
 
-    <!-- 保存ボタン（将来の実装） -->
+    <!-- 保存ボタンは上に移動。注意書きは残す -->
     <div class="footer-actions">
       <div class="note">
         ※ 現時点では「名簿表示」と「最終成績の自動計算」のみ実装済みです。<br>
         &nbsp;&nbsp;Firestore への本保存はこのあと段階的に実装していきます。
       </div>
-
-      <button id="saveBtn" class="btn-primary" type="button" disabled>
-        保存する
-      </button>
     </div>
+    <button id="skillSaveBtn" style="display:none;">習熟度を保存</button>
   </main>
 
   <!-- ========================================= -->
@@ -107,14 +113,35 @@
   <div id="electiveModal" class="ktc-modal" style="display:none;">
     <div class="ktc-modal-content">
       <h2>受講者登録（選択科目）</h2>
+            <div class="ktc-modal-actions">
+              <button id="electiveRegisterBtn" class="primary">登録</button>
+        <button id="electiveCancelBtn">キャンセル</button>    
+      </div>
+      <div class="elective-group-filter">
+  <button data-group="all" class="eg-btn active">全員</button>
+  <button data-group="1" class="eg-btn">1</button>
+  <button data-group="2" class="eg-btn">2</button>
+  <button data-group="3" class="eg-btn">3</button>
+  <button data-group="4" class="eg-btn">4</button>
+  <button data-group="5" class="eg-btn">5</button>
+</div>
       <p>受講する学生にチェックを入れてください。</p>
 
-      <div id="electiveStudentList" class="ktc-student-list"></div>
+      <table class="elective-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>学籍番号</th>
+            <th>学年</th>
+            <th>組・コース</th>
+            <th>番号</th>
+            <th>氏名</th>
+          </tr>
+        </thead>
+        <tbody id="elective-table-body"></tbody>
+      </table>
 
-      <div class="ktc-modal-actions">
-        <button id="electiveCancelBtn">キャンセル</button>
-        <button id="electiveRegisterBtn" class="primary">登録</button>
-      </div>
+
     </div>
   </div>
 </body>
