@@ -90,16 +90,21 @@ function applySkillLevelFilter(subject, key) {
     filtered = baseList.filter(stu => !levelsMap[stu.studentId] || levelsMap[stu.studentId] === "");
   }
   stashCurrentInputScores(tbody);
-  renderStudentRows(
-    tbody,
-    subject,
-    filtered,
-    criteriaState.items,
-    (tr) => {
-      updateFinalScoreForRow(tr, criteriaState, modeState);
-    },
-    studentState
-  );
+  isRenderingTable = true;
+  try {
+    renderStudentRows(
+      tbody,
+      subject,
+      filtered,
+      criteriaState.items,
+      (tr) => {
+        updateFinalScoreForRow(tr, criteriaState, modeState);
+      },
+      studentState
+    );
+  } finally {
+    isRenderingTable = false;
+  }
   restoreStashedScores(tbody);
   // 習熟度値の反映
   if (currentIsSkillLevel && studentState.skillLevelsMap) {
@@ -184,6 +189,8 @@ let unsavedListenerInitialized = false;
 let beforeUnloadListenerInitialized = false;
 let currentSubjectId = null;
 const tempScoresMap = new Map();
+let isRenderingTable = false;
+let isProgrammaticInput = false;
 
 // ================================
 // 共通：メッセージ表示ヘルパ
@@ -269,6 +276,8 @@ function restoreStashedScores(tbodyEl) {
     "input[data-student-id][data-criteria-name]"
   );
 
+  isProgrammaticInput = true;
+  try {
   inputs.forEach((input) => {
     const sid = input.dataset.studentId;
     const crit = input.dataset.criteriaName;
@@ -278,6 +287,9 @@ function restoreStashedScores(tbodyEl) {
     input.value = score;
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
+  } finally {
+    isProgrammaticInput = false;
+  }
 }
 
 async function loadSavedScoresForSubject(year, subjectId) {
@@ -665,16 +677,21 @@ studentState.currentStudents = displayStudents.slice();
   await loadScoreUpdatedAtBase(subjectId, displayStudents);
   console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
   // 学生行描画（入力時にその行の最終成績を計算）
-  renderStudentRows(
-    tbody,
-    subject,
-    displayStudents,
-    criteriaState.items,
-    (tr) => {
-      updateFinalScoreForRow(tr, criteriaState, modeState);
-    },
-    studentState
-  );
+  isRenderingTable = true;
+  try {
+    renderStudentRows(
+      tbody,
+      subject,
+      displayStudents,
+      criteriaState.items,
+      (tr) => {
+        updateFinalScoreForRow(tr, criteriaState, modeState);
+      },
+      studentState
+    );
+  } finally {
+    isRenderingTable = false;
+  }
   restoreStashedScores(tbody);
   // --- ★ STEP D：保存済み scores を読み込み、途中再開用に反映 ---
   try {
@@ -695,6 +712,8 @@ studentState.currentStudents = displayStudents.slice();
   restoreStashedScores(tbody);
   if (!unsavedListenerInitialized && tbody) {
     tbody.addEventListener("input", (ev) => {
+      if (isRenderingTable) return;
+      if (isProgrammaticInput) return;
       const target = ev.target;
       if (!(target instanceof HTMLInputElement)) return;
       if (target.classList.contains("skill-level-input")) return;
@@ -929,14 +948,19 @@ function applyGroupOrCourseFilter(subject, filterKey) {
 
     // tbody 再描画
     stashCurrentInputScores(tbody);
-    renderStudentRows(
-      tbody,
-      subject,
-      filtered,
-      criteriaState.items,
-      (tr) => updateFinalScoreForRow(tr, criteriaState, modeState),
-      studentState
-    );
+    isRenderingTable = true;
+    try {
+      renderStudentRows(
+        tbody,      
+        subject,    
+        filtered,   
+        criteriaState.items,                 
+        (tr) => updateFinalScoreForRow(tr, criteriaState, modeState),                        
+        studentState
+      );
+    } finally {
+      isRenderingTable = false;
+    }
     restoreStashedScores(tbody);
     updateStudentCountDisplay(filtered.length);
     studentState.currentStudents = filtered.slice();
@@ -970,7 +994,7 @@ export function initScoreInput() {
       }
 
       if (hasInputErrors(tbody)) {
-        alert("入力エラー（赤枠）があるため保存できません。エラーを解消してください。");
+        showSaveErrorModal();
         return;
       }
 
@@ -1008,6 +1032,7 @@ export function initScoreInput() {
         }
 
         if (ngCount === 0) {
+          showSaveSuccessToast();
           setInfoMessage(`保存しました（${okCount}件）`);
           setUnsavedChanges(false);
         } else {
@@ -1083,4 +1108,33 @@ export function initScoreInput() {
       window.location.href = "start.html";
     });
   }
+}
+
+function showSaveErrorModal() {
+  const modal = document.getElementById("saveErrorModal");
+  const okBtn = document.getElementById("saveErrorOkBtn");
+  if (!modal || !okBtn) return;
+
+  modal.classList.remove("hidden");
+
+  okBtn.onclick = () => {
+    modal.classList.add("hidden");
+  };
+}
+
+function showSaveSuccessToast() {
+  const toast = document.getElementById("saveSuccessToast");
+  if (!toast) return;
+
+  toast.classList.remove("hidden");
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => {
+      toast.classList.add("hidden");
+    }, 300);
+  }, 1800);
 }

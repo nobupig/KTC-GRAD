@@ -144,5 +144,20 @@
 
     </div>
   </div>
+  <div id="saveSuccessToast" class="toast hidden">
+    <span class="toast-icon">✓</span>
+    <span class="toast-text">保存しました</span>
+  </div>
 </body>
+
+<div id="saveErrorModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 class="modal-title error">保存できません</h2>
+    <p class="modal-message">
+      入力エラー（赤枠）があるため、保存できません。<br>
+      赤く表示されている項目を修正してください。
+    </p>
+    <button id="saveErrorOkBtn" class="modal-ok">OK</button>
+  </div>
+</div>
 </html>
