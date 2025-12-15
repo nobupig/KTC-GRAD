@@ -93,6 +93,24 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+.score-table-wrapper {
+  margin-top: 8px;
+}
+}
+.score-table thead th {
+  background: #f9fafb;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.score-table-body-scroll {
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+  border-top: 1px solid #e5e7eb;
+}
+.score-table-body-scroll table {
+  border-collapse: collapse;
+  width: 100%;
 }
 
 header h1 {

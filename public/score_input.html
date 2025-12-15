@@ -72,8 +72,8 @@
 <div id="groupFilterArea" style="margin: 12px 0;"></div>
 
     <!-- テーブル部分 -->
-    <div class="table-wrapper">
-      <table id="scoreTable">
+    <div class="score-table-wrapper">
+      <table class="score-table">
         <thead>
           <tr id="scoreHeaderRow">
             <th>学籍番号</th>
@@ -85,11 +85,15 @@
             <th>最終成績</th>
           </tr>
         </thead>
-
-        <tbody id="scoreTableBody">
-          <!-- 学生行は students.js で動的生成 -->
-        </tbody>
       </table>
+
+      <div class="score-table-body-scroll">
+        <table class="score-table">
+          <tbody id="scoreTableBody">
+            <!-- 学生行は students.js で動的生成 -->
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- 保存ボタンは上に移動。注意書きは残す -->
