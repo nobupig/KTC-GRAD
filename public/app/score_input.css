@@ -232,6 +232,10 @@ h2 {
 .info-message strong {
   color: #111827;
 }
+.warning-message {
+  color: #c62828;
+  font-weight: 600;
+}
 
 /* ================================
    モードタブ（素点 / 自動換算）

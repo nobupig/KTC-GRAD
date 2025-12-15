@@ -1,3 +1,14 @@
+import {
+  collection,
+  doc,
+  getDocs,
+  getFirestore,
+  setDoc,
+  serverTimestamp,
+  query,
+  where,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
 /**
  * 習熟度・コース・番号・ID順でソート
  * @param {any[]} students
@@ -21,13 +32,46 @@ export function sortStudentsBySkillLevel(students, skillLevelsMap) {
     return String(a.studentId).localeCompare(String(b.studentId));
   });
 }
+const currentYear = new Date().getFullYear();
+const SKILL_LEVEL_COLLECTION_PREFIX = "skillLevels_";
+const SKILL_LEVEL_SAVE_DEBOUNCE_MS = 500;
+const FINAL_SKILL_ALLOWED = ["", "S", "A1", "A2", "A3"];
+const LIVE_SKILL_ALLOWED = ["", "S", "A", "A1", "A2", "A3"];
+const skillSaveTimers = new Map();
+
+function scheduleSkillLevelSave(subjectId, studentId, value) {
+  if (!subjectId || !studentId) return;
+  if (!FINAL_SKILL_ALLOWED.includes(value)) return;
+  const key = `${subjectId}::${studentId}`;
+  const existing = skillSaveTimers.get(key);
+  if (existing) {
+    clearTimeout(existing);
+  }
+  const timer = setTimeout(() => {
+    skillSaveTimers.delete(key);
+    performSkillLevelSave(subjectId, studentId, value).catch((err) => {
+      console.error("[skill-level save]", err);
+    });
+  }, SKILL_LEVEL_SAVE_DEBOUNCE_MS);
+  skillSaveTimers.set(key, timer);
+}
+
+async function performSkillLevelSave(subjectId, studentId, value) {
+  const db = getFirestore();
+  const ref = doc(db, `${SKILL_LEVEL_COLLECTION_PREFIX}${currentYear}`, subjectId);
+  await setDoc(
+    ref,
+    {
+      levels: {
+        [studentId]: value,
+      },
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
 // js/score_input_students.js
 // STEP A：学生名簿の取得・フィルタ・テーブル行レンダリング専用モジュール
-
-import {
-  collection,
-  getDocs,
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 /**
  * 学生関連の状態オブジェクトを作成
@@ -37,6 +81,7 @@ import {
 export function createStudentState() {
   return {
     allStudents: [],
+    baseStudents: [],
     currentStudents: [],
     electiveStudents: [],   // 選択科目用（追加するだけ）
   };
@@ -49,7 +94,8 @@ export function createStudentState() {
  * @param {{ allStudents: any[] }} studentState
  */
 export async function loadAllStudents(db, studentState) {
-  const snap = await getDocs(collection(db, "students"));
+  const q = query(collection(db, "students"), where("isActive", "==", true));
+  const snap = await getDocs(q);
   studentState.allStudents = snap.docs.map((d) => d.data() || {});
 }
 
@@ -225,13 +271,15 @@ export function populateSubjectSelect(subjectSelect, teacherSubjects, buildSubje
  * @param {any[]} students currentStudents
  * @param {Array<{name:string,percent:number}>} criteriaItems
  * @param {(tr: HTMLTableRowElement) => void} onScoreInputChange
+ * @param {{ skillLevelsMap?: object }} [studentState]
  */
 export function renderStudentRows(
   tbody,
   subject,
   students,
   criteriaItems,
-  onScoreInputChange
+  onScoreInputChange,
+  studentState
 ) {
   tbody.innerHTML = "";
 
@@ -272,33 +320,35 @@ export function renderStudentRows(
 
     // isSkillLevel===true の場合のみ、先頭にinput[type=text]セルを追加
     if (subject && subject.isSkillLevel === true) {
+      const subjectId = subject.subjectId || "";
+      const studentId = String(stu.studentId ?? "");
       const td = document.createElement("td");
       const input = document.createElement("input");
       input.type = "text";
       input.className = "skill-level-input skill-input";
       input.maxLength = 2;
-      input.dataset.studentId = String(stu.studentId);
+      input.dataset.studentId = studentId;
       input.readOnly = false;
       input.disabled = false;
-      // ★ 手入力：途中入力を許可（A を消さない）→ blur で確定チェック
-      const FINAL_ALLOWED = ["", "S", "A1", "A2", "A3"];
-      const LIVE_ALLOWED  = ["", "S", "A", "A1", "A2", "A3"];
       input.addEventListener("input", () => {
         let v = input.value
           .toUpperCase()
           .replace(/　/g, "")
           .replace(/\s+/g, "");
-        // 途中入力は許可（A もOK）
-        if (LIVE_ALLOWED.includes(v)) {
+        if (LIVE_SKILL_ALLOWED.includes(v)) {
           input.value = v;
-          return;
+        } else {
+          input.value = "";
         }
-        // それ以外は空にする
-        input.value = "";
+        const saveValue = FINAL_SKILL_ALLOWED.includes(v) ? v : "";
+        if (!studentState.skillLevelsMap) {
+          studentState.skillLevelsMap = {};
+        }
+        studentState.skillLevelsMap[studentId] = saveValue;
+        scheduleSkillLevelSave(subjectId, studentId, saveValue);
       });
       input.addEventListener("blur", () => {
-        // blur 時は完成形のみ許可（A 単体は消す）
-        if (!FINAL_ALLOWED.includes(input.value)) {
+        if (!FINAL_SKILL_ALLOWED.includes(input.value)) {
           input.value = "";
         }
       });
@@ -328,6 +378,8 @@ export function renderStudentRows(
         input.max = "100";
         input.step = "0.1";
         input.dataset.index = String(index);
+        input.dataset.criteriaName = item.name;
+        input.dataset.studentId = String(stu.studentId);
         input.dataset.itemName = item.name || "";
         input.addEventListener("paste", (ev) => ev.preventDefault());
         input.addEventListener("input", () => {

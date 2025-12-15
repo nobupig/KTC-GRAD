@@ -33,6 +33,7 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  runTransaction,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 // ================================
@@ -77,7 +78,7 @@ function renderSkillLevelFilter(subject) {
 // 新規追加: 習熟度フィルタ適用
 // ================================
 function applySkillLevelFilter(subject, key) {
-  const baseList = studentState.currentStudents.slice();
+  const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
   const levelsMap = studentState.skillLevelsMap || {};
   let filtered = baseList;
   if (key === "all") {
@@ -88,6 +89,7 @@ function applySkillLevelFilter(subject, key) {
   } else if (key === "unset") {
     filtered = baseList.filter(stu => !levelsMap[stu.studentId] || levelsMap[stu.studentId] === "");
   }
+  stashCurrentInputScores(tbody);
   renderStudentRows(
     tbody,
     subject,
@@ -95,8 +97,10 @@ function applySkillLevelFilter(subject, key) {
     criteriaState.items,
     (tr) => {
       updateFinalScoreForRow(tr, criteriaState, modeState);
-    }
+    },
+    studentState
   );
+  restoreStashedScores(tbody);
   // 習熟度値の反映
   if (currentIsSkillLevel && studentState.skillLevelsMap) {
     const inputs = tbody.querySelectorAll('input.skill-level-input');
@@ -105,8 +109,9 @@ function applySkillLevelFilter(subject, key) {
       input.value = studentState.skillLevelsMap[sid] || "";
     });
   }
+  studentState.currentStudents = filtered.slice();
   updateStudentCountDisplay(filtered.length);
-  updateAllFinalScores();
+  updateAllFinalScores(tbody, criteriaState, modeState);
 }
 // ================================
 // 新規追加: 習熟度データを取得
@@ -150,7 +155,6 @@ const infoMessageEl = document.getElementById("infoMessage");
 const headerRow = document.getElementById("scoreHeaderRow");
 const tbody = document.getElementById("scoreTableBody");
 const saveBtn = document.getElementById("saveBtn");
-const skillSaveBtn = document.getElementById("skillSaveBtn");
 const backHomeBtn = document.getElementById("backHomeBtn");
 const toEvaluationLink = document.getElementById("toEvaluationLink");
 
@@ -168,11 +172,18 @@ let subjectIdFromURL = urlParams.get("subjectId") || null;
 const criteriaState = createCriteriaState();
 const studentState = createStudentState();
 const modeState = createModeState();
+const scoreUpdatedAtBaseMap = new Map(); // key: studentId, value: Firestore Timestamp|null
 let pasteInitialized = false;
 
 const currentYear = new Date().getFullYear();
 let teacherSubjects = []; // 教員の担当科目リスト（teacherSubjects_YYYY の subjects 配列）
 let currentIsSkillLevel = false;
+let currentUser = null;
+let hasUnsavedChanges = false;
+let unsavedListenerInitialized = false;
+let beforeUnloadListenerInitialized = false;
+let currentSubjectId = null;
+const tempScoresMap = new Map();
 
 // ================================
 // 共通：メッセージ表示ヘルパ
@@ -180,6 +191,127 @@ let currentIsSkillLevel = false;
 function setInfoMessage(text) {
   if (!infoMessageEl) return;
   infoMessageEl.textContent = text || "";
+}
+
+function setUnsavedChanges(flag) {
+  hasUnsavedChanges = !!flag;
+
+  if (hasUnsavedChanges) {
+    infoMessageEl?.classList.add("warning-message");
+    setInfoMessage("未保存の変更があります。保存してください。");
+  } else {
+    infoMessageEl?.classList.remove("warning-message");
+    // 既存フローでのメッセージ更新に任せる
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = !hasUnsavedChanges;
+  }
+}
+
+function buildScoresObjFromRow(tr, criteriaState) {
+  const items = (criteriaState?.items) || [];
+  const scores = {};
+  const inputs = tr.querySelectorAll('input[type="number"]');
+
+  inputs.forEach((input) => {
+    const idx = Number(input.dataset.index || "0");
+    const item = items[idx];
+    const key = item?.name || input.dataset.itemName || `item_${idx}`;
+
+    const raw = (input.value ?? "").toString().trim();
+    if (raw === "") return;
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return;
+
+    scores[key] = num;
+  });
+
+  return scores;
+}
+
+function getSaveTargetRows(tbody) {
+  if (!tbody) return [];
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  return rows.filter((tr) => Boolean(tr?.dataset?.studentId));
+}
+
+function hasInputErrors(tbody) {
+  if (!tbody) return false;
+  return tbody.querySelector(".ktc-input-error") != null;
+}
+
+function stashCurrentInputScores(tbodyEl) {
+  if (!tbodyEl) return;
+  const inputs = tbodyEl.querySelectorAll(
+    "input[data-student-id][data-criteria-name]"
+  );
+
+  inputs.forEach((input) => {
+    const sid = input.dataset.studentId;
+    const crit = input.dataset.criteriaName;
+    const val = input.value;
+
+    if (!sid || !crit || val === "") return;
+
+    if (!tempScoresMap.has(sid)) {
+      tempScoresMap.set(sid, {});
+    }
+    tempScoresMap.get(sid)[crit] = Number(val);
+  });
+}
+
+function restoreStashedScores(tbodyEl) {
+  if (!tbodyEl) return;
+  if (!tempScoresMap.size) return;
+
+  const inputs = tbodyEl.querySelectorAll(
+    "input[data-student-id][data-criteria-name]"
+  );
+
+  inputs.forEach((input) => {
+    const sid = input.dataset.studentId;
+    const crit = input.dataset.criteriaName;
+    const score = tempScoresMap.get(sid)?.[crit];
+    if (score == null) return;
+
+    input.value = score;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+async function loadSavedScoresForSubject(year, subjectId) {
+  if (!subjectId) return null;
+  const ref = doc(db, `scores_${year}`, subjectId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+
+  const data = snap.data() || {};
+  return data.students || null;
+}
+
+function applySavedScoresToTable(savedStudentsMap, tbodyEl) {
+  if (!savedStudentsMap || !tbodyEl) return;
+
+  const inputs = tbodyEl.querySelectorAll(
+    "input[data-student-id][data-criteria-name]"
+  );
+
+  inputs.forEach((input) => {
+    if (input.classList.contains("skill-level-input")) return;
+
+    const studentId = input.dataset.studentId;
+    const criteriaName = input.dataset.criteriaName;
+
+    const studentData = savedStudentsMap[studentId];
+    if (!studentData || !studentData.scores) return;
+
+    const value = studentData.scores[criteriaName];
+    if (value === undefined || value === null) return;
+
+    input.value = String(value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
 }
 
 
@@ -397,10 +529,34 @@ function updateStudentCountDisplay(count) {
 }
 
 // ================================
+// スコア更新時刻（表示時点）を保持
+// ================================
+async function loadScoreUpdatedAtBase(subjectId, studentsList) {
+  scoreUpdatedAtBaseMap.clear();
+  if (!subjectId) return;
+
+  const list = Array.isArray(studentsList) ? studentsList : [];
+  const ref = doc(db, `scores_${currentYear}`, subjectId);
+  const snap = await getDoc(ref);
+  const data = snap.exists() ? snap.data() || {} : {};
+  const studentsMap = data.students || {};
+
+  list.forEach((stu) => {
+    const sid = String(stu.studentId ?? "");
+    if (!sid) return;
+    const row = studentsMap[sid] || {};
+    scoreUpdatedAtBaseMap.set(sid, row.updatedAt ?? null);
+  });
+}
+
+// ================================
 // 科目選択時の処理
 // ================================
 async function handleSubjectChange(subjectId) {
+  setUnsavedChanges(false);
   if (!subjectId) {
+    infoMessageEl?.classList.remove("warning-message");
+    scoreUpdatedAtBaseMap.clear();
     setInfoMessage("科目が選択されていません。");
     headerRow.innerHTML = "";
     tbody.innerHTML = `
@@ -408,6 +564,7 @@ async function handleSubjectChange(subjectId) {
         <td class="no-data" colspan="6">科目が選択されていません。</td>
       </tr>
     `;
+    currentSubjectId = null;
     return;
   }
 
@@ -433,12 +590,17 @@ async function handleSubjectChange(subjectId) {
   );
   await ensureElectiveRegistrationLoaded(subject);
   if (currentIsSkillLevel) {
+    await ensureSkillLevelsLoaded(subject);
+  }
+  if (currentIsSkillLevel) {
     console.log("[SKILL LEVEL MODE] enabled");
   } else {
     console.log("[SKILL LEVEL MODE] disabled");
   }
   if (subject && subject.required === false) { await openElectiveRegistrationModal(subject); }
   if (!subject) {
+    infoMessageEl?.classList.remove("warning-message");
+    scoreUpdatedAtBaseMap.clear();
     setInfoMessage("選択された科目情報が見つかりません。");
     headerRow.innerHTML = "";
     tbody.innerHTML = `
@@ -446,9 +608,14 @@ async function handleSubjectChange(subjectId) {
         <td class="no-data" colspan="6">科目情報が見つかりません。</td>
       </tr>
     `;
+    currentSubjectId = null;
     return;
   }
 
+  currentSubjectId = subjectId;
+  tempScoresMap.clear(); // 科目切替時のみキャッシュをリセット
+
+  infoMessageEl?.classList.remove("warning-message");
   setInfoMessage("評価基準と名簿を読み込んでいます…");
 
   // 評価基準読み込み → ヘッダ生成
@@ -485,6 +652,7 @@ async function handleSubjectChange(subjectId) {
   }
 
 // ★ STEP C フィルタ用：現在の表示学生を保持
+studentState.baseStudents = displayStudents.slice();
 studentState.currentStudents = displayStudents.slice();
 
   console.log('[DEBUG] subject:', subject);
@@ -494,6 +662,7 @@ studentState.currentStudents = displayStudents.slice();
     displayStudents = sortStudentsBySkillLevel(displayStudents, studentState.skillLevelsMap);
     console.log('[DEBUG] displayStudents(after skill sort):', displayStudents);
   }
+  await loadScoreUpdatedAtBase(subjectId, displayStudents);
   console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
   // 学生行描画（入力時にその行の最終成績を計算）
   renderStudentRows(
@@ -503,8 +672,37 @@ studentState.currentStudents = displayStudents.slice();
     criteriaState.items,
     (tr) => {
       updateFinalScoreForRow(tr, criteriaState, modeState);
-    }
+    },
+    studentState
   );
+  restoreStashedScores(tbody);
+  // --- ★ STEP D：保存済み scores を読み込み、途中再開用に反映 ---
+  try {
+    const savedScores = await loadSavedScoresForSubject(currentYear, subjectId);
+    applySavedScoresToTable(savedScores, tbody);
+    if (savedScores) {
+      tempScoresMap.clear();
+      Object.entries(savedScores).forEach(([sid, data]) => {
+        if (data?.scores) {
+          tempScoresMap.set(sid, { ...data.scores });
+        }
+      });
+    }
+    setUnsavedChanges(false);
+  } catch (e) {
+    console.warn("[WARN] failed to restore saved scores", e);
+  }
+  restoreStashedScores(tbody);
+  if (!unsavedListenerInitialized && tbody) {
+    tbody.addEventListener("input", (ev) => {
+      const target = ev.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.classList.contains("skill-level-input")) return;
+      if (!target.dataset.index) return;
+      setUnsavedChanges(true);
+    });
+    unsavedListenerInitialized = true;
+  }
   // --- 新規追加: 習熟度値の反映 ---
   if (currentIsSkillLevel && studentState.skillLevelsMap) {
     const inputs = tbody.querySelectorAll('input.skill-level-input');
@@ -514,33 +712,6 @@ studentState.currentStudents = displayStudents.slice();
     });
   }
   updateStudentCountDisplay(displayStudents.length);
-
-  // --- 習熟度保存ボタンの表示切替 ---
-  if (skillSaveBtn) {
-    if (currentIsSkillLevel) {
-      skillSaveBtn.style.display = "inline-block";
-    } else {
-      skillSaveBtn.style.display = "none";
-    }
-  }
-  // --- 習熟度保存ボタンのonclick ---
-  if (skillSaveBtn) {
-    skillSaveBtn.onclick = async () => {
-      if (!currentIsSkillLevel) return;
-      const inputs = tbody.querySelectorAll('input.skill-level-input');
-      const levelsMap = {};
-      inputs.forEach(input => {
-        const sid = input.dataset.studentId;
-        levelsMap[sid] = input.value || "";
-      });
-      const ref = doc(db, `skillLevels_${currentYear}`, subject.subjectId);
-      await setDoc(ref, {
-        levels: levelsMap,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      setInfoMessage("習熟度を保存しました");
-    };
-  }
 
   // ▼ 貼り付け処理の接続（初回だけ）
   if (!pasteInitialized) {
@@ -571,13 +742,17 @@ studentState.currentStudents = displayStudents.slice();
       }
 
       // それ以外は既存の点数貼り付けロジック
-      applyPastedScores(
-        text,
-        tbody,
-        criteriaState,
-        modeState,
-        (msg) => window.alert(msg)
-      );
+      if (
+        applyPastedScores(
+          text,
+          tbody,
+          criteriaState,
+          modeState,
+          (msg) => window.alert(msg)
+        )
+      ) {
+        setUnsavedChanges(true);
+      }
     });
     pasteInitialized = true;
   }
@@ -587,7 +762,9 @@ studentState.currentStudents = displayStudents.slice();
     setInfoMessage(
       "この科目には評価基準が登録されていません。評価基準画面で登録してください。"
     );
+    infoMessageEl?.classList.add("warning-message");
   } else {
+    infoMessageEl?.classList.remove("warning-message");
     setInfoMessage("成績を入力してください。（モード：自動換算モードがデフォルトです）");
   }
 
@@ -609,6 +786,73 @@ if (currentIsSkillLevel) {
   // 保存ボタンはまだ本保存未実装なので disable のまま
   if (saveBtn) {
     saveBtn.disabled = true;
+  }
+}
+
+// ================================
+// スコア保存（楽観ロック付き・学生単位）
+// ================================
+export async function saveStudentScores(subjectId, studentId, scoresObj, teacherEmail) {
+  if (!subjectId || !studentId) {
+    throw new Error("subjectId と studentId は必須です");
+  }
+
+  const sid = String(studentId);
+  const ref = doc(db, `scores_${currentYear}`, subjectId);
+  const baseUpdatedAt = scoreUpdatedAtBaseMap.get(sid) ?? null;
+  const email = teacherEmail || currentUser?.email || "";
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const latestData = snap.exists() ? snap.data() || {} : {};
+    const latestUpdatedAt = latestData.students?.[sid]?.updatedAt ?? null;
+
+    const baseMillis = typeof baseUpdatedAt?.toMillis === "function" ? baseUpdatedAt.toMillis() : null;
+    const latestMillis = typeof latestUpdatedAt?.toMillis === "function" ? latestUpdatedAt.toMillis() : null;
+
+    const conflict =
+      (baseMillis === null && latestMillis !== null) ||
+      (baseMillis !== null && latestMillis === null) ||
+      (baseMillis !== null && latestMillis !== null && baseMillis !== latestMillis);
+
+    if (conflict) {
+      throw new Error("SCORE_CONFLICT");
+    }
+
+    tx.set(
+      ref,
+      {
+        students: {
+          [sid]: {
+            scores: scoresObj || {},
+            updatedAt: serverTimestamp(),
+            updatedBy: email,
+          },
+        },
+      },
+      { merge: true }
+    );
+  });
+
+  const afterSnap = await getDoc(ref);
+  const afterData = afterSnap.exists() ? afterSnap.data() || {} : {};
+  const newUpdatedAt = afterData.students?.[sid]?.updatedAt ?? null;
+  scoreUpdatedAtBaseMap.set(sid, newUpdatedAt ?? null);
+}
+
+export async function saveStudentScoresWithAlert(subjectId, studentId, scoresObj, teacherEmail) {
+  try {
+    await saveStudentScores(subjectId, studentId, scoresObj, teacherEmail);
+    setUnsavedChanges(false);
+    setInfoMessage("保存しました。");
+    return true;
+  } catch (err) {
+    if (err?.code === "conflict" || err?.message === "SCORE_CONFLICT") {
+      alert("他の教員がこの学生の成績を更新しました。再読み込みしてください。");
+      await handleSubjectChange(subjectId);
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -678,20 +922,24 @@ function renderGroupOrCourseFilter(subject) {
 // ================================
 function applyGroupOrCourseFilter(subject, filterKey) {
   // baseList = 科目ごとの初期並び済リスト（共通科目なら全学生）
-  const baseList = studentState.currentStudents.slice();
+  const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
 
   import("./score_input_students.js").then(({ filterStudentsByGroupOrCourse }) => {
     const filtered = filterStudentsByGroupOrCourse(subject, baseList, filterKey);
 
     // tbody 再描画
+    stashCurrentInputScores(tbody);
     renderStudentRows(
       tbody,
       subject,
       filtered,
       criteriaState.items,
-      (tr) => updateFinalScoreForRow(tr, criteriaState, modeState)
+      (tr) => updateFinalScoreForRow(tr, criteriaState, modeState),
+      studentState
     );
+    restoreStashedScores(tbody);
     updateStudentCountDisplay(filtered.length);
+    studentState.currentStudents = filtered.slice();
 
     // 再計算
     updateAllFinalScores(tbody, criteriaState, modeState);
@@ -705,11 +953,84 @@ export function initScoreInput() {
   // モードタブを生成（infoMessage の直下）
   initModeTabs({ infoMessageEl }, modeState);
 
+  if (!beforeUnloadListenerInitialized) {
+    window.addEventListener("beforeunload", (e) => {
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    });
+    beforeUnloadListenerInitialized = true;
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
+      if (!currentSubjectId) {
+        alert("科目を選択してください。");
+        return;
+      }
+
+      if (hasInputErrors(tbody)) {
+        alert("入力エラー（赤枠）があるため保存できません。エラーを解消してください。");
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.dataset.saving = "1";
+
+      try {
+        const rows = getSaveTargetRows(tbody);
+        if (rows.length === 0) {
+          alert("保存対象の学生がありません。");
+          return;
+        }
+
+        let okCount = 0;
+        let ngCount = 0;
+
+        for (const tr of rows) {
+          const studentId = String(tr.dataset.studentId || "");
+          if (!studentId) continue;
+
+          const scoresObj = buildScoresObjFromRow(tr, criteriaState);
+          if (!scoresObj || Object.keys(scoresObj).length === 0) {
+            continue;
+          }
+
+          const ok = await saveStudentScoresWithAlert(
+            currentSubjectId,
+            studentId,
+            scoresObj,
+            currentUser?.email || ""
+          );
+
+          if (ok) okCount++;
+          else ngCount++;
+        }
+
+        if (ngCount === 0) {
+          setInfoMessage(`保存しました（${okCount}件）`);
+          setUnsavedChanges(false);
+        } else {
+          setInfoMessage(`${okCount}件保存、${ngCount}件は競合等で保存できませんでした。再読み込みして確認してください。`);
+          setUnsavedChanges(true);
+        }
+      } catch (e) {
+        console.error("[save click]", e);
+        alert("保存中にエラーが発生しました。コンソールログを確認してください。");
+      } finally {
+        if (saveBtn) delete saveBtn.dataset.saving;
+        if (saveBtn) saveBtn.disabled = !hasUnsavedChanges;
+      }
+    });
+  }
+
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
       window.location.href = "index.html";
       return;
     }
+
+    currentUser = user;
 
     // 教員名表示
     const teacherName = await loadTeacherName(user);

@@ -3,14 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // -----------------------------------------
-    // 教員認証
+    // 共通：教員判定
     // -----------------------------------------
     function isTeacher() {
       return request.auth != null &&
         (
-          // 本番
           exists(/databases/$(database)/documents/teachers/$(request.auth.token.email))
-          // テスト用（必要な場合のみ）
           || request.auth.token.email == "nobupig@gmail.com"
         );
     }
@@ -25,7 +23,6 @@ service cloud.firestore {
 
     // -----------------------------------------
     // subjects（科目マスタ）
-    // ※ 教員は参照のみ
     // -----------------------------------------
     match /subjects/{id} {
       allow read: if isTeacher();
@@ -63,8 +60,7 @@ service cloud.firestore {
     }
 
     // -----------------------------------------
-    // 成績・選択科目・習熟度（年度別）
-    // evaluation / elective / skill 系を完全統合
+    // 年度別 成績・評価・習熟度 系
     // -----------------------------------------
     match /{col}/{docId} {
       allow read, write: if
@@ -72,28 +68,15 @@ service cloud.firestore {
         (
           col.matches('evaluationCriteria_\\d{4}') ||
           col.matches('evaluationLocks_\\d{4}') ||
+          col.matches('evaluationHistory') ||
           col.matches('electiveRegistrations_\\d{4}') ||
-          col.matches('skillLevels_\\d{4}')
+          col.matches('skillLevels_\\d{4}') ||
+          col.matches('scores_\\d{4}')   // ← ★追加（最重要）
         );
     }
 
     // -----------------------------------------
-    // evaluationHistory（修正履歴）
-    // -----------------------------------------
-    match /evaluationHistory/{id} {
-      allow read, write: if isTeacher();
-    }
-
-    // -----------------------------------------
-    // drafts（途中保存）
-    // -----------------------------------------
-    match /drafts/{id} {
-      allow read, write: if isTeacher();
-    }
-
-    // -----------------------------------------
     // students（学生マスタ）
-    // ※ 読み取りのみ
     // -----------------------------------------
     match /students/{id} {
       allow read: if isTeacher();
