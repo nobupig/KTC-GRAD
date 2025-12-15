@@ -875,47 +875,56 @@
 
       const ref = doc(db, evalColName, subjectId);
       const snap = await getDoc(ref);
-      if (!snap.exists()) return;
 
+      const hasCriteria = snap.exists();
+      const data = hasCriteria ? snap.data() : null;
 
-      const data = snap.data();
-
-      // ★ Firestore にデータがある場合は初期状態を「保存済み」に設定
-      if (data && (data.items?.length ?? 0) > 0) {
-        setSavedUI(true);
-      }
-
-      const method = data.method || "exam_only";
+      const method = (data?.method) || "exam_only";
       currentScheme = method;
       // ★ 評価方式タブとUIを正しく初期化
       resetSchemeTabs(method);
       applyCurrentScheme();
 
+      if (!hasCriteria) {
+        setupSchemeExamOnly();
+      }
+
+      // ★ Firestore にデータがある場合は初期状態を「保存済み」に設定
+      if (hasCriteria && (data?.items?.length ?? 0) > 0) {
+        setSavedUI(true);
+      }
+
       // 中身を上書き
-      criteriaTbody.innerHTML = "";
-      (data.items || []).forEach((item) => {
-        addCriteriaRow(item.name, item.percent, {
-          fixedName: false,
-          fixedPercent: false,
-          allowDelete: true,
+      if (hasCriteria) {
+        criteriaTbody.innerHTML = "";
+        (data.items || []).forEach((item) => {
+          addCriteriaRow(item.name, item.percent, {
+            fixedName: false,
+            fixedPercent: false,
+            allowDelete: true,
+          });
         });
-      });
+      }
 
 
       // totalPercent が未保存の古いデータにも対応する
       let totalPercent;
 
-      if (typeof data.totalPercent === "number") {
-        totalPercent = data.totalPercent;
+      if (hasCriteria) {
+        if (typeof data.totalPercent === "number") {
+          totalPercent = data.totalPercent;
+        } else {
+          totalPercent = (data.items || []).reduce((sum, item) => {
+            const raw = item?.percent;
+            const p =
+              typeof raw === "number"
+                ? raw
+                : parseFloat(raw ?? "");
+            return sum + (Number.isNaN(p) ? 0 : p);
+          }, 0);
+        }
       } else {
-        totalPercent = (data.items || []).reduce((sum, item) => {
-          const raw = item?.percent;
-          const p =
-            typeof raw === "number"
-              ? raw
-              : parseFloat(raw ?? "");
-          return sum + (Number.isNaN(p) ? 0 : p);
-        }, 0);
+        totalPercent = currentScheme === "exam_only" ? 100 : 0;
       }
 
       totalArea.textContent = `合計：${totalPercent}%`;
