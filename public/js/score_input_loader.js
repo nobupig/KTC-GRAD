@@ -1,3 +1,111 @@
+// ================================
+// 超過学生登録モーダルの最低限の表示/非表示フック
+// ================================
+document.addEventListener('DOMContentLoaded', () => {
+      const excessStudentRegisterBtn = document.getElementById('excessStudentRegisterBtn');
+      if (excessStudentRegisterBtn) {
+        excessStudentRegisterBtn.addEventListener('click', () => {
+          // 1人以上チェックされているか
+          const checkedIds = Object.keys(excessStudentsState);
+            // バリデーション：チェックされている学生が1人以上いる場合、超過時間数未入力がいればアラート
+            const listArea = modal.querySelector('.excess-list-scroll');
+            const invalid = checkedIds.some(sid => {
+              const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
+              return !input || !input.value || Number(input.value) <= 0;
+            });
+            if (invalid) {
+              alert('超過時間数が未入力の学生がいます。すべて入力してください。');
+              return; // 中断
+            }
+          // ここで保存処理やFirestore操作は行わない
+        });
+      }
+    // 超過学生登録用 state
+    const excessStudentsState = {};
+  const excessStudentBtn = document.getElementById('excessStudentBtn');
+  const excessStudentModal = document.getElementById('excessStudentModal');
+  const excessStudentCancelBtn = document.getElementById('excessStudentCancelBtn');
+  if (excessStudentBtn && excessStudentModal && excessStudentCancelBtn) {
+    excessStudentBtn.addEventListener('click', () => {
+      // 名簿表示処理（DOMから取得）
+      const listArea = document.getElementById('excessStudentListArea');
+      const tbody = document.getElementById('scoreTableBody');
+      let studentsFromDom = [];
+      if (tbody) {
+        const trs = Array.from(tbody.querySelectorAll('tr'));
+        for (const tr of trs) {
+          if (tr.style.display === 'none') continue;
+          const tds = tr.querySelectorAll('td');
+          if (tds.length < 5) continue;
+          const studentId = tds[0].textContent.trim();
+          const grade = tds[1].textContent.trim();
+          const course = tds[2].textContent.trim();
+          const name = tds[4].textContent.trim();
+          studentsFromDom.push({ studentId, grade, course, name });
+        }
+      }
+      console.log("excess modal students:", studentsFromDom);
+      if (listArea) {
+        // ヘッダー
+        let html = '<table class="excess-modal-table" style="width:100%;border-collapse:collapse;">';
+        html += '<thead><tr>';
+        html += '<th style="width:32px;"></th>';
+        html += '<th>学籍番号</th>';
+        html += '<th>学年</th>';
+        html += '<th>組・コース</th>';
+        html += '<th>氏名</th>';
+        html += '<th>超過時間数</th>';
+        html += '</tr></thead><tbody>';
+        for (const stu of studentsFromDom) {
+          html += '<tr>';
+          html += `<td><input type="checkbox" class="excess-student-checkbox" data-student-id="${stu.studentId||''}"></td>`;
+          html += `<td>${stu.studentId||''}</td>`;
+          html += `<td>${stu.grade||''}</td>`;
+          html += `<td>${stu.course||''}</td>`;
+          html += `<td>${stu.name||''}</td>`;
+            html += `<td><input type="number" class="excess-hours-input" data-student-id="${stu.studentId||''}" min="1" placeholder="時間" style="width:60px;text-align:right;"></td>`;
+          html += '</tr>';
+        }
+        html += '</tbody></table>';
+        listArea.innerHTML = html;
+
+        // チェックボックス・inputイベントでstate更新
+        const checkboxes = listArea.querySelectorAll('.excess-student-checkbox');
+        const hoursInputs = listArea.querySelectorAll('.excess-hours-input');
+        checkboxes.forEach(cb => {
+          cb.addEventListener('change', () => {
+            const sid = cb.getAttribute('data-student-id');
+            const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
+            const hours = input && input.value ? Number(input.value) : 0;
+            if (cb.checked && hours > 0) {
+              excessStudentsState[sid] = { hours };
+            } else {
+              delete excessStudentsState[sid];
+            }
+            console.log('excessStudentsState', excessStudentsState);
+          });
+        });
+        hoursInputs.forEach(input => {
+          input.addEventListener('input', () => {
+            const sid = input.getAttribute('data-student-id');
+            const cb = listArea.querySelector(`.excess-student-checkbox[data-student-id='${sid}']`);
+            const hours = input.value ? Number(input.value) : 0;
+            if (cb && cb.checked && hours > 0) {
+              excessStudentsState[sid] = { hours };
+            } else if (cb && cb.checked) {
+              delete excessStudentsState[sid];
+            }
+            console.log('excessStudentsState', excessStudentsState);
+          });
+        });
+      }
+      excessStudentModal.classList.remove('hidden');
+    });
+    excessStudentCancelBtn.addEventListener('click', () => {
+      excessStudentModal.classList.add('hidden');
+    });
+  }
+});
 import {
   createCriteriaState,
   loadCriteria,
@@ -63,15 +171,26 @@ function renderSkillLevelFilter(subject) {
   ];
   const container = document.createElement("div");
   container.className = "filter-button-group";
+  // デフォルトフィルタ値（必要に応じて変更可）
+  const defaultFilterKey = "all";
+  let defaultBtn = null;
   filterDefs.forEach(def => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = def.label;
     btn.className = "btn btn-secondary";
     btn.onclick = () => applySkillLevelFilter(subject, def.key);
+    if (def.key === defaultFilterKey) {
+      btn.classList.add("active");
+      defaultBtn = btn;
+    }
     container.appendChild(btn);
   });
   area.appendChild(container);
+  // 初回のみ明示的にフィルタ適用
+  if (defaultBtn) {
+    applySkillLevelFilter(subject, defaultFilterKey);
+  }
 }
 
 // ================================
@@ -302,6 +421,7 @@ async function loadSavedScoresForSubject(year, subjectId) {
   return data.students || null;
 }
 
+
 function applySavedScoresToTable(savedStudentsMap, tbodyEl) {
   if (!savedStudentsMap || !tbodyEl) return;
 
@@ -309,21 +429,26 @@ function applySavedScoresToTable(savedStudentsMap, tbodyEl) {
     "input[data-student-id][data-criteria-name]"
   );
 
-  inputs.forEach((input) => {
-    if (input.classList.contains("skill-level-input")) return;
+  isProgrammaticInput = true;
+  try {
+    inputs.forEach((input) => {
+      if (input.classList.contains("skill-level-input")) return;
 
-    const studentId = input.dataset.studentId;
-    const criteriaName = input.dataset.criteriaName;
+      const studentId = input.dataset.studentId;
+      const criteriaName = input.dataset.criteriaName;
 
-    const studentData = savedStudentsMap[studentId];
-    if (!studentData || !studentData.scores) return;
+      const studentData = savedStudentsMap[studentId];
+      if (!studentData || !studentData.scores) return;
 
-    const value = studentData.scores[criteriaName];
-    if (value === undefined || value === null) return;
+      const value = studentData.scores[criteriaName];
+      if (value === undefined || value === null) return;
 
-    input.value = String(value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+      input.value = String(value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  } finally {
+    isProgrammaticInput = false;
+  }
 }
 
 
@@ -802,10 +927,7 @@ if (currentIsSkillLevel) {
 }
 
 
-  // 保存ボタンはまだ本保存未実装なので disable のまま
-  if (saveBtn) {
-    saveBtn.disabled = true;
-  }
+  // 保存ボタンの有効/無効は setUnsavedChanges() で一元管理する
 }
 
 // ================================

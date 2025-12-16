@@ -1,3 +1,211 @@
+/* 超過学生登録モーダル名簿の間延び解消・中央寄せ */
+#excessStudentListArea {
+  max-width: 740px;
+  margin: 0 auto;
+}
+.excess-modal-table {
+  margin: 0 auto;
+  max-width: 740px;
+}
+.excess-modal-table tr {
+  /* width: 100% を外す（指定されていれば上書き） */
+  width: auto !important;
+  /* 不要な space-between を使わない */
+  justify-content: unset !important;
+}
+.excess-modal-table td:nth-child(5),
+.excess-modal-table th:nth-child(5) {
+  max-width: 240px;
+  flex-grow: 1;
+}
+/* thead側にスクロールバー分の余白を確保 */
+.score-table thead tr {
+  padding-right: 16px; /* scrollbar 対策 */
+}
+/* 成績一覧テーブルの列幅を固定し、thead/tbodyのズレを防止 */
+.score-table {
+  table-layout: fixed;
+  width: 100%;
+}
+/* ================================
+   超過学生登録モーダル 列幅最適化
+================================= */
+.excess-modal-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.excess-modal-table th,
+.excess-modal-table td {
+  padding: 6px 8px;
+  font-size: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.excess-modal-table th:nth-child(1),
+.excess-modal-table td:nth-child(1) { /* チェックボックス */
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  flex-shrink: 0;
+}
+.excess-modal-table th:nth-child(2),
+.excess-modal-table td:nth-child(2) { /* 学籍番号 */
+  width: 96px;
+  min-width: 96px;
+  max-width: 96px;
+  flex-shrink: 0;
+}
+.excess-modal-table th:nth-child(3),
+.excess-modal-table td:nth-child(3) { /* 学年 */
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.excess-modal-table th:nth-child(4),
+.excess-modal-table td:nth-child(4) { /* 組・コース */
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.excess-modal-table th:nth-child(5),
+.excess-modal-table td:nth-child(5),
+.excess-modal-table td:nth-child(5) {
+  /* 氏名列と超過時間数列の間にgapを追加 */
+  padding-right: 16px;
+}
+.excess-modal-table th:nth-child(5) { /* 氏名 */
+  min-width: 120px;
+  max-width: 260px;
+  width: auto;
+  flex: 1 1 0%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.excess-modal-table th:nth-child(6),
+.excess-modal-table td:nth-child(6) { /* 超過時間数 */
+  width: 96px;
+  min-width: 96px;
+  max-width: 96px;
+  flex-shrink: 0;
+}
+.excess-modal-table .excess-hours-input {
+  width: 88px;
+  min-width: 72px;
+  max-width: 96px;
+  box-sizing: border-box;
+}
+/* ================================
+   超過学生登録モーダル 横幅・テーブル列幅調整
+================================= */
+#excessStudentModal .modal-content {
+  width: min(960px, 96vw);
+  max-width: 96vw;
+  min-width: 600px;
+}
+
+.excess-modal-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.excess-modal-table th:nth-child(2),
+.excess-modal-table td:nth-child(2) { /* 学籍番号 */
+  width: 90px;
+  min-width: 70px;
+  max-width: 110px;
+  word-break: break-all;
+}
+.excess-modal-table th:nth-child(3),
+.excess-modal-table td:nth-child(3) { /* 学年 */
+  width: 48px;
+  min-width: 40px;
+  max-width: 60px;
+}
+.excess-modal-table th:nth-child(4),
+.excess-modal-table td:nth-child(4) { /* 組・コース */
+  width: 80px;
+  min-width: 60px;
+  max-width: 100px;
+}
+.excess-modal-table th:nth-child(5),
+.excess-modal-table td:nth-child(5) { /* 氏名 */
+  width: auto;
+  min-width: 80px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.excess-modal-table th:nth-child(6),
+.excess-modal-table td:nth-child(6) { /* 超過時間数 */
+  width: 80px;
+  min-width: 72px;
+  max-width: 96px;
+}
+.excess-modal-table .excess-hours-input {
+  width: 72px;
+  min-width: 60px;
+  max-width: 96px;
+  box-sizing: border-box;
+}
+/* 超過学生登録モーダル：名簿スクロール枠 */
+.excess-list-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  overflow-x: hidden; /* 横スクロール基本無効。列が欠ける場合はautoに戻す */
+  padding: 8px 0 8px 0;
+  background: #fff;
+  border-radius: 6px;
+}
+
+/* モーダル名簿テーブル行の見やすさ向上 */
+.excess-modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.excess-modal-table th, .excess-modal-table td {
+  padding: 6px 8px;
+  text-align: left;
+}
+.excess-modal-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.15s;
+}
+.excess-modal-table tbody tr:hover {
+  background: #f3f6fa;
+}
+.excess-modal-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+/* 成績一覧見出しと超過学生登録ボタンの横並び調整 */
+.grade-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+.grade-header-row h2 {
+  font-size: 18px;
+  margin: 0;
+  border-left: 4px solid #004A99;
+  padding-left: 10px;
+}
+#excessStudentBtn {
+  margin-left: 16px;
+  margin-bottom: 0;
+}
+/* 超過学生登録ボタン：名簿ヘッダー付近で自然に見せる */
+#excessStudentBtn {
+  margin-left: 8px;
+  margin-bottom: 4px;
+}
 /* 習熟度入力欄：操作を完全許可 */
 .skill-input {
   pointer-events: auto;
@@ -93,9 +301,9 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
 .score-table-wrapper {
   margin-top: 8px;
-}
 }
 .score-table thead th {
   background: #f9fafb;
@@ -107,6 +315,7 @@ header {
   max-height: calc(100vh - 420px);
   overflow-y: auto;
   border-top: 1px solid #e5e7eb;
+  scrollbar-gutter: stable;
 }
 .score-table-body-scroll table {
   border-collapse: collapse;
@@ -525,13 +734,14 @@ td input[type="number"] {
 }
 
 /* ★ 選択中のボタンを強く強調する */
-.filter-btn.active {
+.filter-btn.active,
+.btn.active {
   background-color: #004A99;
-  color: white;
+  color: #fff;
   font-weight: 600;
   opacity: 1;
   border-color: #003570;
-  box-shadow: 0 0 0 3px rgba(0, 74, 153, 0.25);
+  box-shadow: 0 0 0 3px rgba(0, 74, 153, 0.18);
   transform: translateY(-1px);
 }
 .elective-group-filter {

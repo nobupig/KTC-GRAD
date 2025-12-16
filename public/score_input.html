@@ -36,14 +36,22 @@
   <!--  メインカード -->
   <!-- ========================================= -->
   <main>
-    <!-- 上部操作エリア -->
-    <div class="top-controls">
-      <label for="subjectSelect">対象科目：</label>
-      <select id="subjectSelect"></select>
 
-      <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
-        ホームへ戻る
-      </button>
+    <!-- 上部操作エリア：左寄せで対象科目プルダウン、右側に他ボタン -->
+    <div class="top-controls" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;">
+      <div class="subject-select-area" style="display: flex; align-items: center; gap: 8px;">
+        <label for="subjectSelect">対象科目：</label>
+        <select id="subjectSelect"></select>
+      </div>
+      <div class="top-btn-area" style="display: flex; align-items: center; gap: 8px;">
+        <button id="saveBtn" class="btn-primary" type="button" disabled>
+          保存する
+        </button>
+        <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
+          ホームへ戻る
+        </button>
+        <!-- 将来: 送信・Excel等のボタンをここに横並びで追加可能 -->
+      </div>
     </div>
 
     <!-- 関連ページへのリンク -->
@@ -52,15 +60,14 @@
       <a id="toSubjectsLink" href="subjects.html">科目登録へ</a>
     </div>
 
-    <h2>成績一覧</h2>
+
+    <div class="grade-header-row" style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; margin-bottom: 4px;">
+      <h2 style="margin: 0;">成績一覧</h2>
+      <button id="excessStudentBtn" class="btn btn-secondary" type="button" style="margin-left: 16px;">超過学生登録</button>
+    </div>
 
     <div class="subheader-row">
       <div id="studentCountDisplay" class="student-count">受講者人数：0名</div>
-
-      <!-- ★ 保存ボタンを上に移動（idはそのまま） -->
-      <button id="saveBtn" class="btn-primary" type="button" disabled>
-        保存する
-      </button>
     </div>
 
     <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
@@ -152,6 +159,35 @@
     <span class="toast-icon">✓</span>
     <span class="toast-text">保存しました</span>
   </div>
+
+<!-- 超過学生登録モーダル（骨組みのみ） -->
+<div id="excessStudentModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 class="modal-title">超過学生登録</h2>
+    <div class="excess-list-scroll" style="margin-bottom: 16px;">
+      <div id="excessStudentListArea"></div>
+    </div>
+    <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button id="excessStudentRegisterBtn" class="btn btn-primary" type="button">登録</button>
+      <button id="excessStudentCancelBtn" class="btn btn-secondary" type="button">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 超過学生登録モーダルの表示・非表示制御
+  const excessStudentBtn = document.getElementById('excessStudentBtn');
+  const excessStudentModal = document.getElementById('excessStudentModal');
+  const excessStudentCancelBtn = document.getElementById('excessStudentCancelBtn');
+  if (excessStudentBtn && excessStudentModal && excessStudentCancelBtn) {
+    excessStudentBtn.addEventListener('click', () => {
+      excessStudentModal.classList.remove('hidden');
+    });
+    excessStudentCancelBtn.addEventListener('click', () => {
+      excessStudentModal.classList.add('hidden');
+    });
+  }
+</script>
 </body>
 
 <div id="saveErrorModal" class="modal hidden">
