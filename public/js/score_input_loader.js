@@ -1,23 +1,98 @@
+// 科目メタ情報の単一状態
+let currentSubjectMeta = {
+  subjectId: null,
+  isSkillLevel: false,
+  usesAdjustPoint: false, // isSkillLevel と同義（将来拡張用）
+  passRule: null,
+  required: false,
+};
+let avgUpdateRafId = null;
+// ================================
+// 調整点表示を更新
+// ================================
+function updateAdjustPointDisplay() {
+  const el = document.getElementById("adjustPointDisplay");
+  if (!el) return;
+  const passRule = currentSubjectMeta?.passRule ?? null;
+  const required = currentSubjectMeta?.required === true;
+  if (passRule !== "adjustment" && !required) {
+    el.textContent = "調整点：—";
+    return;
+  }
+  // 平均点表示から値を取得
+  const avgEl = document.getElementById("avgPointDisplay");
+  if (!avgEl) {
+    el.textContent = "調整点：—";
+    return;
+  }
+  const avgText = avgEl.textContent.replace(/[^\d.]/g, "");
+  const avg = parseFloat(avgText);
+  if (isNaN(avg)) {
+    el.textContent = "調整点：—";
+    return;
+  }
+  const adjust = Math.ceil(avg * 0.7);
+  el.textContent = `調整点：${adjust}`;
+}
+// ================================
+// 平均点表示をリアルタイム更新（未入力行除外・DOMのみ）
+// ================================
+function updateAveragePointDisplay() {
+  const el = document.getElementById("avgPointDisplay");
+  if (!el) return;
+  const finalScores = studentState.finalScores ?? new Map();
+  let sum = 0, count = 0;
+  finalScores.forEach((score) => {
+    if (Number.isFinite(score)) {
+      sum += score;
+      count++;
+    }
+  });
+  el.textContent = count === 0 ? "平均点：—" : `平均点：${(sum / count).toFixed(1)}`;
+  updateAdjustPointDisplay();
+}
 // ================================
 // 超過学生登録モーダルの最低限の表示/非表示フック
 // ================================
 document.addEventListener('DOMContentLoaded', () => {
-      const excessStudentRegisterBtn = document.getElementById('excessStudentRegisterBtn');
+  updateAdjustPointDisplay();
+  const excessStudentRegisterBtn = document.getElementById('excessStudentRegisterBtn');
       if (excessStudentRegisterBtn) {
         excessStudentRegisterBtn.addEventListener('click', () => {
           // 1人以上チェックされているか
           const checkedIds = Object.keys(excessStudentsState);
-            // バリデーション：チェックされている学生が1人以上いる場合、超過時間数未入力がいればアラート
-            const listArea = modal.querySelector('.excess-list-scroll');
-            const invalid = checkedIds.some(sid => {
-              const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
-              return !input || !input.value || Number(input.value) <= 0;
+          // バリデーション：チェックされている学生が1人以上いる場合、超過時間数未入力がいればアラート
+          const modal = document.getElementById('excessStudentModal');
+          const listArea = modal.querySelector('.excess-list-scroll');
+          const invalid = checkedIds.some(sid => {
+            const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
+            return !input || !input.value || Number(input.value) <= 0;
+          });
+          if (invalid) {
+            alert('超過時間数が未入力の学生がいます。すべて入力してください。');
+            return; // 中断
+          }
+          // stateはそのまま保持し、モーダルを閉じる
+          modal.classList.add('hidden');
+          // 成績一覧への反映処理を呼び出す（仮：updateExcessStudentsInTable）
+          // 成績一覧への反映処理：該当行にハイライトクラスを付与
+          const tbody = document.getElementById('scoreTableBody');
+          if (tbody) {
+            const trs = Array.from(tbody.querySelectorAll('tr'));
+            trs.forEach(tr => {
+              const tds = tr.querySelectorAll('td');
+              if (tds.length < 1) return;
+              const studentId = tds[0].textContent.trim();
+              if (excessStudentsState[studentId]) {
+                tr.classList.add('excess-student-row');
+              } else {
+                tr.classList.remove('excess-student-row');
+              }
             });
-            if (invalid) {
-              alert('超過時間数が未入力の学生がいます。すべて入力してください。');
-              return; // 中断
-            }
-          // ここで保存処理やFirestore操作は行わない
+          }
+          if (typeof updateExcessStudentsInTable === 'function') {
+            updateExcessStudentsInTable(excessStudentsState);
+          }
         });
       }
     // 超過学生登録用 state
@@ -80,19 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (cb.checked && hours > 0) {
               excessStudentsState[sid] = { hours };
             } else {
-              delete excessStudentsState[sid];
-            }
-            console.log('excessStudentsState', excessStudentsState);
-          });
-        });
-        hoursInputs.forEach(input => {
-          input.addEventListener('input', () => {
-            const sid = input.getAttribute('data-student-id');
-            const cb = listArea.querySelector(`.excess-student-checkbox[data-student-id='${sid}']`);
-            const hours = input.value ? Number(input.value) : 0;
-            if (cb && cb.checked && hours > 0) {
-              excessStudentsState[sid] = { hours };
-            } else if (cb && cb.checked) {
               delete excessStudentsState[sid];
             }
             console.log('excessStudentsState', excessStudentsState);
@@ -226,7 +288,7 @@ function applySkillLevelFilter(subject, key) {
   }
   restoreStashedScores(tbody);
   // 習熟度値の反映
-  if (currentIsSkillLevel && studentState.skillLevelsMap) {
+  if (currentSubjectMeta.isSkillLevel && studentState.skillLevelsMap) {
     const inputs = tbody.querySelectorAll('input.skill-level-input');
     inputs.forEach(input => {
       const sid = input.dataset.studentId;
@@ -236,12 +298,13 @@ function applySkillLevelFilter(subject, key) {
   studentState.currentStudents = filtered.slice();
   updateStudentCountDisplay(filtered.length);
   updateAllFinalScores(tbody, criteriaState, modeState);
+  syncFinalScoresFromTbody(tbody);
 }
 // ================================
 // 新規追加: 習熟度データを取得
 // ================================
 async function ensureSkillLevelsLoaded(subject) {
-  if (!subject || subject.isSkillLevel !== true) return;
+  if (!subject || currentSubjectMeta.isSkillLevel !== true) return;
   const ref = doc(db, `skillLevels_${currentYear}`, subject.subjectId);
   const snap = await getDoc(ref);
   if (snap.exists()) {
@@ -301,7 +364,6 @@ let pasteInitialized = false;
 
 const currentYear = new Date().getFullYear();
 let teacherSubjects = []; // 教員の担当科目リスト（teacherSubjects_YYYY の subjects 配列）
-let currentIsSkillLevel = false;
 let currentUser = null;
 let hasUnsavedChanges = false;
 let unsavedListenerInitialized = false;
@@ -310,6 +372,33 @@ let currentSubjectId = null;
 const tempScoresMap = new Map();
 let isRenderingTable = false;
 let isProgrammaticInput = false;
+
+function syncFinalScoreForRow(tr) {
+  if (!tr) return;
+  const sid = String(tr.dataset.studentId || "");
+  if (!sid) return;
+  const scoreInputs = Array.from(tr.querySelectorAll("input[type='number']"));
+  const hasInputValue = scoreInputs.some((input) => {
+    return (input.value || "").toString().trim() !== "";
+  });
+  if (!hasInputValue) {
+    studentState.finalScores.delete(sid);
+    return;
+  }
+  const finalCell = tr.querySelector(".final-score");
+  const score = finalCell ? Number(finalCell.textContent.trim()) : NaN;
+  if (Number.isFinite(score)) {
+    studentState.finalScores.set(sid, score);
+  } else {
+    studentState.finalScores.delete(sid);
+  }
+}
+
+function syncFinalScoresFromTbody(tbody) {
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  rows.forEach(syncFinalScoreForRow);
+}
 
 // ================================
 // 共通：メッセージ表示ヘルパ
@@ -702,34 +791,46 @@ async function handleSubjectChange(subjectId) {
       </tr>
     `;
     currentSubjectId = null;
+    currentSubjectMeta = {
+      subjectId: null,
+      isSkillLevel: false,
+      usesAdjustPoint: false,
+      passRule: null,
+      required: false,
+    };
     return;
   }
 
   const subject = findSubjectById(subjectId);
-  // ★ subjects 正本を参照
   const subjectMaster = await loadSubjectMaster(subjectId);
-  // ★ isSkillLevel は subjects 正本だけを見る
   const isSkillLevel = subjectMaster?.isSkillLevel === true;
-  // ★ downstream 安定化：subject にも注入しておく（teacherSubjects が欠けてても動く）
-  if (subject) subject.isSkillLevel = isSkillLevel;
-  currentIsSkillLevel = isSkillLevel;
+  const passRule = subjectMaster?.passRule ?? subject?.passRule ?? null;
+  const required = subjectMaster?.required ?? subject?.required ?? false;
+  const usesAdjustPoint = passRule === "adjustment" || required === true;
+  currentSubjectMeta = {
+    subjectId,
+    isSkillLevel,
+    usesAdjustPoint,
+    passRule,
+    required,
+  };
 
   console.log("[DEBUG subjectMaster]", subjectMaster);
-  console.log("[DEBUG isSkillLevel]", currentIsSkillLevel);
+  console.log("[DEBUG isSkillLevel]", currentSubjectMeta.isSkillLevel);
   console.log(
     "[DEBUG subject]",
     {
       subjectId: subject?.subjectId,
       name: subject?.name,
-      isSkillLevel: currentIsSkillLevel,
+      isSkillLevel: currentSubjectMeta.isSkillLevel,
       required: subject?.required
     }
   );
   await ensureElectiveRegistrationLoaded(subject);
-  if (currentIsSkillLevel) {
+  if (currentSubjectMeta.isSkillLevel) {
     await ensureSkillLevelsLoaded(subject);
   }
-  if (currentIsSkillLevel) {
+  if (currentSubjectMeta.isSkillLevel) {
     console.log("[SKILL LEVEL MODE] enabled");
   } else {
     console.log("[SKILL LEVEL MODE] disabled");
@@ -751,16 +852,18 @@ async function handleSubjectChange(subjectId) {
 
   currentSubjectId = subjectId;
   tempScoresMap.clear(); // 科目切替時のみキャッシュをリセット
+  studentState.finalScores.clear();
 
   infoMessageEl?.classList.remove("warning-message");
   setInfoMessage("評価基準と名簿を読み込んでいます…");
 
   // 評価基準読み込み → ヘッダ生成
   await loadCriteria(db, currentYear, subjectId, criteriaState);
-
+  // 評価基準ロード直後に調整点表示を更新
+  updateAdjustPointDisplay();
   renderTableHeader(headerRow, criteriaState);
-  // currentIsSkillLevel===true の場合のみ「習熟度」thを先頭に追加
-  if (currentIsSkillLevel) {
+  // isSkillLevel===true の場合のみ「習熟度」thを先頭に追加
+  if (currentSubjectMeta.isSkillLevel) {
     const th = document.createElement("th");
     th.textContent = "習熟度";
     headerRow.insertBefore(th, headerRow.firstChild);
@@ -794,8 +897,8 @@ studentState.currentStudents = displayStudents.slice();
 
   console.log('[DEBUG] subject:', subject);
   console.log('[DEBUG] displayStudents(before sort):', displayStudents);
-  // 習熟度ソート（currentIsSkillLevel===true時のみ）
-  if (currentIsSkillLevel) {
+  // 習熟度ソート（isSkillLevel===true時のみ）
+  if (currentSubjectMeta.isSkillLevel) {
     displayStudents = sortStudentsBySkillLevel(displayStudents, studentState.skillLevelsMap);
     console.log('[DEBUG] displayStudents(after skill sort):', displayStudents);
   }
@@ -803,15 +906,22 @@ studentState.currentStudents = displayStudents.slice();
   console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
   // 学生行描画（入力時にその行の最終成績を計算）
   isRenderingTable = true;
+  const handleScoreInputChange = (tr) => {
+    if (!tr) return;
+    updateFinalScoreForRow(tr, criteriaState, modeState);
+    syncFinalScoreForRow(tr);
+    if (avgUpdateRafId) cancelAnimationFrame(avgUpdateRafId);
+    avgUpdateRafId = requestAnimationFrame(() => {
+      updateAveragePointDisplay();
+    });
+  };
   try {
     renderStudentRows(
       tbody,
       subject,
       displayStudents,
       criteriaState.items,
-      (tr) => {
-        updateFinalScoreForRow(tr, criteriaState, modeState);
-      },
+      handleScoreInputChange,
       studentState
     );
   } finally {
@@ -844,11 +954,13 @@ studentState.currentStudents = displayStudents.slice();
       if (target.classList.contains("skill-level-input")) return;
       if (!target.dataset.index) return;
       setUnsavedChanges(true);
+      const tr = target.closest("tr");
+      handleScoreInputChange(tr);
     });
     unsavedListenerInitialized = true;
   }
   // --- 新規追加: 習熟度値の反映 ---
-  if (currentIsSkillLevel && studentState.skillLevelsMap) {
+  if (currentSubjectMeta.isSkillLevel && studentState.skillLevelsMap) {
     const inputs = tbody.querySelectorAll('input.skill-level-input');
     inputs.forEach(input => {
       const sid = input.dataset.studentId;
@@ -856,6 +968,7 @@ studentState.currentStudents = displayStudents.slice();
     });
   }
   updateStudentCountDisplay(displayStudents.length);
+  updateAveragePointDisplay();
 
   // ▼ 貼り付け処理の接続（初回だけ）
   if (!pasteInitialized) {
@@ -920,7 +1033,7 @@ studentState.currentStudents = displayStudents.slice();
   }
 
 // STEP C：フィルタ UI を生成
-if (currentIsSkillLevel) {
+if (currentSubjectMeta.isSkillLevel) {
   renderSkillLevelFilter(subject);
 } else {
   renderGroupOrCourseFilter(subject);
@@ -1089,6 +1202,7 @@ function applyGroupOrCourseFilter(subject, filterKey) {
 
     // 再計算
     updateAllFinalScores(tbody, criteriaState, modeState);
+    syncFinalScoresFromTbody(tbody);
   });
 }
 

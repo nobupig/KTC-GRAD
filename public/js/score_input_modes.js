@@ -154,6 +154,7 @@ export function updateFinalScoreForRow(
     });
 
   let total = 0;
+  let hasAnyInput = false;
   const errors = [];
 
   inputs.forEach((input) => {
@@ -197,6 +198,9 @@ export function updateFinalScoreForRow(
     }
 
     // ---------- 空欄は無視（アラート無し・括弧表示無し） ----------
+    if (rawStr !== "") {
+      hasAnyInput = true;
+    }
     if (rawStr === "") {
       return;
     }
@@ -277,9 +281,13 @@ export function updateFinalScoreForRow(
   // ---------- ⑥ 最終成績セルに合計を反映 ----------
   const finalCell = tr.querySelector(".final-score");
   if (finalCell) {
-    finalCell.textContent = Number.isFinite(total)
-      ? Math.floor(total).toString()
-      : "";
+    if (!hasAnyInput) {
+      finalCell.textContent = "";
+    } else {
+      finalCell.textContent = Number.isFinite(total)
+        ? Math.floor(total).toString()
+        : "";
+    }
   }
 
   return {

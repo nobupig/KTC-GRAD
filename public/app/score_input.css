@@ -1,3 +1,28 @@
+/* 平均点・調整点ピル（バッジ）表示 */
+.point-pill-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+#avgPointDisplay, #adjustPointDisplay {
+  display: inline-block;
+  background: #f3f4f6;
+  color: #222;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  min-width: 64px;
+  text-align: center;
+  line-height: 1.3;
+}
+/* 超過学生ハイライト（成績一覧行） */
+.excess-student-row {
+  background: #e6f2ff !important; /* 薄い青系 */
+  border-left: 5px solid #3399ff !important; /* 強調色 */
+}
 /* 超過学生登録モーダル名簿の間延び解消・中央寄せ */
 #excessStudentListArea {
   max-width: 740px;

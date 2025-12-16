@@ -84,6 +84,7 @@ export function createStudentState() {
     baseStudents: [],
     currentStudents: [],
     electiveStudents: [],   // 選択科目用（追加するだけ）
+    finalScores: new Map(),
   };
 }
 
@@ -382,11 +383,6 @@ export function renderStudentRows(
         input.dataset.studentId = String(stu.studentId);
         input.dataset.itemName = item.name || "";
         input.addEventListener("paste", (ev) => ev.preventDefault());
-        input.addEventListener("input", () => {
-          if (typeof onScoreInputChange === "function") {
-            onScoreInputChange(tr);
-          }
-        });
         td.appendChild(input);
         // ▼ 内部換算点表示用の <span>
           const span = document.createElement("span");

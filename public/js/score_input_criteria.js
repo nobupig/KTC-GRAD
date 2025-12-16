@@ -59,6 +59,10 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
   const data = snap.data() || {};
   const items = data.items || [];
 
+  // --- adjustPoint, useAdjustPoint を state に格納 ---
+  criteriaState.adjustPoint = (typeof data.adjustPoint === 'number' || data.adjustPoint === null) ? data.adjustPoint : null;
+  criteriaState.useAdjustPoint = (typeof data.useAdjustPoint === 'boolean') ? data.useAdjustPoint : false;
+
   const mapped = items.map((it) => ({
     name: it.name || "",
     percent: Number(it.percent || 0),
