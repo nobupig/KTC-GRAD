@@ -1,6 +1,55 @@
+/**
+ * 指定学年の学生のみ取得（Firestore Reads削減版）
+ * @param {import("firebase/firestore").Firestore} db
+ * @param {string|number} grade
+ * @param {{ allStudents: any[] }} studentState
+ */
+export async function loadStudentsForGrade(db, grade, studentState) {
+  if (!grade) return;
+  const cacheKey = `students_cache_grade_${grade}`;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && Array.isArray(parsed.data) && typeof parsed.ts === "number") {
+        const now = Date.now();
+        if (now - parsed.ts < 6 * 60 * 60 * 1000) {
+          studentState.allStudents = parsed.data;
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    // キャッシュ破損時は無視してFirestoreへ
+  }
+  const q = query(
+    collection(db, "students"),
+    where("isActive", "==", true),
+    where("grade", "==", String(grade))
+  );
+  let snap;
+  try {
+    snap = await getDocs(q);
+  } catch (err) {
+    if (err.code === "resource-exhausted" || String(err.message).includes("Quota exceeded")) {
+      activateQuotaErrorState();
+      throw err;
+    } else {
+      throw err;
+    }
+  }
+  const students = snap.docs.map((d) => d.data() || {});
+  studentState.allStudents = students;
+  try {
+    sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: students }));
+  } catch (e) {
+    // sessionStorage容量超過等は無視
+  }
+}
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   getFirestore,
   setDoc,
@@ -8,6 +57,8 @@ import {
   query,
   where,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { activateQuotaErrorState } from "./quota_banner.js";
+import { CURRENT_YEAR } from "./config.js";
 
 /**
  * 習熟度・コース・番号・ID順でソート
@@ -32,7 +83,7 @@ export function sortStudentsBySkillLevel(students, skillLevelsMap) {
     return String(a.studentId).localeCompare(String(b.studentId));
   });
 }
-const currentYear = new Date().getFullYear();
+const currentYear = CURRENT_YEAR;
 const SKILL_LEVEL_COLLECTION_PREFIX = "skillLevels_";
 const SKILL_LEVEL_SAVE_DEBOUNCE_MS = 500;
 const FINAL_SKILL_ALLOWED = ["", "S", "A1", "A2", "A3"];
@@ -96,8 +147,93 @@ export function createStudentState() {
  */
 export async function loadAllStudents(db, studentState) {
   const q = query(collection(db, "students"), where("isActive", "==", true));
-  const snap = await getDocs(q);
+  let snap;
+  try {
+    snap = await getDocs(q);
+  } catch (err) {
+    if (err.code === "resource-exhausted" || String(err.message).includes("Quota exceeded")) {
+      activateQuotaErrorState();
+      throw err;
+    } else {
+      throw err;
+    }
+  }
   studentState.allStudents = snap.docs.map((d) => d.data() || {});
+}
+
+const STUDENT_IN_BATCH_SIZE = 10;
+
+/**
+ * studentIdのリストから該当学生情報を取得（返却順は studentIds 順）
+ */
+export async function loadStudentsByIds(db, studentIds) {
+  if (!Array.isArray(studentIds) || studentIds.length === 0) return [];
+  const batches = [];
+  for (let i = 0; i < studentIds.length; i += STUDENT_IN_BATCH_SIZE) {
+    batches.push(studentIds.slice(i, i + STUDENT_IN_BATCH_SIZE));
+  }
+  const fetched = [];
+  for (const batch of batches) {
+    const ids = batch.map((id) => String(id));
+    const q = query(
+      collection(db, "students"),
+      where("studentId", "in", ids)
+    );
+    let snap;
+    try {
+      snap = await getDocs(q);
+    } catch (err) {
+      if (err.code === "resource-exhausted" || String(err.message).includes("Quota exceeded")) {
+        activateQuotaErrorState();
+        throw err;
+      } else {
+        throw err;
+      }
+    }
+    fetched.push(...snap.docs.map((d) => d.data() || {}));
+  }
+  const byId = new Map();
+  fetched.forEach((stu) => {
+    const key = stu.studentId != null ? String(stu.studentId) : null;
+    if (key !== null && !byId.has(key)) {
+      byId.set(key, stu);
+    }
+  });
+  const ordered = [];
+  studentIds.forEach((id) => {
+    const key = id != null ? String(id) : null;
+    if (key && byId.has(key)) {
+      ordered.push(byId.get(key));
+    }
+  });
+  return ordered;
+}
+
+/**
+ * 科目ごとの名簿（studentIds）を取得
+ * @param {import("firebase/firestore").Firestore} db
+ * @param {string|number} year
+ * @param {string} subjectId
+ * @returns {Promise<null|any[]>}
+ */
+export async function loadSubjectRoster(db, year, subjectId) {
+  const rosterYear = year || CURRENT_YEAR;
+  if (!subjectId) return null;
+  const ref = doc(db, `subjectRoster_${rosterYear}`, subjectId);
+  let snap;
+  try {
+    snap = await getDoc(ref);
+  } catch (err) {
+    if (err.code === "resource-exhausted" || String(err.message).includes("Quota exceeded")) {
+      activateQuotaErrorState();
+      throw err;
+    } else {
+      throw err;
+    }
+  }
+  if (!snap.exists()) return null;
+  const data = snap.data() || {};
+  return Array.isArray(data.studentIds) ? data.studentIds : null;
 }
 
 /**
@@ -282,6 +418,35 @@ export function renderStudentRows(
   onScoreInputChange,
   studentState
 ) {
+  const bodyTable = tbody?.closest("table");
+  // 列幅を固定する colgroup をテーブル先頭に挿入（thead/tbody より前）
+  if (bodyTable) {
+    const existing = bodyTable.querySelector("colgroup");
+    if (existing) existing.remove();
+
+    const colgroup = document.createElement("colgroup");
+    const addCol = (px) => {
+      const col = document.createElement("col");
+      col.style.width = px;
+      colgroup.appendChild(col);
+    };
+
+    const enableSkillLevel = subject && subject.isSkillLevel === true;
+    if (enableSkillLevel) addCol("72px");
+
+    addCol("110px"); // 学籍番号
+    addCol("56px");  // 学年
+    addCol("84px");  // 組・コース
+    addCol("56px");  // 番号
+    addCol("160px"); // 氏名
+
+    (criteriaItems || []).forEach(() => addCol("140px")); // 評価入力列
+
+    addCol("90px"); // 最終成績
+
+    bodyTable.insertBefore(colgroup, bodyTable.firstElementChild || null);
+  }
+
   tbody.innerHTML = "";
 
   // 科目未選択

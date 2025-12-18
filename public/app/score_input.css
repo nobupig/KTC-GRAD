@@ -1,3 +1,186 @@
+/* ================================
+   成績入力テーブル：スクロール制御
+================================= */
+.score-table-wrapper {
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+.score-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  overflow: visible;
+}
+.score-table th,
+.score-table td {
+  white-space: nowrap;
+}
+.score-table thead th {
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+/* ================================
+   成績入力テーブル：列内改行防止
+================================= */
+.score-table th,
+.score-table td {
+  white-space: nowrap;
+}
+/* ================================
+   成績入力テーブル：body側テーブル横スクロール対応（上書き）
+================================= */
+.score-table-body-scroll table {
+  width: max-content !important;
+  min-width: 100%;
+}
+/* ================================
+   成績入力テーブル：横スクロール対応（上書き）
+================================= */
+/* 固定レイアウト＋横スクロール（wrapper が持つ） */
+.score-table {
+  table-layout: fixed;
+  width: max-content;
+  min-width: 0;
+  border-collapse: collapse;
+}
+
+/* ================================
+   行全体ハイライト（tr > td） - 行ベースで統一
+   無効化: デバッグ目的で行背景の自動付与を停止
+   - td に直接個別背景を指定するのではなく
+     tr.row-... > td で列全体を統一的に着色する実装を一時的に無効化
+================================= */
+/*
+#scoreTableBody tr.row-fail > td {
+  background: #ffeaea !important;
+}
+#scoreTableBody tr.row-excess > td {
+  background: #e6f2ff !important;
+}
+#scoreTableBody tr.row-fail-excess > td,
+#scoreTableBody tr.row-excess.row-fail > td,
+#scoreTableBody tr.row-fail.row-excess > td {
+  background: #e9d5ff !important;
+}
+*/
+/* ================================
+   行側の帯表示（疑似要素でレイアウトを崩さない）
+   - 左端の薄い帯を ::before で表示（#scoreTableBody スコープ）
+   - 超過＋赤点は最終成績セルの ::after で表示（絶対配置）
+   ※ DOM 変更（td追加）に依存しない
+   =================================
+
+   ※ 一時的に無効化: 列幅やレイアウト不具合の原因を切り分けるため、
+   行側の疑似要素・位置指定による装飾をコメントアウトしています。
+*/
+
+/*
+  #scoreTableBody tr.row-excess,
+  #scoreTableBody tr.row-fail-excess,
+  #scoreTableBody tr.row-fail { position: relative; }
+
+  #scoreTableBody tr.row-excess::before,
+  #scoreTableBody tr.row-fail-excess::before,
+  #scoreTableBody tr.row-fail::before {
+    content: "";
+    position: absolute;
+    left: 0;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      border-radius: 6px 0 0 6px;
+      pointer-events: none;
+    }
+
+    #scoreTableBody tr.row-excess::before { background: #2b6cb0; }
+    #scoreTableBody tr.row-fail-excess::before { background: #7c3aed; }
+    #scoreTableBody tr.row-fail::before { background: #c62828; }
+
+    #scoreTableBody tr.row-fail-excess::after{ display: none; }
+
+    #scoreTableBody .final-score {
+      position: relative !important;
+      padding-right: 22px !important;
+      box-sizing: border-box !important;
+      min-width: 0 !important;
+    }
+
+    #scoreTableBody .final-score::after {
+      content: "";
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      pointer-events: none;
+      display: block;
+      width: 12px;
+      height: 12px;
+      line-height: 12px;
+      text-align: center;
+      color: inherit;
+      opacity: 0.95;
+    }
+
+    #scoreTableBody tr.row-fail-excess .final-score::after {
+      content: "⚠";
+      color: #7c3aed;
+    }
+  */
+
+/* 最終成績セルや個別セルの背景は行背景に従う（セル単体の背景を禁止） */
+#scoreTableBody .final-score,
+#scoreTableBody .cell-fail,
+#scoreTableBody .cell-excess {
+  background: transparent !important;
+}
+
+/*
+tr.row-fail-excess .final-score::after {
+  content: "⚠";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #7c3aed;  紫に合わせる
+  pointer-events: none;
+  opacity: 0.95;
+}
+*/
+
+/* フォーカス／アクティブ状態の行も行背景を優先。背景は奪わず枠線表示にする */
+#scoreTableBody tr:focus-visible,
+#scoreTableBody tr:focus,
+#scoreTableBody tr:active {
+  background: inherit !important;
+  outline: 2px solid rgba(0,74,153,0.35);
+  outline-offset: -2px;
+}
+/* ================================
+   赤点・超過セル強調
+================================= */
+.cell-fail {
+  background: transparent !important; /* 背景なしにして行背景を尊重 */
+  color: #b71c1c !important;
+  font-weight: 700;
+  outline: 1px solid rgba(183,28,28,0.06);
+}
+.cell-excess {
+  background: transparent !important;
+  color: #0b4f8a !important;
+  font-weight: 700;
+  outline: 1px solid rgba(11,79,138,0.08);
+}
+.cell-fail.cell-excess, .cell-excess.cell-fail {
+  background: transparent !important;
+  color: #b71c1c !important;
+  font-weight: 700;
+  outline: 1px solid rgba(183,28,28,0.08);
+}
 /* 平均点・調整点ピル（バッジ）表示 */
 .point-pill-area {
   display: flex;
@@ -20,9 +203,66 @@
 }
 /* 超過学生ハイライト（成績一覧行） */
 .excess-student-row {
-  background: #e6f2ff !important; /* 薄い青系 */
-  border-left: 5px solid #3399ff !important; /* 強調色 */
+  background: transparent !important; /* legacy を無効化：行背景ルールに一本化 */
+  /* border-left を廃止（列幅に影響を与えないよう box-shadow を使用） */
+  border-left: none !important;
 }
+/* ★旧 .excess-student-row が残っていても「赤点+超過」を紫で勝たせる */
+/* legacy override neutralized */
+tr.row-fail.row-excess.excess-student-row > td,
+tr.excess-student-row.row-fail.row-excess > td {
+  background: transparent !important;
+}
+
+/* 左帯：列幅を一切変えない方式（inset box-shadow を最初のセルへ適用） */
+/* 左帯は score table tbody 内でのみ適用（列幅に影響を与えない） */
+/*
+#scoreTableBody tr.row-excess > td:first-child {
+  box-shadow: inset 6px 0 0 #2b6cb0;
+}
+#scoreTableBody tr.row-fail-excess > td:first-child {
+  box-shadow: inset 6px 0 0 #7c3aed;
+}
+*/
+
+/* ================================
+   列ズレ完全防止（最終解）
+================================ */
+/* テーブルは固定レイアウトにする */
+.score-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  min-width: 100% !important;
+}
+
+/* 各列の幅を明示的に固定 */
+.score-table th:nth-child(1),
+.score-table td:nth-child(1) { width: 110px; } /* 学籍番号 */
+
+.score-table th:nth-child(2),
+.score-table td:nth-child(2) { width: 60px; }  /* 学年 */
+
+.score-table th:nth-child(3),
+.score-table td:nth-child(3) { width: 80px; }  /* 組・コース */
+
+.score-table th:nth-child(4),
+.score-table td:nth-child(4) { width: 60px; }  /* 番号 */
+
+.score-table th:nth-child(5),
+.score-table td:nth-child(5) { width: 160px; } /* 氏名 */
+
+.score-table th:nth-child(6),
+.score-table td:nth-child(6) { width: 140px; } /* 評価入力 */
+
+.score-table th.final-score,
+.score-table td.final-score {
+  width: 80px !important;
+}
+/*
+#scoreTableBody tr.row-fail > td:first-child {
+  box-shadow: inset 6px 0 0 #c62828;
+}
+*/
 /* 超過学生登録モーダル名簿の間延び解消・中央寄せ */
 #excessStudentListArea {
   max-width: 740px;
@@ -47,10 +287,11 @@
 .score-table thead tr {
   padding-right: 16px; /* scrollbar 対策 */
 }
-/* 成績一覧テーブルの列幅を固定し、thead/tbodyのズレを防止 */
 .score-table {
-  table-layout: fixed;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  overflow: visible;
 }
 /* ================================
    超過学生登録モーダル 列幅最適化
@@ -96,13 +337,13 @@
   text-align: center;
   flex-shrink: 0;
 }
-.excess-modal-table th:nth-child(5),
-.excess-modal-table td:nth-child(5),
-.excess-modal-table td:nth-child(5) {
+.excess-modal-table th:nth-child(6),
+.excess-modal-table td:nth-child(6),
+.excess-modal-table td:nth-child(6) {
   /* 氏名列と超過時間数列の間にgapを追加 */
   padding-right: 16px;
 }
-.excess-modal-table th:nth-child(5) { /* 氏名 */
+.excess-modal-table th:nth-child(6) { /* 氏名 */
   min-width: 120px;
   max-width: 260px;
   width: auto;
@@ -111,8 +352,8 @@
   overflow: hidden;
   white-space: nowrap;
 }
-.excess-modal-table th:nth-child(6),
-.excess-modal-table td:nth-child(6) { /* 超過時間数 */
+.excess-modal-table th:nth-child(7),
+.excess-modal-table td:nth-child(7) { /* 超過時間数 */
   width: 96px;
   min-width: 96px;
   max-width: 96px;
@@ -329,16 +570,20 @@ header {
 }
 .score-table-wrapper {
   margin-top: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: auto;
 }
 .score-table thead th {
-  background: #f9fafb;
+  background: #fff;
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 3;
 }
 .score-table-body-scroll {
   max-height: calc(100vh - 420px);
   overflow-y: auto;
+  overflow-x: visible; /* 横スクロールは wrapper に任せる */
   border-top: 1px solid #e5e7eb;
   scrollbar-gutter: stable;
 }
@@ -584,6 +829,8 @@ th {
 
 td input[type="number"] {
   width: 80px;
+  min-width: 64px;
+  box-sizing: border-box;
   padding: 4px 6px;
   border-radius: 6px;
   border: 1px solid #d1d5db;
@@ -961,4 +1208,80 @@ td input[type="number"] {
 .toast-icon {
   font-size: 18px;
   font-weight: 700;
+}
+
+/* ================================
+   凡例
+   ================================ */
+.risk-legend {
+  font-size: 0.85em;
+  color: #555;
+  margin: 6px 0 10px 0;
+}
+
+/* ================================
+   列幅ズレ完全防止：最終成績列を固定
+================================ */
+.score-table th.final-score,
+.score-table td.final-score {
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+  box-sizing: border-box;
+}
+
+/* ================================
+   ⚠ アイコンによる列幅変動防止
+================================ */
+.final-score {
+  position: relative;
+  padding-right: 20px; /* アイコン分を事前確保 */
+}
+
+.final-score::after {
+  width: 12px;          /* ← 幅を明示して再計算を防止 */
+  text-align: center;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* ================================
+   左帯は列幅に影響しない方式に統一
+================================ */
+/*
+  高い具体性で #scoreTableBody 内に適用し、border-left を完全無効化する
+#scoreTableBody tr.row-excess > td:first-child {
+  box-shadow: inset 6px 0 0 #2b6cb0 !important;
+  border-left: none !important;
+}
+#scoreTableBody tr.row-fail > td:first-child {
+  box-shadow: inset 6px 0 0 #c62828 !important;
+  border-left: none !important;
+}
+#scoreTableBody tr.row-fail-excess > td:first-child {
+  box-shadow: inset 6px 0 0 #7c3aed !important;
+  border-left: none !important;
+}
+*/
+
+/* ================================
+   強制上書き：レイアウト固定と横スクロール許容
+================================ */
+.score-table,
+.score-table-body-scroll table {
+  table-layout: fixed !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  border-collapse: collapse;
+}
+
+.score-table th,
+.score-table td {
+  min-width: 0 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

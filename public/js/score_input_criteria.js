@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { activateQuotaErrorState } from "./quota_banner.js";
 
 /**
  * 評価基準状態
@@ -53,7 +54,17 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
 
   const colName = `evaluationCriteria_${year}`;
   const ref = doc(db, colName, subjectId);
-  const snap = await getDoc(ref);
+    let snap;
+    try {
+      snap = await getDoc(ref);
+    } catch (err) {
+      if (err.code === "resource-exhausted" || String(err.message).includes("Quota exceeded")) {
+        activateQuotaErrorState();
+        throw err;
+      } else {
+        throw err;
+      }
+    }
   if (!snap.exists()) return;
 
   const data = snap.data() || {};
@@ -82,6 +93,32 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
  * 成績表ヘッダ描画＋項目ごとミニモードボタン
  */
 export function renderTableHeader(headerRow, criteriaState) {
+  const table = headerRow?.closest("table");
+  if (table) {
+    const oldColgroup = table.querySelector("colgroup");
+    if (oldColgroup) oldColgroup.remove();
+
+    const colgroup = document.createElement("colgroup");
+    const fixedWidths = [120, 60, 90, 60, 140];
+    fixedWidths.forEach((w) => {
+      const col = document.createElement("col");
+      col.style.width = `${w}px`;
+      colgroup.appendChild(col);
+    });
+
+    (criteriaState.items || []).forEach(() => {
+      const col = document.createElement("col");
+      col.style.width = "90px";
+      colgroup.appendChild(col);
+    });
+
+    const finalCol = document.createElement("col");
+    finalCol.style.width = "80px";
+    colgroup.appendChild(finalCol);
+
+    table.prepend(colgroup);
+  }
+
   headerRow.innerHTML = "";
 
   const ths = [];

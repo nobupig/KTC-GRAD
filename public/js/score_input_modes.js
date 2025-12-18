@@ -155,6 +155,7 @@ export function updateFinalScoreForRow(
 
   let total = 0;
   let hasAnyInput = false;
+  let hasEmpty = false;
   const errors = [];
 
   inputs.forEach((input) => {
@@ -198,11 +199,15 @@ export function updateFinalScoreForRow(
     }
 
     // ---------- 空欄は無視（アラート無し・括弧表示無し） ----------
-    if (rawStr !== "") {
-      hasAnyInput = true;
-    }
     if (rawStr === "") {
+      // 空欄があることを記録し、換算表示が残らないようクリアして戻る
+      hasEmpty = true;
+      if (hasConvertedSpan) {
+        span.textContent = "";
+      }
       return;
+    } else {
+      hasAnyInput = true;
     }
 
     const value = Number(rawStr);
@@ -283,16 +288,55 @@ export function updateFinalScoreForRow(
   if (finalCell) {
     if (!hasAnyInput) {
       finalCell.textContent = "";
+    
     } else {
-      finalCell.textContent = Number.isFinite(total)
-        ? Math.floor(total).toString()
-        : "";
+      finalCell.textContent = Number.isFinite(total) ? Math.floor(total).toString() : "";
+    }
+    // === STEP.B: 保存時点で「全入力済か」を DOM に記録 ===
+    try {
+      if (tr && tr.dataset) {
+        tr.dataset.allFilled = (!hasEmpty && hasAnyInput) ? "1" : "0";
+      }
+    } catch (e) {
+      // 何もしない（安全）
     }
   }
 
   return {
     hasError: errors.length > 0,
     errors,
+  };
+}
+
+/**
+ * 与えられた最終成績と文脈から赤点/超過を判定する共通関数
+ * @param {string|number|null|undefined} finalScore
+ * @param {{ useAdjustment?: boolean, adjustPoint?: number|null }} [ctx]
+ * @returns {{ isFail: boolean, isExcess: boolean }}
+ */
+export function computeRiskFlags(finalScore, ctx) {
+  // 空欄・未入力ガード
+  if (finalScore === null || finalScore === undefined) {
+    return { isFail: false, isExcess: false };
+  }
+  if (typeof finalScore === "string" && finalScore.trim() === "") {
+    return { isFail: false, isExcess: false };
+  }
+  const useAdjustment = ctx?.useAdjustment === true;
+  const rawAdjust = ctx?.adjustPoint;
+  const adjustPoint = Number.isFinite(Number(rawAdjust)) ? Number(rawAdjust) : null;
+  const numericScore = Number(finalScore);
+  if (!Number.isFinite(numericScore)) {
+    return { isFail: false, isExcess: false };
+  }
+  const isFail = useAdjustment
+    ? Number.isFinite(adjustPoint)
+      ? numericScore < adjustPoint
+      : false
+    : numericScore < 60;
+  return {
+    isFail,
+    isExcess: false,
   };
 }
 

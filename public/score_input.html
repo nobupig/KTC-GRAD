@@ -70,6 +70,10 @@
       <button id="excessStudentBtn" class="btn btn-secondary" type="button" style="margin-left: 16px;">超過学生登録</button>
     </div>
 
+    <div class="risk-legend">
+      🔴 赤点　🔵 超過　🟣 赤点かつ超過（特に注意）
+    </div>
+
     <div class="subheader-row">
       <div id="studentCountDisplay" class="student-count">受講者人数：0名</div>
     </div>
@@ -96,15 +100,10 @@
             <th>最終成績</th>
           </tr>
         </thead>
+        <tbody id="scoreTableBody">
+          <!-- 学生行は students.js で動的生成 -->
+        </tbody>
       </table>
-
-      <div class="score-table-body-scroll">
-        <table class="score-table">
-          <tbody id="scoreTableBody">
-            <!-- 学生行は students.js で動的生成 -->
-          </tbody>
-        </table>
-      </div>
     </div>
 
     <!-- 保存ボタンは上に移動。注意書きは残す -->
