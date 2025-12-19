@@ -289,6 +289,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import {
   getFirestore,
+  onSnapshot,
   doc,
   getDoc,
   setDoc,
@@ -514,6 +515,9 @@ let excessDraftState = null;
 let excessDirty = false;
 // フラグ: 復元時に savedScores が適用されたかを示す
 let didApplySavedScores = false;
+let ignoreNextSnapshot = false;
+let lastSavedByMeAt = 0;
+let scoresSnapshotUnsubscribe = null;
 
 function cloneExcessState(src) {
   const base = src && typeof src === "object" ? src : {};
@@ -1102,12 +1106,47 @@ async function loadScoreUpdatedAtBase(subjectId, studentsList) {
   });
 }
 
+function cleanupScoresSnapshotListener() {
+  if (scoresSnapshotUnsubscribe) {
+    scoresSnapshotUnsubscribe();
+    scoresSnapshotUnsubscribe = null;
+  }
+}
+
+function setupScoresSnapshotListener(subjectId) {
+  cleanupScoresSnapshotListener();
+  if (!subjectId) return;
+  const ref = doc(db, `scores_${currentYear}`, subjectId);
+  let initialized = false;
+  scoresSnapshotUnsubscribe = onSnapshot(ref, (snapshot) => {
+    if (!snapshot || !snapshot.exists()) return;
+    if (!initialized) {
+      initialized = true;
+      return;
+    }
+    if (ignoreNextSnapshot) {
+      ignoreNextSnapshot = false;
+      return;
+    }
+    const data = snapshot.data?.() || {};
+    const currentUserEmail = currentUser?.email || "";
+    if (data.updatedBy && data.updatedBy === currentUserEmail) {
+      return;
+    }
+    if (Date.now() - lastSavedByMeAt < 3000) {
+      return;
+    }
+    alert("他の教員がこのクラスの成績を更新しました。再読み込みしてください。");
+  });
+}
+
 // ================================
 // 科目選択時の処理
 // ================================
 async function handleSubjectChange(subjectId) {
   setUnsavedChanges(false);
   if (!subjectId) {
+    cleanupScoresSnapshotListener();
     infoMessageEl?.classList.remove("warning-message");
     scoreUpdatedAtBaseMap.clear();
     setInfoMessage("科目が選択されていません。");
@@ -1135,6 +1174,7 @@ async function handleSubjectChange(subjectId) {
     return;
   }
   currentSubjectId = subjectId;
+  setupScoresSnapshotListener(subjectId);
 
   const subject = findSubjectById(subjectId);
 
@@ -1199,6 +1239,7 @@ async function handleSubjectChange(subjectId) {
       </tr>
     `;
     currentSubjectId = null;
+    cleanupScoresSnapshotListener();
     return;
   }
 
@@ -1510,6 +1551,8 @@ export async function saveStudentScores(subjectId, studentId, scoresObj, teacher
       { merge: true }
     );
   });
+  ignoreNextSnapshot = true;
+  lastSavedByMeAt = Date.now();
   scoreUpdatedAtBaseMap.set(sid, "SAVED");
 }
 
@@ -1571,6 +1614,8 @@ export async function saveBulkStudentScores(bulkScores) {
 
     tx.set(ref, writeData, { merge: true });
   });
+  ignoreNextSnapshot = true;
+  lastSavedByMeAt = Date.now();
 
   studentIds.forEach((sid) => scoreUpdatedAtBaseMap.set(sid, "SAVED"));
   if (excessDirty) {
