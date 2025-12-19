@@ -100,36 +100,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   updateAdjustPointDisplay();
   const excessStudentRegisterBtn = document.getElementById('excessStudentRegisterBtn');
-      if (excessStudentRegisterBtn) {
-        excessStudentRegisterBtn.addEventListener('click', () => {
-          // 1人以上チェックされているか
-            const checkedIds = Object.keys(excessStudentsState);
-            // 追加チェック：何も選択されていない場合は中断（現場での混乱防止）
-            if (checkedIds.length === 0) {
-              alert('超過学生が選択されていません（チェック＋時間入力をしてください）。');
+        if (excessStudentRegisterBtn) {
+          excessStudentRegisterBtn.addEventListener('click', () => {
+            const modal = document.getElementById('excessStudentModal');
+            const listArea = modal?.querySelector('.excess-list-scroll');
+            if (!modal || !listArea) return;
+
+            const checkedIds = Array.from(
+              listArea.querySelectorAll('.excess-student-checkbox:checked')
+            )
+              .map((cb) => cb.dataset.studentId)
+              .filter((id) => Boolean(id));
+
+            const invalid = checkedIds.some((sid) => {
+              const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
+              return !input || !input.value || Number(input.value) <= 0;
+            });
+            if (invalid) {
+              alert('超過時間数が未入力の学生がいます。すべて入力してください。');
               return;
             }
-            // バリデーション：チェックされている学生が1人以上いる場合、超過時間数未入力がいればアラート
-          const modal = document.getElementById('excessStudentModal');
-          const listArea = modal.querySelector('.excess-list-scroll');
-          const invalid = checkedIds.some(sid => {
-            const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
-            return !input || !input.value || Number(input.value) <= 0;
+
+            const nextState = {};
+            checkedIds.forEach((sid) => {
+              const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
+              const hours = Number(input?.value);
+              if (Number.isFinite(hours) && hours > 0) {
+                nextState[sid] = { hours };
+              }
+            });
+
+            excessStudentsState = nextState;
+            excessDirty = true;
+            try { markDirty("excessStudents"); } catch (e) { /* noop */ }
+            try { applyRiskClassesToAllRows(); } catch (e) { /* noop */ }
+            modal.classList.add('hidden');
           });
-          if (invalid) {
-            alert('超過時間数が未入力の学生がいます。すべて入力してください。');
-            return; // 中断
-          }
-          // stateはそのまま保持し、モーダルを閉じる
-          modal.classList.add('hidden');
-          // 成績一覧への反映は行クラス付与のみで行う（DOM構造は変更しない）
-          // refreshRiskClassesForVisibleRows() が tr の class を一元管理する
-          // 超過登録は保存対象の変更なので明示的に dirty を立てる
-          excessDirty = true;
-          try { markDirty("excessStudents"); } catch (e) { /* noop */ }
-          // 表示を更新（赤点/超過の行ハイライト）
-          // try { applyRiskClassesToAllRows(); } catch (e) { /* noop */ }
-        });
       }
     // 超過学生登録用 state (top-level `excessStudentsState` を使用)
   const excessStudentBtn = document.getElementById('excessStudentBtn');
@@ -152,92 +158,92 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
       // if (DEBUG) console.log("excess modal students:", studentsFromDom);
       if (listArea) {
-        // モーダル内の既存DOMとイベントを破棄（多重イベント防止）
         listArea.replaceChildren();
+        excessDraftState = cloneExcessState(excessStudentsState || {});
 
-       // ===== 超過学生モーダル：tableレイアウトで再構築 =====
-listArea.replaceChildren();
+        for (const stu of studentsFromDom) {
+          const tr = document.createElement("tr");
 
-// studentsFromDom を table row（tr）として描画
-for (const stu of studentsFromDom) {
-  const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="text-align:center;">
+              <input type="checkbox"
+                     class="excess-student-checkbox"
+                     data-student-id="${stu.studentId || ""}">
+            </td>
+            <td>${stu.studentId || ""}</td>
+            <td style="text-align:center;">${stu.grade || ""}</td>
+            <td style="text-align:center;">${stu.course || ""}</td>
+            <td style="text-align:center;">${stu.number || ""}</td>
+            <td>${stu.name || ""}</td>
+            <td style="text-align:right;">
+              <input type="number"
+                     class="excess-hours-input"
+                     data-student-id="${stu.studentId || ""}"
+                     min="1"
+                     placeholder="時間">
+            </td>
+          `;
 
-  tr.innerHTML = `
-    <td style="text-align:center;">
-      <input type="checkbox"
-             class="excess-student-checkbox"
-             data-student-id="${stu.studentId || ""}">
-    </td>
-    <td>${stu.studentId || ""}</td>
-    <td style="text-align:center;">${stu.grade || ""}</td>
-    <td style="text-align:center;">${stu.course || ""}</td>
-    <td style="text-align:center;">${stu.number || ""}</td>
-    <td>${stu.name || ""}</td>
-    <td style="text-align:right;">
-      <input type="number"
-             class="excess-hours-input"
-             data-student-id="${stu.studentId || ""}"
-             min="1"
-             placeholder="時間">
-    </td>
-  `;
+          listArea.appendChild(tr);
 
-  listArea.appendChild(tr);
+          const hoursTd = tr.querySelector('td:last-child');
+          if (hoursTd) {
+            hoursTd.style.width = '96px';
+            hoursTd.style.minWidth = '96px';
+            hoursTd.style.maxWidth = '96px';
+          }
+          const cb = tr.querySelector('.excess-student-checkbox');
+          const hoursInput = tr.querySelector('.excess-hours-input');
+          const draftEntry = excessDraftState?.[stu.studentId];
 
-  const hoursTd = tr.querySelector('td:last-child');
-  if (hoursTd) {
-    hoursTd.style.width = '96px';
-    hoursTd.style.minWidth = '96px';
-    hoursTd.style.maxWidth = '96px';
-    const hoursInput = hoursTd.querySelector('.excess-hours-input');
-    if (hoursInput) {
-      hoursInput.style.width = '100%';
-      hoursInput.style.boxSizing = 'border-box';
-      hoursInput.style.textAlign = 'right';
-    }
-  }
-}
+          if (draftEntry && cb) {
+            cb.checked = true;
+          }
+          if (draftEntry && hoursInput && typeof draftEntry.hours === "number") {
+            hoursInput.value = String(draftEntry.hours);
+          }
 
-        // ▼ 既存 state からチェック状態と時間を復元
-        for (const [sid, v] of Object.entries(excessStudentsState)) {
-          const cb = listArea.querySelector(`.excess-student-checkbox[data-student-id='${sid}']`);
-          const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
-          if (cb) cb.checked = true;
-          if (input && v && typeof v.hours === "number") input.value = String(v.hours);
+          if (cb) {
+            cb.addEventListener('change', () => {
+              const sid = cb.dataset.studentId;
+              if (!sid) return;
+              if (!excessDraftState) {
+                excessDraftState = {};
+              }
+              if (!cb.checked) {
+                delete excessDraftState[sid];
+                return;
+              }
+              const hours = Number(hoursInput?.value);
+              if (Number.isFinite(hours) && hours > 0) {
+                excessDraftState[sid] = { hours };
+              }
+            });
+          }
+
+          if (hoursInput) {
+            hoursInput.style.width = '100%';
+            hoursInput.style.boxSizing = 'border-box';
+            hoursInput.style.textAlign = 'right';
+            hoursInput.addEventListener('input', () => {
+              const sid = hoursInput.dataset.studentId;
+              if (!sid) return;
+              if (!cb || !cb.checked) {
+                if (excessDraftState) delete excessDraftState[sid];
+                return;
+              }
+              const hours = Number(hoursInput.value);
+              if (!excessDraftState) {
+                excessDraftState = {};
+              }
+              if (Number.isFinite(hours) && hours > 0) {
+                excessDraftState[sid] = { hours };
+              } else {
+                delete excessDraftState[sid];
+              }
+            });
+          }
         }
-
-        // チェックボックス・inputイベントでstate更新（安全化）
-        const checkboxes = listArea.querySelectorAll('.excess-student-checkbox');
-        const hoursInputs = listArea.querySelectorAll('.excess-hours-input');
-
-        // checkbox は off のときだけ state から削除する（削除処理を一本化）
-        checkboxes.forEach(cb => {
-          cb.addEventListener('change', () => {
-            const sid = cb.getAttribute('data-student-id');
-            if (!sid) return;
-            if (!cb.checked) {
-              delete excessStudentsState[sid];
-              // if (DEBUG) console.log('excessStudentsState', excessStudentsState);
-            }
-          });
-        });
-
-        // hours 入力はチェックが入っている場合のみ state を上書き（削除は行わない）
-        hoursInputs.forEach(inputEl => {
-          inputEl.addEventListener('input', () => {
-            const sid = inputEl.getAttribute('data-student-id');
-            const cb = listArea.querySelector(
-              `.excess-student-checkbox[data-student-id='${sid}']`
-            );
-            if (!cb || !cb.checked) return;
-
-            const hours = Number(inputEl.value);
-            if (hours > 0) {
-              excessStudentsState[sid] = { hours };
-            }
-            // if (DEBUG) console.log('excessStudentsState', excessStudentsState);
-          });
-        });
       }
       excessStudentModal.classList.remove('hidden');
     });
@@ -504,9 +510,22 @@ let isRenderingTable = false;
 let isProgrammaticInput = false;
 // 超過学生 state（モーダルと保存連携で使用）
 let excessStudentsState = {};
+let excessDraftState = null;
 let excessDirty = false;
 // フラグ: 復元時に savedScores が適用されたかを示す
 let didApplySavedScores = false;
+
+function cloneExcessState(src) {
+  const base = src && typeof src === "object" ? src : {};
+  if (typeof structuredClone === "function") {
+    try { return structuredClone(base); } catch (e) { /* noop */ }
+  }
+  try {
+    return JSON.parse(JSON.stringify(base));
+  } catch (e) {
+    return {};
+  }
+}
 
 function syncFinalScoreForRow(tr) {
   if (!tr) return;
@@ -570,11 +589,14 @@ function applyRiskClassForRow(tr) {
     const isExcess = !!excessStudentsState?.[studentId];
 
     tr.classList.remove("row-fail", "row-excess", "row-fail-excess", "red-failure-row");
-    if (isFail && isExcess) tr.classList.add("row-fail-excess");
-    else if (isFail) tr.classList.add("row-fail");
-    else if (isExcess) tr.classList.add("row-excess");
 
-    tr.classList.toggle("red-failure-row", isFail);
+    if (isFail && isExcess) {
+      tr.classList.add("row-fail-excess", "red-failure-row");
+    } else if (isFail) {
+      tr.classList.add("row-fail", "red-failure-row");
+    } else if (isExcess) {
+      tr.classList.add("row-excess");
+    }
   } catch (e) {
     // noop
   }

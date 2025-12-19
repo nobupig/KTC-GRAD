@@ -526,7 +526,8 @@ export function renderStudentRows(
     addCell(stu.grade ?? "");
     addCell(stu.courseClass ?? "");
     addCell(stu.number ?? "");
-    addCell(stu.name ?? "");
+    const nameTd = addCell(stu.name ?? "");
+    if (nameTd) nameTd.classList.add("student-name");
 
     if (!criteriaItems || criteriaItems.length === 0) {
       const td = document.createElement("td");

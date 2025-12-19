@@ -1,3 +1,10 @@
+/* 行ハイライト用カラー変数 */
+:root {
+  --excess-main: #1565c0;
+  --excess-bg: #e3f2fd;
+  --both-bg: #f3e5f5;
+}
+
 /* ================================
    成績入力テーブル：スクロール制御
 ================================= */
@@ -173,13 +180,27 @@ tr.row-fail-excess .final-score::after {
 }
 /* 成績赤点行の新しいハイライト（列幅に影響を与えない） */
 #scoreTableBody tr.red-failure-row > td {
-  background: rgba(255, 171, 171, 0.35) !important;
-  box-shadow: inset 4px 0 0 0 #b71c1c;
+  background: #fdecea !important;
+  box-shadow: none;
+  border-left: none !important;
   transition: background 0.2s ease;
 }
+#scoreTableBody tr.red-failure-row .student-name {
+  border-left: 4px solid #c62828;
+}
 #scoreTableBody tr.red-failure-row .final-score {
-  color: #b71c1c !important;
+  color: #c62828 !important;
   font-weight: 700;
+}
+
+/* 超過のみ */
+#scoreTableBody tr.row-excess > td {
+  background-color: var(--excess-bg) !important;
+}
+
+/* 赤点＋超過（特に注意） */
+#scoreTableBody tr.row-fail-excess > td {
+  background-color: var(--both-bg) !important;
 }
 /* 平均点・調整点ピル（バッジ）表示 */
 .point-pill-area {
