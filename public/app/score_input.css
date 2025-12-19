@@ -6,12 +6,7 @@
   overflow-y: auto;
   overflow-x: auto;
 }
-.score-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  overflow: visible;
-}
+
 .score-table th,
 .score-table td {
   white-space: nowrap;
@@ -39,13 +34,6 @@
 /* ================================
    成績入力テーブル：横スクロール対応（上書き）
 ================================= */
-/* 固定レイアウト＋横スクロール（wrapper が持つ） */
-.score-table {
-  table-layout: fixed;
-  width: max-content;
-  min-width: 0;
-  border-collapse: collapse;
-}
 
 /* ================================
    行全体ハイライト（tr > td） - 行ベースで統一
@@ -78,58 +66,60 @@
 */
 
 /*
-  #scoreTableBody tr.row-excess,
-  #scoreTableBody tr.row-fail-excess,
-  #scoreTableBody tr.row-fail { position: relative; }
+#scoreTableBody tr.row-excess,
+#scoreTableBody tr.row-fail-excess,
+#scoreTableBody tr.row-fail {
+  position: relative;
+}
 
-  #scoreTableBody tr.row-excess::before,
-  #scoreTableBody tr.row-fail-excess::before,
-  #scoreTableBody tr.row-fail::before {
-    content: "";
-    position: absolute;
-    left: 0;
-      top: 0;
-      bottom: 0;
-      width: 6px;
-      border-radius: 6px 0 0 6px;
-      pointer-events: none;
-    }
+#scoreTableBody tr.row-excess::before,
+#scoreTableBody tr.row-fail-excess::before,
+#scoreTableBody tr.row-fail::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: 6px 0 0 6px;
+  pointer-events: none;
+}
 
-    #scoreTableBody tr.row-excess::before { background: #2b6cb0; }
-    #scoreTableBody tr.row-fail-excess::before { background: #7c3aed; }
-    #scoreTableBody tr.row-fail::before { background: #c62828; }
+#scoreTableBody tr.row-excess::before { background: #2b6cb0; }
+#scoreTableBody tr.row-fail-excess::before { background: #7c3aed; }
+#scoreTableBody tr.row-fail::before { background: #c62828; }
 
-    #scoreTableBody tr.row-fail-excess::after{ display: none; }
+#scoreTableBody tr.row-fail-excess::after { display: none; }
 
-    #scoreTableBody .final-score {
-      position: relative !important;
-      padding-right: 22px !important;
-      box-sizing: border-box !important;
-      min-width: 0 !important;
-    }
+#scoreTableBody .final-score {
+  position: relative !important;
+  padding-right: 22px !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+}
 
-    #scoreTableBody .final-score::after {
-      content: "";
-      position: absolute;
-      right: 6px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      pointer-events: none;
-      display: block;
-      width: 12px;
-      height: 12px;
-      line-height: 12px;
-      text-align: center;
-      color: inherit;
-      opacity: 0.95;
-    }
+#scoreTableBody .final-score::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  pointer-events: none;
+  display: block;
+  width: 12px;
+  height: 12px;
+  line-height: 12px;
+  text-align: center;
+  color: inherit;
+  opacity: 0.95;
+}
 
-    #scoreTableBody tr.row-fail-excess .final-score::after {
-      content: "⚠";
-      color: #7c3aed;
-    }
-  */
+#scoreTableBody tr.row-fail-excess .final-score::after {
+  content: "⚠";
+  color: #7c3aed;
+}
+*/
 
 /* 最終成績セルや個別セルの背景は行背景に従う（セル単体の背景を禁止） */
 #scoreTableBody .final-score,
@@ -181,6 +171,16 @@ tr.row-fail-excess .final-score::after {
   font-weight: 700;
   outline: 1px solid rgba(183,28,28,0.08);
 }
+/* 成績赤点行の新しいハイライト（列幅に影響を与えない） */
+#scoreTableBody tr.red-failure-row > td {
+  background: rgba(255, 171, 171, 0.35) !important;
+  box-shadow: inset 4px 0 0 0 #b71c1c;
+  transition: background 0.2s ease;
+}
+#scoreTableBody tr.red-failure-row .final-score {
+  color: #b71c1c !important;
+  font-weight: 700;
+}
 /* 平均点・調整点ピル（バッジ）表示 */
 .point-pill-area {
   display: flex;
@@ -192,14 +192,15 @@ tr.row-fail-excess .final-score::after {
   display: inline-block;
   background: #f3f4f6;
   color: #222;
-  border-radius: 999px;
-  padding: 4px 12px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  min-width: 64px;
+
+  font-size: 1.0rem;      /* ← ここで一段階“見出し感” */
+  padding: 8px 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+
+  min-width: 80px;         /* ← 数字の塊として認識させる */
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 /* 超過学生ハイライト（成績一覧行） */
 .excess-student-row {
@@ -264,38 +265,21 @@ tr.excess-student-row.row-fail.row-excess > td {
 }
 */
 /* 超過学生登録モーダル名簿の間延び解消・中央寄せ */
+/* Legacy excess modal layout disabled; see consolidated block at file end */
 #excessStudentListArea {
   max-width: 740px;
   margin: 0 auto;
 }
-.excess-modal-table {
-  margin: 0 auto;
-  max-width: 740px;
-}
-.excess-modal-table tr {
-  /* width: 100% を外す（指定されていれば上書き） */
-  width: auto !important;
-  /* 不要な space-between を使わない */
-  justify-content: unset !important;
-}
-.excess-modal-table td:nth-child(5),
-.excess-modal-table th:nth-child(5) {
-  max-width: 240px;
-  flex-grow: 1;
-}
+
 /* thead側にスクロールバー分の余白を確保 */
 .score-table thead tr {
   padding-right: 16px; /* scrollbar 対策 */
 }
-.score-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  overflow: visible;
-}
+
 /* ================================
-   超過学生登録モーダル 列幅最適化
+   Legacy: 超過学生登録モーダル 列幅最適化（無効）
 ================================= */
+/*
 .excess-modal-table {
   table-layout: fixed;
   width: 100%;
@@ -308,21 +292,21 @@ tr.excess-student-row.row-fail.row-excess > td {
   white-space: nowrap;
 }
 .excess-modal-table th:nth-child(1),
-.excess-modal-table td:nth-child(1) { /* チェックボックス */
+.excess-modal-table td:nth-child(1) {
   width: 40px;
   min-width: 40px;
   max-width: 40px;
   flex-shrink: 0;
 }
 .excess-modal-table th:nth-child(2),
-.excess-modal-table td:nth-child(2) { /* 学籍番号 */
+.excess-modal-table td:nth-child(2) {
   width: 96px;
   min-width: 96px;
   max-width: 96px;
   flex-shrink: 0;
 }
 .excess-modal-table th:nth-child(3),
-.excess-modal-table td:nth-child(3) { /* 学年 */
+.excess-modal-table td:nth-child(3) {
   width: 48px;
   min-width: 48px;
   max-width: 48px;
@@ -330,7 +314,7 @@ tr.excess-student-row.row-fail.row-excess > td {
   flex-shrink: 0;
 }
 .excess-modal-table th:nth-child(4),
-.excess-modal-table td:nth-child(4) { /* 組・コース */
+.excess-modal-table td:nth-child(4) {
   width: 72px;
   min-width: 72px;
   max-width: 72px;
@@ -338,12 +322,10 @@ tr.excess-student-row.row-fail.row-excess > td {
   flex-shrink: 0;
 }
 .excess-modal-table th:nth-child(6),
-.excess-modal-table td:nth-child(6),
 .excess-modal-table td:nth-child(6) {
-  /* 氏名列と超過時間数列の間にgapを追加 */
   padding-right: 16px;
 }
-.excess-modal-table th:nth-child(6) { /* 氏名 */
+.excess-modal-table th:nth-child(6) {
   min-width: 120px;
   max-width: 260px;
   width: auto;
@@ -353,7 +335,7 @@ tr.excess-student-row.row-fail.row-excess > td {
   white-space: nowrap;
 }
 .excess-modal-table th:nth-child(7),
-.excess-modal-table td:nth-child(7) { /* 超過時間数 */
+.excess-modal-table td:nth-child(7) {
   width: 96px;
   min-width: 96px;
   max-width: 96px;
@@ -365,6 +347,7 @@ tr.excess-student-row.row-fail.row-excess > td {
   max-width: 96px;
   box-sizing: border-box;
 }
+*/
 /* ================================
    超過学生登録モーダル 横幅・テーブル列幅調整
 ================================= */
@@ -372,51 +355,6 @@ tr.excess-student-row.row-fail.row-excess > td {
   width: min(960px, 96vw);
   max-width: 96vw;
   min-width: 600px;
-}
-
-.excess-modal-table {
-  table-layout: fixed;
-  width: 100%;
-}
-.excess-modal-table th:nth-child(2),
-.excess-modal-table td:nth-child(2) { /* 学籍番号 */
-  width: 90px;
-  min-width: 70px;
-  max-width: 110px;
-  word-break: break-all;
-}
-.excess-modal-table th:nth-child(3),
-.excess-modal-table td:nth-child(3) { /* 学年 */
-  width: 48px;
-  min-width: 40px;
-  max-width: 60px;
-}
-.excess-modal-table th:nth-child(4),
-.excess-modal-table td:nth-child(4) { /* 組・コース */
-  width: 80px;
-  min-width: 60px;
-  max-width: 100px;
-}
-.excess-modal-table th:nth-child(5),
-.excess-modal-table td:nth-child(5) { /* 氏名 */
-  width: auto;
-  min-width: 80px;
-  max-width: 220px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.excess-modal-table th:nth-child(6),
-.excess-modal-table td:nth-child(6) { /* 超過時間数 */
-  width: 80px;
-  min-width: 72px;
-  max-width: 96px;
-}
-.excess-modal-table .excess-hours-input {
-  width: 72px;
-  min-width: 60px;
-  max-width: 96px;
-  box-sizing: border-box;
 }
 /* 超過学生登録モーダル：名簿スクロール枠 */
 .excess-list-scroll {
@@ -429,26 +367,6 @@ tr.excess-student-row.row-fail.row-excess > td {
 }
 
 /* モーダル名簿テーブル行の見やすさ向上 */
-.excess-modal-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-.excess-modal-table th, .excess-modal-table td {
-  padding: 6px 8px;
-  text-align: left;
-}
-.excess-modal-table tbody tr {
-  border-bottom: 1px solid #e5e7eb;
-  transition: background 0.15s;
-}
-.excess-modal-table tbody tr:hover {
-  background: #f3f6fa;
-}
-.excess-modal-table th {
-  background: #f5f7fa;
-  font-weight: 600;
-}
 /* 成績一覧見出しと超過学生登録ボタンの横並び調整 */
 .grade-header-row {
   display: flex;
@@ -503,6 +421,23 @@ tr.excess-student-row.row-fail.row-excess > td {
 .submit-btn:hover {
   background: #003a78;
 }
+
+/* ================================
+   超過学生モーダル：氏名〜超過時間数の間隔調整
+================================ */
+
+/* 氏名列（右側の余白を詰める） */
+.excess-table td:nth-child(6),
+.excess-table th:nth-child(6) {
+  padding-right: 4px;   /* 既定 8px → 4px */
+}
+
+/* 超過時間数列（左側の余白を詰める） */
+.excess-table td:nth-child(7),
+.excess-table th:nth-child(7) {
+  padding-left: 4px;    /* 既定 8px → 4px */
+}
+
 /* 選択科目モーダル・学生リスト用CSS */
 .ktc-modal {
   position: fixed;
@@ -1284,4 +1219,165 @@ td input[type="number"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ================================
+   FIX: 超過学生モーダルを純粋な table レイアウトに戻す
+================================ */
+
+/* table としての振る舞いを強制 */
+.excess-modal-table,
+.excess-modal-table tr,
+.excess-modal-table th,
+.excess-modal-table td {
+  display: table-cell;
+  flex: none !important;
+}
+
+/* 行の高さが勝手に伸びるのを防止 */
+.excess-modal-table tr {
+  height: auto !important;
+}
+
+/* 氏名列は table の自動幅に任せる */
+.excess-modal-table th:nth-child(5),
+.excess-modal-table td:nth-child(5) {
+  width: auto;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ================================
+   FIX: score-table の幅定義を一本化（右余白・二重定義の解消）
+================================ */
+.score-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  border-collapse: collapse;
+}
+
+/* ================================
+   Consolidated: excess-* rules
+   - ここに scattered な .excess-* ルールを統合しました。
+   - 既存の個別定義は残したまま新品ブロックを追加し、
+     次のステップで安全に段階的にコメントアウトします。
+================================= */
+
+/* Modal wrapper and list area */
+#excessStudentListArea,
+.excess-modal-table {
+  margin: 0 auto;
+  max-width: 740px;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+/* Basic cell styling shared by modal and excess table */
+.excess-modal-table th,
+.excess-modal-table td,
+.excess-table th,
+.excess-table td {
+  padding: 6px 8px;
+  font-size: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+/* Column sizing (conservative, covers existing variants) */
+.excess-modal-table th:nth-child(1),
+.excess-modal-table td:nth-child(1) { /* checkbox */
+  width: 40px; min-width: 40px; max-width: 40px; flex-shrink: 0;
+}
+.excess-modal-table th:nth-child(2),
+.excess-modal-table td:nth-child(2) { /* 学籍番号 */
+  width: 90px; min-width: 70px; max-width: 110px; flex-shrink: 0;
+}
+.excess-modal-table th:nth-child(3),
+.excess-modal-table td:nth-child(3) { /* 学年 */
+  width: 48px; min-width: 40px; max-width: 60px; text-align: center;
+}
+.excess-modal-table th:nth-child(4),
+.excess-modal-table td:nth-child(4) { /* 組・コース */
+  width: 80px; min-width: 60px; max-width: 100px; text-align: center;
+}
+.excess-modal-table th:nth-child(5),
+.excess-modal-table td:nth-child(5) { /* 氏名 */
+  width: auto; min-width: 80px; max-width: 260px; overflow: hidden; text-overflow: ellipsis;
+}
+.excess-modal-table th:nth-child(6),
+.excess-modal-table td:nth-child(6) { /* 氏名（余白調整） */
+  padding-right: 4px;
+}
+.excess-modal-table th:nth-child(7),
+.excess-modal-table td:nth-child(7) { /* 超過時間数 */
+  width: 80px; min-width: 60px; max-width: 96px; flex-shrink: 0;
+}
+
+.excess-modal-table .excess-hours-input,
+.excess-table .excess-hours-input {
+  width: 72px; min-width: 60px; max-width: 96px; box-sizing: border-box;
+}
+
+/* Modal sizing / responsive */
+#excessStudentModal .modal-content {
+  width: min(960px, 96vw);
+  max-width: 96vw;
+  min-width: 600px;
+}
+
+/* Scroll area for the modal student list */
+.excess-list-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+  background: #fff;
+  border-radius: 6px;
+}
+
+/* Table row visuals in modal */
+.excess-modal-table tbody tr { border-bottom: 1px solid #e5e7eb; transition: background 0.15s; }
+.excess-modal-table tbody tr:hover { background: #f3f6fa; }
+.excess-modal-table th { background: #f5f7fa; font-weight: 600; }
+
+/* Legacy-neutral excess row style (preserve row-background approach) */
+.excess-student-row { background: transparent !important; border-left: none !important; }
+tr.row-fail.row-excess.excess-student-row > td,
+tr.excess-student-row.row-fail.row-excess > td { background: transparent !important; }
+
+/* Ensure table semantics for modal tables (fixes flex/table mixing) */
+.excess-modal-table, .excess-modal-table tr, .excess-modal-table th, .excess-modal-table td { display: table-cell; flex: none !important; }
+.excess-modal-table tr { height: auto !important; }
+
+/* Small utility: ensure consistent final column spacing when icons appear */
+.excess-table td:nth-child(6), .excess-table th:nth-child(6) { padding-right: 4px; }
+.excess-table td:nth-child(7), .excess-table th:nth-child(7) { padding-left: 4px; }
+
+/* End consolidated excess block */
+
+/* =====================================================
+   FIX: 超過学生モーダル
+   氏名列と超過時間数列の余白最終調整
+===================================================== */
+
+/* 氏名列（5列目）に上限を強制 */
+.excess-modal-table th:nth-child(5),
+.excess-modal-table td:nth-child(5) {
+  width: 180px !important;
+  max-width: 180px !important;
+}
+
+/* 超過時間数列（7列目）は固定 */
+.excess-modal-table th:nth-child(7),
+.excess-modal-table td:nth-child(7) {
+  width: 96px !important;
+  min-width: 96px !important;
 }

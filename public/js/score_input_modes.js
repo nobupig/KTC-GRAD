@@ -89,6 +89,51 @@ function basicNumericCheck(value, showAlert) {
   return true;
 }
 
+// DOMから調整点を読み取る（Firestore readなし）
+function getAdjustPointFromDom() {
+  const el = document.getElementById("adjustPointDisplay");
+  if (!el) return null;
+  const n = Number((el.textContent || "").replace(/[^\d]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+// 現在の科目タイプを推定（special/elective/normal/skill）
+function deriveSubjectType(modeState) {
+  if (modeState && typeof modeState.subjectType === "string") {
+    return modeState.subjectType;
+  }
+
+  try {
+    const meta = (typeof window !== "undefined" && (window.currentSubjectMeta || window.__currentSubjectMeta)) || null;
+    if (meta && typeof meta === "object") {
+      if (meta.specialType === 1 || meta.specialType === 2) return "special";
+      if (meta.required === false) return "elective";
+      if (meta.isSkillLevel === true) return "skill";
+    }
+  } catch (e) { /* noop */ }
+
+  try {
+    const bodyType = document?.body?.dataset?.subjectType;
+    if (bodyType) return bodyType;
+  } catch (e) { /* noop */ }
+
+  return "normal";
+}
+
+// 既存の riskContext 提供者を優先しつつ、DOMから補完
+function buildLocalRiskContext(modeState) {
+  if (modeState && typeof modeState.riskContextBuilder === "function") {
+    try { return modeState.riskContextBuilder() || {}; } catch (e) { /* noop */ }
+  }
+  if (modeState && modeState.riskContext) {
+    return modeState.riskContext;
+  }
+
+  const adjustPoint = getAdjustPointFromDom();
+  const subjectType = deriveSubjectType(modeState);
+  return { adjustPoint, subjectType };
+}
+
 /**
  * 1行分の最終成績を計算してセルに反映
  *
@@ -300,6 +345,16 @@ export function updateFinalScoreForRow(
     } catch (e) {
       // 何もしない（安全）
     }
+
+    // --- 赤点ハイライト（発火点をここに集約） ---
+    try {
+      const finalText = finalCell.textContent || "";
+      const riskContext = buildLocalRiskContext(modeState);
+      const flags = computeRiskFlags(finalText, riskContext);
+      tr.classList.toggle("red-failure-row", !!(flags && flags.isFail));
+    } catch (e) {
+      // noop
+    }
   }
 
   return {
@@ -322,22 +377,31 @@ export function computeRiskFlags(finalScore, ctx) {
   if (typeof finalScore === "string" && finalScore.trim() === "") {
     return { isFail: false, isExcess: false };
   }
-  const useAdjustment = ctx?.useAdjustment === true;
-  const rawAdjust = ctx?.adjustPoint;
-  const adjustPoint = Number.isFinite(Number(rawAdjust)) ? Number(rawAdjust) : null;
   const numericScore = Number(finalScore);
   if (!Number.isFinite(numericScore)) {
     return { isFail: false, isExcess: false };
   }
-  const isFail = useAdjustment
-    ? Number.isFinite(adjustPoint)
-      ? numericScore < adjustPoint
-      : false
-    : numericScore < 60;
-  return {
-    isFail,
-    isExcess: false,
-  };
+
+  const subjectType = ctx?.subjectType || "normal";
+  const rawAdjust = ctx?.adjustPoint;
+  const adjustPoint = Number.isFinite(Number(rawAdjust)) ? Number(rawAdjust) : null;
+
+  if (subjectType === "special") {
+    return { isFail: false, isExcess: false };
+  }
+
+  if (subjectType === "elective") {
+    return { isFail: numericScore < 60, isExcess: false };
+  }
+
+  if (subjectType === "normal" || subjectType === "skill") {
+    if (Number.isFinite(adjustPoint)) {
+      return { isFail: numericScore < adjustPoint, isExcess: false };
+    }
+    return { isFail: false, isExcess: false };
+  }
+
+  return { isFail: false, isExcess: false };
 }
 
 /**

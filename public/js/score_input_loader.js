@@ -16,7 +16,22 @@ let currentSubjectMeta = {
   usesAdjustPoint: false, // isSkillLevel と同義（将来拡張用）
   passRule: null,
   required: false,
+  specialType: 0,
 };
+function getSubjectType(meta) {
+  if (!meta) return "normal";
+
+  if (meta.specialType === 1 || meta.specialType === 2) {
+    return "special";
+  }
+  if (meta.required === false) {
+    return "elective";
+  }
+  if (meta.isSkillLevel === true) {
+    return "skill";
+  }
+  return "normal";
+}
 let avgUpdateRafId = null;
 // markDirty: 保存可能フラグを立てるユーティリティ
 function markDirty(reason = "score") {
@@ -140,35 +155,48 @@ document.addEventListener('DOMContentLoaded', () => {
         // モーダル内の既存DOMとイベントを破棄（多重イベント防止）
         listArea.replaceChildren();
 
-        // ヘッダー（table を使わず div ベースで構築）
-        const header = document.createElement('div');
-        header.className = 'excess-list-header';
-        header.innerHTML = `
-          <div class="excess-col check" style="width:32px;"></div>
-          <div class="excess-col id">学籍番号</div>
-          <div class="excess-col grade">学年</div>
-          <div class="excess-col course">組・コース</div>
-          <div class="excess-col number">番号</div>
-          <div class="excess-col name">氏名</div>
-          <div class="excess-col hours">超過時間数</div>
-        `;
-        listArea.appendChild(header);
+       // ===== 超過学生モーダル：tableレイアウトで再構築 =====
+listArea.replaceChildren();
 
-        // 各行を div で生成（td を一切使わない）
-        for (const stu of studentsFromDom) {
-          const row = document.createElement('div');
-          row.className = 'excess-row';
-          row.innerHTML = `
-            <div class="excess-col check"><input type="checkbox" class="excess-student-checkbox" data-student-id="${stu.studentId||''}"></div>
-            <div class="excess-col id">${stu.studentId||''}</div>
-            <div class="excess-col grade">${stu.grade||''}</div>
-            <div class="excess-col course">${stu.course||''}</div>
-            <div class="excess-col number">${stu.number||''}</div>
-            <div class="excess-col name">${stu.name||''}</div>
-            <div class="excess-col hours"><input type="number" class="excess-hours-input" data-student-id="${stu.studentId||''}" min="1" placeholder="時間" style="width:60px;text-align:right;"></div>
-          `;
-          listArea.appendChild(row);
-        }
+// studentsFromDom を table row（tr）として描画
+for (const stu of studentsFromDom) {
+  const tr = document.createElement("tr");
+
+  tr.innerHTML = `
+    <td style="text-align:center;">
+      <input type="checkbox"
+             class="excess-student-checkbox"
+             data-student-id="${stu.studentId || ""}">
+    </td>
+    <td>${stu.studentId || ""}</td>
+    <td style="text-align:center;">${stu.grade || ""}</td>
+    <td style="text-align:center;">${stu.course || ""}</td>
+    <td style="text-align:center;">${stu.number || ""}</td>
+    <td>${stu.name || ""}</td>
+    <td style="text-align:right;">
+      <input type="number"
+             class="excess-hours-input"
+             data-student-id="${stu.studentId || ""}"
+             min="1"
+             placeholder="時間">
+    </td>
+  `;
+
+  listArea.appendChild(tr);
+
+  const hoursTd = tr.querySelector('td:last-child');
+  if (hoursTd) {
+    hoursTd.style.width = '96px';
+    hoursTd.style.minWidth = '96px';
+    hoursTd.style.maxWidth = '96px';
+    const hoursInput = hoursTd.querySelector('.excess-hours-input');
+    if (hoursInput) {
+      hoursInput.style.width = '100%';
+      hoursInput.style.boxSizing = 'border-box';
+      hoursInput.style.textAlign = 'right';
+    }
+  }
+}
 
         // ▼ 既存 state からチェック状態と時間を復元
         for (const [sid, v] of Object.entries(excessStudentsState)) {
@@ -303,18 +331,31 @@ function renderSkillLevelFilter(subject) {
   // デフォルトフィルタ値（必要に応じて変更可）
   const defaultFilterKey = "all";
   let defaultBtn = null;
-  filterDefs.forEach(def => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = def.label;
-    btn.className = "btn btn-secondary";
-    btn.onclick = () => applySkillLevelFilter(subject, def.key);
-    if (def.key === defaultFilterKey) {
-      btn.classList.add("active");
-      defaultBtn = btn;
-    }
-    container.appendChild(btn);
+filterDefs.forEach(def => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = def.label;
+
+  // ★共通フィルタと同じクラス運用に寄せる（見た目が安定する）
+  btn.className = "filter-btn";
+  btn.dataset.filterKey = def.key;
+
+  if (def.key === defaultFilterKey) {
+    btn.classList.add("active");
+    defaultBtn = btn;
+  }
+
+  btn.addEventListener("click", () => {
+    // ★active を1つだけにする（全ボタン青の根本原因）
+    container.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    applySkillLevelFilter(subject, def.key);
   });
+
+  container.appendChild(btn);
+});
+
   area.appendChild(container);
   // 初回のみ明示的にフィルタ適用
   if (defaultBtn) {
@@ -364,6 +405,15 @@ function applySkillLevelFilter(subject, key) {
   }
   studentState.currentStudents = filtered.slice();
   updateStudentCountDisplay(filtered.length);
+  // ===== FIX: 習熟度フィルタ後の表示再構築（DOMのみ / Firestore readなし）=====
+    const hasNumberInputs =
+    tbody && tbody.querySelector("input[type='number'][data-criteria-name]");
+
+    if (hasNumberInputs) {
+      recalcFinalScoresAfterRestore(tbody);
+    } else {
+      updateAveragePointDisplay();
+    }
   // applyRiskClassesToAllRows(); // disabled: avoid immediate row-level excess/red highlighting
 }
 // ================================
@@ -496,52 +546,57 @@ function applyRiskClassesToCell(cellEl, flags) {
 function buildRiskContext() {
   const useAdjustment = currentSubjectMeta?.usesAdjustPoint === true;
   const adjustPoint = getCurrentAdjustPointNumber();
-  return { useAdjustment, adjustPoint };
+  const subjectType = getSubjectType(currentSubjectMeta);
+  return { useAdjustment, adjustPoint, subjectType };
+}
+
+// 1行分のリスククラスを即時反映（Firestore readなし）
+function applyRiskClassForRow(tr) {
+  try {
+    if (!tr) return;
+
+    if (currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2) {
+      tr.classList.remove("row-fail", "row-excess", "row-fail-excess", "red-failure-row");
+      return;
+    }
+
+    const studentId = tr.dataset.studentId;
+    if (!studentId) return;
+
+    const finalCell = tr.querySelector('.final-score');
+    const finalText = finalCell ? (finalCell.textContent || '').toString().trim() : "";
+    const flags = computeRiskFlags(finalText, buildRiskContext());
+    const isFail = !!flags.isFail;
+    const isExcess = !!excessStudentsState?.[studentId];
+
+    tr.classList.remove("row-fail", "row-excess", "row-fail-excess", "red-failure-row");
+    if (isFail && isExcess) tr.classList.add("row-fail-excess");
+    else if (isFail) tr.classList.add("row-fail");
+    else if (isExcess) tr.classList.add("row-excess");
+
+    tr.classList.toggle("red-failure-row", isFail);
+  } catch (e) {
+    // noop
+  }
 }
 
 function refreshRiskClassesForVisibleRows() {
   // 再描画時の行表示はここで一本化する
   const rows = tbody ? tbody.querySelectorAll("tr") : document.querySelectorAll("#scoreTableBody tr");
   rows.forEach(row => {
-    // まず旧クラスをクリア
-    // row.classList.remove(
-    //   "row-fail",
-    //   "row-excess",
-    //   "row-fail-excess"
-    // );
-
-    const studentId = row.dataset.studentId;
-    if (!studentId) return;
-
-    // 判定は final-score セルの値から行単位で算出する（入力イベントに依存しない）
-    const finalCell = row.querySelector('.final-score');
-    const finalText = finalCell ? (finalCell.textContent || '').toString().trim() : "";
-    const flags = computeRiskFlags(finalText, buildRiskContext());
-    const isFail = !!flags.isFail;
-    const isExcess = !!excessStudentsState[studentId];
-    // デバッグログ削除済み
-
-    // 行クラスは優先順：fail+excess > fail > excess
-    // if (isFail && isExcess) {
-    //   row.classList.add("row-fail-excess");
-    // } else if (isFail) {
-    //   row.classList.add("row-fail");
-    // } else if (isExcess) {
-    //   row.classList.add("row-excess");
-    // }
-
-    // final-score セルのクラスは文字色/太字用途に限定して反映
-    try {
-      if (finalCell) {
-        // finalCell.classList.toggle('cell-fail', !!flags.isFail);
-        // finalCell.classList.toggle('cell-excess', !!flags.isExcess);
-      }
-        } catch (e) { /* noop */ }
-    });
+    applyRiskClassForRow(row);
+  });
   }
 
 // 一括適用ユーティリティ：最終成績を再計算してから行クラスを付与する
 function applyRiskClassesToAllRows() {
+  if (currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2) {
+    const rows = tbody?.querySelectorAll("tr") || [];
+    rows.forEach((tr) => {
+      tr.classList.remove("row-fail", "row-excess", "row-fail-excess", "red-failure-row");
+    });
+    return;
+  }
   try {
     if (tbody) {
       try {
@@ -1047,6 +1102,7 @@ async function handleSubjectChange(subjectId) {
       usesAdjustPoint: false,
       passRule: null,
       required: false,
+      specialType: 0,
     };
     return;
   }
@@ -1079,12 +1135,14 @@ async function handleSubjectChange(subjectId) {
   const passRule = subjectMaster?.passRule ?? subject?.passRule ?? null;
   const required = subjectMaster?.required ?? subject?.required ?? false;
   const usesAdjustPoint = passRule === "adjustment" || required === true;
+  const specialType = Number(subjectMaster?.specialType ?? subject?.specialType ?? 0);
   currentSubjectMeta = {
     subjectId,
     isSkillLevel,
     usesAdjustPoint,
     passRule,
     required,
+    specialType,
   };
 
   if (DEBUG) console.log("[DEBUG subjectMaster]", subjectMaster);
@@ -1202,6 +1260,7 @@ studentState.currentStudents = displayStudents.slice();
         const flags = computeRiskFlags(finalCell.textContent, buildRiskContext());
         applyRiskClassesToCell(finalCell, flags);
       }
+    applyRiskClassForRow(tr);
     if (avgUpdateRafId) cancelAnimationFrame(avgUpdateRafId);
     avgUpdateRafId = requestAnimationFrame(() => {
       updateAveragePointDisplay();
@@ -1373,6 +1432,9 @@ if (currentSubjectMeta.isSkillLevel) {
 }
 
   recalcFinalScoresAfterRestore(tbody);
+
+  // ★途中再開直後・描画直後に一括適用（Firestore readなし）
+  applyRiskClassesToAllRows();
 
   // （再計算は上で1回実行済みのため、ここでの再呼び出しは不要）
 

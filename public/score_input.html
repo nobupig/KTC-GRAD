@@ -43,9 +43,14 @@
         <label for="subjectSelect">対象科目：</label>
         <select id="subjectSelect"></select>
         <div class="point-pill-area" style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
-          <span id="avgPointDisplay" style="background: #f3f7fa; border-radius: 12px; padding: 2px 12px; font-size: 13px;">平均点：—</span>
-          <span id="adjustPointDisplay" style="background: #f3f7fa; border-radius: 12px; padding: 2px 12px; font-size: 13px;">調整点：—</span>
-        </div>
+  <span id="avgPointDisplay" style="background: #f3f7fa; border-radius: 12px;">
+    平均点：—
+  </span>
+  <span id="adjustPointDisplay" style="background: #f3f7fa; border-radius: 12px;">
+    調整点：—
+  </span>
+</div>
+
       </div>
       <div class="top-btn-area" style="display: flex; align-items: center; gap: 8px;">
         <button id="saveBtn" class="btn-primary" type="button" disabled>
@@ -168,8 +173,31 @@
   <div class="modal-content">
     <h2 class="modal-title">超過学生登録</h2>
     <div class="excess-list-scroll" style="margin-bottom: 16px;">
-      <div id="excessStudentListArea"></div>
-    </div>
+    <table class="excess-table">
+      <colgroup>
+        <col style="width:32px">
+        <col style="width:120px">
+        <col style="width:48px">
+        <col style="width:72px">
+        <col style="width:48px">
+        <col style="width:180px">
+        <col style="width:96px">
+      </colgroup>
+    <thead>
+      <tr>
+        <th style="width:32px;"></th>
+        <th>学籍番号</th>
+        <th>学年</th>
+        <th>組・コース</th>
+        <th>番号</th>
+        <th>氏名</th>
+        <th style="width:96px;">超過時間数</th>
+      </tr>
+    </thead>
+    <tbody id="excessStudentListArea"></tbody>
+  </table>
+</div>
+
     <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
       <button id="excessStudentRegisterBtn" class="btn btn-primary" type="button">登録</button>
       <button id="excessStudentCancelBtn" class="btn btn-secondary" type="button">キャンセル</button>
@@ -177,20 +205,6 @@
   </div>
 </div>
 
-<script>
-  // 超過学生登録モーダルの表示・非表示制御
-  const excessStudentBtn = document.getElementById('excessStudentBtn');
-  const excessStudentModal = document.getElementById('excessStudentModal');
-  const excessStudentCancelBtn = document.getElementById('excessStudentCancelBtn');
-  if (excessStudentBtn && excessStudentModal && excessStudentCancelBtn) {
-    excessStudentBtn.addEventListener('click', () => {
-      excessStudentModal.classList.remove('hidden');
-    });
-    excessStudentCancelBtn.addEventListener('click', () => {
-      excessStudentModal.classList.add('hidden');
-    });
-  }
-</script>
 </body>
 
 <div id="saveErrorModal" class="modal hidden">
