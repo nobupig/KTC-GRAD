@@ -68,7 +68,18 @@
       <a id="toEvaluationLink" href="#">評価基準へ</a>
       <a id="toSubjectsLink" href="subjects.html">科目登録へ</a>
     </div>
-<div id="electiveButtonArea" style="display:none; gap:8px;">
+
+    <div class="grade-header-row" style="
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+  margin-bottom: 4px;
+">
+  <h2 style="margin: 0;">成績一覧</h2>
+
+  <!-- 右側ボタン群 -->
+  <div class="grade-header-actions">
+    <div id="electiveButtonArea" style="gap:8px;">
       <button
         id="electiveAddBtn"
         class="btn-primary"
@@ -87,16 +98,6 @@
       </button>
     </div>
 
-    <div class="grade-header-row" style="
-  display: flex;
-  align-items: center;
-  margin-top: 16px;
-  margin-bottom: 4px;
-">
-  <h2 style="margin: 0;">成績一覧</h2>
-
-  <!-- 右側ボタン群 -->
-  <div style="margin-left: auto; display: flex; gap: 8px;">
     <button
       id="excessStudentBtn"
       class="btn btn-secondary"
@@ -104,8 +105,6 @@
     >
       超過学生登録
     </button>
-
-    
   </div>
 </div>
 

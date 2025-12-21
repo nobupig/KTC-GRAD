@@ -1549,6 +1549,7 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
 #electiveButtonArea.is-visible {
   display: flex;
 }
+
 /* ===== FINAL FIX: elective buttons visibility ===== */
 
 /* 親が潰しているのを防ぐ */
@@ -1561,10 +1562,125 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
 /* elective button area */
 #electiveButtonArea {
   display: none;
+  align-items: center;
+  gap: 8px;
 }
 
 #electiveButtonArea.is-visible {
   display: flex !important;
   gap: 8px;
   align-items: center;
+}
+
+#electiveButtonArea .btn-primary,
+#electiveButtonArea .btn-secondary {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+/* ================================
+   FINAL: 成績一覧ヘッダ右の3ボタン横並び（最終勝ち）
+================================ */
+
+/* 見出し行は幅100%で、右側を押し出せるようにする */
+.grade-header-row {
+  width: 100%;
+}
+
+/* 右側ボタン群 */
+.grade-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+/* elective はCSSで非表示がデフォルト（JSが .is-visible を付与） */
+#electiveButtonArea {
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+
+/* inline display:none を無くした上で、これで確実に表示 */
+#electiveButtonArea.is-visible {
+  display: flex !important;
+}
+
+/* 3ボタンのサイズを完全統一 */
+.grade-header-actions #electiveAddBtn,
+.grade-header-actions #electiveRemoveBtn,
+.grade-header-actions #excessStudentBtn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 40px;
+  white-space: nowrap;
+}
+
+/* 既存のmargin指定が残っていても邪魔しないように無効化 */
+#excessStudentBtn {
+  margin: 0 !important;
+}
+/* ================================
+   Header actions: 3ボタン横並び最終固定
+================================ */
+
+/* 見出し行：左にタイトル、右にボタン群 */
+.grade-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 右側ボタン群（ここに elective + excess をまとめる） */
+.grade-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap; /* 基本は折り返さない（画面幅が狭い時は次のmediaで許容） */
+  overflow: visible !important;
+  height: auto !important;
+}
+
+/* elective ボタンエリア：JS制御で表示 */
+#electiveButtonArea {
+  display: none; /* default hidden */
+  align-items: center;
+  gap: 10px;
+}
+
+#electiveButtonArea.is-visible {
+  display: flex;
+}
+
+/* 3ボタンのサイズ統一（高さ・padding・文字サイズ） */
+.grade-header-actions button,
+#electiveButtonArea button {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 38px; /* 高さと揃えて縦中央 */
+  white-space: nowrap;
+}
+
+/* excessStudentBtn だけ .btn が混在しているので強制で揃える */
+#excessStudentBtn {
+  height: 38px;
+  padding: 0 16px;
+  line-height: 38px;
+}
+
+/* 画面が狭い時は折り返しを許可（PC専用運用でも保険） */
+@media (max-width: 900px) {
+  .grade-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
 }
