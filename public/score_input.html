@@ -68,12 +68,47 @@
       <a id="toEvaluationLink" href="#">評価基準へ</a>
       <a id="toSubjectsLink" href="subjects.html">科目登録へ</a>
     </div>
+<div id="electiveButtonArea" style="display:none; gap:8px;">
+      <button
+        id="electiveAddBtn"
+        class="btn-primary"
+        type="button"
+      >
+        受講者を追加登録
+      </button>
 
-
-    <div class="grade-header-row" style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; margin-bottom: 4px;">
-      <h2 style="margin: 0;">成績一覧</h2>
-      <button id="excessStudentBtn" class="btn btn-secondary" type="button" style="margin-left: 16px;">超過学生登録</button>
+      <button
+        id="electiveRemoveBtn"
+        class="btn-secondary"
+        type="button"
+        style="border-color:#dc2626; color:#dc2626;"
+      >
+        受講者を解除
+      </button>
     </div>
+
+    <div class="grade-header-row" style="
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+  margin-bottom: 4px;
+">
+  <h2 style="margin: 0;">成績一覧</h2>
+
+  <!-- 右側ボタン群 -->
+  <div style="margin-left: auto; display: flex; gap: 8px;">
+    <button
+      id="excessStudentBtn"
+      class="btn btn-secondary"
+      type="button"
+    >
+      超過学生登録
+    </button>
+
+    
+  </div>
+</div>
+
 
     <div class="risk-legend">
       🔴 赤点　🔵 超過　🟣 赤点かつ超過（特に注意）
@@ -133,7 +168,7 @@
     <div class="ktc-modal-content">
       <h2>受講者登録（選択科目）</h2>
             <div class="ktc-modal-actions">
-              <button id="electiveRegisterBtn" class="primary">登録</button>
+              <button id="electiveRegisterBtn" type="button" class="primary">登録</button>
         <button id="electiveCancelBtn">キャンセル</button>    
       </div>
       <div class="elective-group-filter">
@@ -169,7 +204,7 @@
   </div>
 
 <!-- 超過学生登録モーダル（骨組みのみ） -->
-<div id="excessStudentModal" class="modal hidden">
+  <div id="excessStudentModal" class="modal hidden">
   <div class="modal-content">
     <h2 class="modal-title">超過学生登録</h2>
     <div class="excess-list-scroll" style="margin-bottom: 16px;">
@@ -204,6 +239,24 @@
     </div>
   </div>
 </div>
+
+  <div id="electivePostRegisterModal" class="app-modal" aria-hidden="true" style="display:none;">
+    <div class="app-modal__backdrop"></div>
+    <div class="app-modal__panel" role="dialog" aria-modal="true" aria-labelledby="electivePostRegisterTitle">
+      <h3 id="electivePostRegisterTitle">選択科目の登録が完了しました。</h3>
+      <p>続けて別の選択科目を登録しますか？<br>
+        ※ 名簿への反映は『登録を完了して名簿を反映する』を押した後に行われます。</p>
+
+      <div class="app-modal__actions">
+        <button id="electivePostRegisterContinueBtn" type="button" class="btn primary">
+          このまま続ける
+        </button>
+        <button id="electivePostRegisterFinishBtn" type="button" class="btn primary">
+          登録を完了して名簿を反映する
+        </button>
+      </div>
+    </div>
+  </div>
 
 </body>
 

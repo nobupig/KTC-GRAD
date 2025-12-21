@@ -18,6 +18,29 @@ let currentSubjectMeta = {
   required: false,
   specialType: 0,
 };
+// ===== 受講者登録ボタン：安全無効化制御 =====
+const electiveAddBtn = document.getElementById("electiveAddBtn");
+const electiveRemoveBtn = document.getElementById("electiveRemoveBtn");
+
+function disableElectiveButtons() {
+  [electiveAddBtn, electiveRemoveBtn].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = true;
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0";
+    btn.setAttribute("aria-hidden", "true");
+  });
+}
+
+function enableElectiveButtons() {
+  [electiveAddBtn, electiveRemoveBtn].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = false;
+    btn.style.pointerEvents = "";
+    btn.style.opacity = "";
+    btn.removeAttribute("aria-hidden");
+  });
+}
 function getSubjectType(meta) {
   if (!meta) return "normal";
 
@@ -491,6 +514,7 @@ let subjectIdFromURL = urlParams.get("subjectId") || null;
 // ================================
 const criteriaState = createCriteriaState();
 const studentState = createStudentState();
+studentState.lastElectiveGrade = null;
 const modeState = createModeState();
 const scoreUpdatedAtBaseMap = new Map(); // key: studentId, value: Firestore Timestamp|null
 let pasteInitialized = false;
@@ -945,10 +969,24 @@ async function ensureElectiveRegistrationLoaded(subject) {
   if (snap.exists()) {
     const data = snap.data() || {};
     const students = Array.isArray(data.students) ? data.students : [];
-    studentState.electiveStudents = students;
+    studentState.electiveStudents = sortStudents(students);
   } else {
     studentState.electiveStudents = [];
   }
+}
+
+function showElectivePostRegisterModal() {
+  const modal = document.getElementById("electivePostRegisterModal");
+  if (!modal) return;
+  modal.style.display = "flex";
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function hideElectivePostRegisterModal() {
+  const modal = document.getElementById("electivePostRegisterModal");
+  if (!modal) return;
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
 }
 
 // 新規追加: 選択科目受講者登録モーダル
@@ -960,6 +998,12 @@ async function openElectiveRegistrationModal(subject) {
 
   if (!modal || !listEl) return;
 
+  // Reads 0 固定：モーダルは allStudents（学年名簿）だけを参照する
+  if (!Array.isArray(studentState.allStudents) || studentState.allStudents.length === 0) {
+    console.warn("[elective modal] allStudents is empty (Reads0 policy).");
+    return;
+  }
+
   // すでに登録済みならモーダルは出さない
   if (studentState.electiveStudents && studentState.electiveStudents.length > 0) {
     return;
@@ -968,7 +1012,9 @@ async function openElectiveRegistrationModal(subject) {
 
   // 学年一致の全学生表示
   const grade = String(subject.grade);
-  const students = studentState.allStudents.filter(s => String(s.grade) === grade);
+  // 必ず最新の学年キャッシュ（allStudents）から候補配列を作る（以前の modal キャッシュを再利用しない）
+  const all = Array.isArray(studentState.allStudents) ? studentState.allStudents.slice() : [];
+  const students = all.filter(s => String(s.grade) === grade);
   // 並び順を成績入力画面と揃える
   const sortedStudents = sortStudents(students);
 
@@ -1043,21 +1089,27 @@ filterButtons.forEach(btn => {
       return;
     }
 
-    const selected = studentState.allStudents.filter(s => checked.includes(s.studentId));
+    const selected = modalBaseStudents.filter(s => checked.includes(String(s.studentId)));
+    const sortedSelected = sortStudents(selected);
 
     const colName = `electiveRegistrations_${currentYear}`;
     const regRef = doc(db, colName, subject.subjectId);
 
     await setDoc(regRef, {
       subjectId: subject.subjectId,
-      students: selected,
+      students: sortedSelected,
       updatedAt: new Date(),
     });
 
-    studentState.electiveStudents = selected;
+    studentState.electiveStudents = sortedSelected;
 
-    modal.style.display = "none";
-    await handleSubjectChange(subject.subjectId);
+    // ハンドラ内で使うモーダルクローズ関数（ハンドラ内部の定義のみ）
+    function closeElectiveModal() {
+      try { modal.style.display = "none"; } catch (e) { /* noop */ }
+    }
+    closeElectiveModal();
+    console.log("[REGISTER] post register modal show");
+    showElectivePostRegisterModal();
   };
 }
 
@@ -1145,6 +1197,18 @@ function setupScoresSnapshotListener(subjectId) {
 // ================================
 async function handleSubjectChange(subjectId) {
   setUnsavedChanges(false);
+  // ===== elective state reset (subject boundary) =====
+  studentState.electiveStudents = [];
+  studentState.lastElectiveGrade = null;
+  const subject = findSubjectById(subjectId);
+
+  // ===== Elective button visibility control (FINAL / SAFE) =====
+  const electiveArea = document.getElementById("electiveButtonArea");
+  if (electiveArea) {
+    electiveArea.classList.remove("is-visible");
+  }
+  disableElectiveButtons();
+
   if (!subjectId) {
     cleanupScoresSnapshotListener();
     infoMessageEl?.classList.remove("warning-message");
@@ -1167,16 +1231,17 @@ async function handleSubjectChange(subjectId) {
     };
     return;
   }
-
   // ▼ 同一科目の再読込防止（Reads削減の核心）
-  if (subjectId === currentSubjectId) {
+  if (subjectId === currentSubjectId && subject?.required !== false) {
     if (DEBUG) console.log("[SKIP] same subject, Firestore reload skipped");
     return;
   }
   currentSubjectId = subjectId;
   setupScoresSnapshotListener(subjectId);
-
-  const subject = findSubjectById(subjectId);
+  const grade = String(subject?.grade ?? "");
+  console.log("[GRADE CACHE] grade=", grade,
+    "hasCache=", studentState.gradeStudentsCache?.has?.(grade),
+    "cacheSize=", studentState.gradeStudentsCache?.size);
 
   let subjectMaster;
   if (subjectCache.has(subjectId)) {
@@ -1207,6 +1272,16 @@ async function handleSubjectChange(subjectId) {
     specialType,
   };
 
+  if (electiveArea) {
+    if (currentSubjectMeta.required === false) {
+      electiveArea.classList.add("is-visible");
+      enableElectiveButtons();
+    } else {
+      electiveArea.classList.remove("is-visible");
+      disableElectiveButtons();
+    }
+  }
+
   if (DEBUG) console.log("[DEBUG subjectMaster]", subjectMaster);
   if (DEBUG) console.log("[DEBUG isSkillLevel]", currentSubjectMeta.isSkillLevel);
   if (DEBUG) console.log(
@@ -1218,7 +1293,10 @@ async function handleSubjectChange(subjectId) {
       required: subject?.required
     }
   );
-  await ensureElectiveRegistrationLoaded(subject);
+  if (subject?.required === false) {
+    await ensureElectiveRegistrationLoaded(subject);
+  }
+
   if (currentSubjectMeta.isSkillLevel) {
     await ensureSkillLevelsLoaded(subject);
   }
@@ -1227,7 +1305,7 @@ async function handleSubjectChange(subjectId) {
   } else {
     if (DEBUG) console.log("[SKILL LEVEL MODE] disabled");
   }
-  if (subject && subject.required === false) { await openElectiveRegistrationModal(subject); }
+  // NOTE: call moved below to ensure students (sourceStudents) are determined first
   if (!subject) {
     infoMessageEl?.classList.remove("warning-message");
     scoreUpdatedAtBaseMap.clear();
@@ -1268,20 +1346,46 @@ async function handleSubjectChange(subjectId) {
   }
 
   // 学生全件ロード（subjectRoster優先 → 学年キャッシュ）
-  const rosterIds = await loadSubjectRoster(db, currentYear, subjectId);
-  if (DEBUG) console.group(`📊 [READ CHECK] subject=${subjectId}`);
-  if (DEBUG) console.log("📘 subjectRoster read = 1");
-  if (DEBUG) console.log("👥 rosterIds length =", Array.isArray(rosterIds) ? rosterIds.length : 0);
- 
-  if (Array.isArray(rosterIds) && rosterIds.length > 0) {
-    const rosterStudents = await loadStudentsByIds(db, rosterIds);
-    if (DEBUG) console.log("🎓 students read by IDs =", rosterStudents.length);
-    studentState.allStudents = rosterStudents;
-  } else {
-    alert("名簿データが未生成です。教務に連絡してください。");
-    throw new Error("subjectRoster missing");
+  const targetGrade = String(subject?.grade ?? "");
+  const currentAllGrade = studentState.allStudentsGrade ? String(studentState.allStudentsGrade) : null;
+
+  let rosterStudents = [];
+
+  // まず学年キャッシュを参照（grade をキーに Map を確認）
+  try {
+    const cached = studentState.gradeStudentsCache?.get(targetGrade);
+    if (Array.isArray(cached) && cached.length > 0) {
+      if (DEBUG) console.log("[CACHE HIT] gradeStudentsCache for grade=", targetGrade);
+      const sourceStudents = studentState.gradeStudentsCache.get(grade);
+      rosterStudents = Array.isArray(sourceStudents) ? sourceStudents.slice() : cached.slice();
+      // キャッシュから取得した配列を必ず allStudents / allStudentsGrade に設定
+      studentState.allStudents = sourceStudents;
+      studentState.allStudentsGrade = grade;
+    } else {
+      // キャッシュ無ければ従来どおり取得してキャッシュに保存
+      console.log("[GRADE CACHE] FETCH students for grade=", grade);
+      const rosterIds = await loadSubjectRoster(db, currentYear, subjectId);
+      if (DEBUG) console.group(`📊 [READ CHECK] subject=${subjectId}`);
+      if (DEBUG) console.log("📘 subjectRoster read = 1");
+      if (DEBUG) console.log("👥 rosterIds length =", Array.isArray(rosterIds) ? rosterIds.length : 0);
+
+      if (Array.isArray(rosterIds) && rosterIds.length > 0) {
+        rosterStudents = await loadStudentsByIds(db, rosterIds);
+        if (DEBUG) console.log("🎓 students read by IDs =", rosterStudents.length);
+        // 取得結果を学年キャッシュと allStudents に保存
+        try { studentState.gradeStudentsCache.set(targetGrade, rosterStudents); } catch (e) { /* noop */ }
+        studentState.allStudents = rosterStudents;
+        studentState.allStudentsGrade = targetGrade;
+      } else {
+        alert("名簿データが未生成です。教務に連絡してください。");
+        throw new Error("subjectRoster missing");
+      }
+      if (DEBUG) console.groupEnd();
+    }
+  } catch (e) {
+    // 取得処理でエラーがあればそのまま投げる
+    throw e;
   }
-if (DEBUG) console.groupEnd();
   // 科目に応じて学生フィルタ＆ソート
   const students = filterAndSortStudentsForSubject(subject, studentState);
 
@@ -1289,12 +1393,8 @@ if (DEBUG) console.groupEnd();
   let displayStudents = students;
   if (subject.required === false) {
     const list = studentState.electiveStudents || [];
-    if (list.length > 0) {
-      const allowedIds = new Set(list.map(s => s.studentId));
-      displayStudents = students.filter(s => allowedIds.has(s.studentId));
-    } else {
-      displayStudents = []; // 登録が無い場合は0名
-    }
+    // electiveStudents を正本として使う（subjectRoster 由来の students を再フィルタしない）
+    displayStudents = sortStudents(list).slice();
   } else {
     displayStudents = students;
   }
@@ -1302,6 +1402,27 @@ if (DEBUG) console.groupEnd();
 // ★ STEP C フィルタ用：現在の表示学生を保持
 studentState.baseStudents = displayStudents.slice();
 studentState.currentStudents = displayStudents.slice();
+
+  // 選択科目モーダルは students が確定した後に表示（Reads0 方針）
+  if (subject && subject.required === false) {
+    // ===== elective modal: grade boundary reset (Reads0) =====
+    if (studentState.lastElectiveGrade !== grade) {
+      console.log("[elective modal] grade changed -> reset modal state", {
+        from: studentState.lastElectiveGrade,
+        to: grade,
+      });
+
+      // モーダル表示に使う候補データや一時状態を必ず破棄
+      if (studentState.electiveCandidates) studentState.electiveCandidates = [];
+      if (studentState.electiveSelected) studentState.electiveSelected = [];
+      // もし allStudents をモーダル側が参照していて汚染しているなら、ここはリセットしない（全画面で使うため）
+      // 代わりに「モーダル内部で使う配列」だけを消す
+
+      studentState.lastElectiveGrade = grade;
+    }
+
+    await openElectiveRegistrationModal(subject);
+  }
 
   if (DEBUG) console.log('[DEBUG] subject:', subject);
   if (DEBUG) console.log('[DEBUG] displayStudents(before sort):', displayStudents);
@@ -1497,13 +1618,21 @@ if (currentSubjectMeta.isSkillLevel) {
   recalcFinalScoresAfterRestore(tbody);
 
   // ★途中再開直後・描画直後に一括適用（Firestore readなし）
-  applyRiskClassesToAllRows();
+applyRiskClassesToAllRows();
+console.log("FINAL META", currentSubjectMeta);
 
-  // （再計算は上で1回実行済みのため、ここでの再呼び出しは不要）
+console.log("TEST: handleSubjectChange called");
 
-
-  // 保存ボタンの有効/無効は setUnsavedChanges() で一元管理する
+const testArea = document.getElementById("electiveButtonArea");
+if (testArea) {
+  testArea.style.display = "flex";
+  console.log("TEST: electiveButtonArea forced visible");
+} else {
+  console.log("TEST: electiveButtonArea NOT FOUND");
 }
+
+}
+
 
 // ================================
 // スコア保存（楽観ロック付き・学生単位）
@@ -1740,6 +1869,21 @@ function applyGroupOrCourseFilter(subject, filterKey) {
 export function initScoreInput() {
   // モードタブを生成（infoMessage の直下）
   initModeTabs({ infoMessageEl }, modeState);
+
+  const continueBtn = document.getElementById("electivePostRegisterContinueBtn");
+  const finishBtn = document.getElementById("electivePostRegisterFinishBtn");
+
+  if (continueBtn) {
+    continueBtn.addEventListener("click", () => {
+      hideElectivePostRegisterModal();
+    });
+  }
+
+  if (finishBtn) {
+    finishBtn.addEventListener("click", () => {
+      location.reload();
+    });
+  }
 
   if (!beforeUnloadListenerInitialized) {
     window.addEventListener("beforeunload", (e) => {

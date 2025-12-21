@@ -132,6 +132,8 @@ async function performSkillLevelSave(subjectId, studentId, value) {
 export function createStudentState() {
   return {
     allStudents: [],
+    allStudentsGrade: null,
+    gradeStudentsCache: new Map(),
     baseStudents: [],
     currentStudents: [],
     electiveStudents: [],   // 選択科目用（追加するだけ）
@@ -632,4 +634,20 @@ export function sortStudents(list) {
     const numB = Number(b.number || 0);
     return numA - numB;
   });
+}
+
+// ===== STEP B-1: 選択科目のみ受講者登録ボタンを表示 =====
+export function updateElectiveRegistrationButtons(subject) {
+  const electiveAddBtn = document.getElementById("electiveAddBtn");
+  const electiveRemoveBtn = document.getElementById("electiveRemoveBtn");
+
+  if (electiveAddBtn && electiveRemoveBtn) {
+    electiveAddBtn.style.display = "none";
+    electiveRemoveBtn.style.display = "none";
+
+    if (subject && subject.required === false) {
+      electiveAddBtn.style.display = "";
+      electiveRemoveBtn.style.display = "";
+    }
+  }
 }
