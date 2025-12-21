@@ -18,6 +18,10 @@ let currentSubjectMeta = {
   required: false,
   specialType: 0,
 };
+// 選択科目モーダル用ソートモード
+// "group" | "course" | null
+let electiveModalSortMode = null;
+let electiveModalSourceStudents = [];
 // ===== 受講者登録ボタン：安全無効化制御 =====
 const electiveAddBtn = document.getElementById("electiveAddBtn");
 const electiveRemoveBtn = document.getElementById("electiveRemoveBtn");
@@ -290,7 +294,9 @@ import {
   filterAndSortStudentsForSubject,
   renderStudentRows,
   sortStudents,
-  sortStudentsBySkillLevel
+  sortStudentsBySkillLevel,
+  sortStudentsSameAsExcess,
+  updateElectiveRegistrationButtons
 } from "./score_input_students.js";
 
 import {
@@ -316,9 +322,13 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
   serverTimestamp,
   runTransaction,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { activateQuotaErrorState } from "./quota_banner.js";
 
 // ================================
@@ -526,6 +536,9 @@ let hasUnsavedChanges = false;
 let unsavedListenerInitialized = false;
 let beforeUnloadListenerInitialized = false;
 let currentSubjectId = null;
+let electiveMode = null;           // "add" | "remove"
+let enrolledStudentIds = [];       // Firestore の studentIds
+let electiveRegistrations = null;  // electiveRegistrations_{year} ドキュメントのキャッシュ
 const subjectCache = new Map();
 const criteriaCache = new Map();
 const scoresCache = new Map();
@@ -970,8 +983,10 @@ async function ensureElectiveRegistrationLoaded(subject) {
     const data = snap.data() || {};
     const students = Array.isArray(data.students) ? data.students : [];
     studentState.electiveStudents = sortStudents(students);
+    electiveRegistrations = data;
   } else {
     studentState.electiveStudents = [];
+    electiveRegistrations = { students: [] };
   }
 }
 
@@ -1201,13 +1216,7 @@ async function handleSubjectChange(subjectId) {
   studentState.electiveStudents = [];
   studentState.lastElectiveGrade = null;
   const subject = findSubjectById(subjectId);
-
-  // ===== Elective button visibility control (FINAL / SAFE) =====
-  const electiveArea = document.getElementById("electiveButtonArea");
-  if (electiveArea) {
-    electiveArea.classList.remove("is-visible");
-  }
-  disableElectiveButtons();
+  try { window.currentSubject = subject; } catch (e) { /* noop */ }
 
   if (!subjectId) {
     cleanupScoresSnapshotListener();
@@ -1271,16 +1280,6 @@ async function handleSubjectChange(subjectId) {
     required,
     specialType,
   };
-
-  if (electiveArea) {
-    if (currentSubjectMeta.required === false) {
-      electiveArea.classList.add("is-visible");
-      enableElectiveButtons();
-    } else {
-      electiveArea.classList.remove("is-visible");
-      disableElectiveButtons();
-    }
-  }
 
   if (DEBUG) console.log("[DEBUG subjectMaster]", subjectMaster);
   if (DEBUG) console.log("[DEBUG isSkillLevel]", currentSubjectMeta.isSkillLevel);
@@ -1386,6 +1385,14 @@ async function handleSubjectChange(subjectId) {
     // 取得処理でエラーがあればそのまま投げる
     throw e;
   }
+  const rosterList = Array.isArray(rosterStudents) ? rosterStudents : [];
+  enrolledStudentIds = Array.from(
+    new Set(
+      rosterList
+        .map((stu) => String(stu.studentId ?? "").trim())
+        .filter((id) => id.length > 0)
+    )
+  );
   // 科目に応じて学生フィルタ＆ソート
   const students = filterAndSortStudentsForSubject(subject, studentState);
 
@@ -1622,14 +1629,8 @@ applyRiskClassesToAllRows();
 console.log("FINAL META", currentSubjectMeta);
 
 console.log("TEST: handleSubjectChange called");
-
-const testArea = document.getElementById("electiveButtonArea");
-if (testArea) {
-  testArea.style.display = "flex";
-  console.log("TEST: electiveButtonArea forced visible");
-} else {
-  console.log("TEST: electiveButtonArea NOT FOUND");
-}
+// ヘッダ側の受講者登録ボタン表示制御（科目変更時の最後に1回だけ）
+updateElectiveRegistrationButtons(subject);
 
 }
 
@@ -1870,6 +1871,44 @@ export function initScoreInput() {
   // モードタブを生成（infoMessage の直下）
   initModeTabs({ infoMessageEl }, modeState);
 
+  if (electiveAddBtn) {
+    electiveAddBtn.addEventListener("click", () => {
+      electiveMode = "add";
+      openElectiveModal();
+    });
+  }
+
+  if (electiveRemoveBtn) {
+    electiveRemoveBtn.addEventListener("click", () => {
+      electiveMode = "remove";
+      openElectiveModal();
+    });
+  }
+
+  // Cancel ボタンは必ず共通ハンドラを接続（モーダルを閉じる）
+  const electiveCancelBtn = document.getElementById("electiveCancelBtn");
+  if (electiveCancelBtn) {
+    electiveCancelBtn.addEventListener("click", closeElectiveModal);
+  }
+
+  const electiveRegisterBtn = document.getElementById("electiveRegisterBtn");
+  if (electiveRegisterBtn) {
+    electiveRegisterBtn.addEventListener("click", confirmElectiveChange);
+  }
+
+  // モーダル内ソートボタンのクリックハンドラ（データ属性の値を渡す）
+  const electiveSortButtons = document.querySelectorAll(".elective-group-filter button");
+  electiveSortButtons.forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const value = btn.dataset.group || btn.dataset.course || "all";
+      handleElectiveModalSortClick(value);
+      // active クラスの更新
+      electiveSortButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
+
   const continueBtn = document.getElementById("electivePostRegisterContinueBtn");
   const finishBtn = document.getElementById("electivePostRegisterFinishBtn");
 
@@ -2037,6 +2076,208 @@ export function initScoreInput() {
       window.location.href = "start.html";
     });
   }
+}
+
+function openElectiveModal() {
+  const isAddMode = electiveMode === "add";
+
+  // ① 超過学生登録と同じ名簿取得
+  const baseStudents = getStudentsForSubject();
+
+  // ② electiveRegistrations の登録済 studentId を参照（electiveRegistrations doc を優先）
+  const regList = Array.isArray(electiveRegistrations?.students)
+    ? electiveRegistrations.students
+    : (studentState.electiveStudents || []);
+  const registeredIds = regList.map((s) => String(s.studentId));
+
+  // ③ モード別に表示対象を決定
+  let displayStudents = isAddMode
+    ? baseStudents.filter((s) => !registeredIds.includes(String(s.studentId)))
+    : baseStudents.filter((s) => registeredIds.includes(String(s.studentId)));
+
+  // ④ ソート（超過学生登録と同一）
+  displayStudents = sortStudentsSameAsExcess(displayStudents || []);
+
+  // モーダル用ソートの元データを保持
+  electiveModalSourceStudents = displayStudents.slice();
+
+  // モーダル用ソートモードを決定し、表示/ボタンを更新
+  const modalSubject = window.currentSubject || findSubjectById(currentSubjectId);
+  electiveModalSortMode = determineElectiveModalSortMode(modalSubject);
+  updateElectiveModalSortVisibility(modalSubject);
+  updateElectiveModalSortButtons();
+
+  // ⑤ 描画
+  renderElectiveStudentList(displayStudents || []);
+
+  // ⑦ モーダル表示
+  const modal = document.getElementById("electiveModal");
+  if (modal) modal.style.display = "flex";
+}
+
+// getStudentsForSubject: 超過学生登録等と共通の名簿取得ラッパー
+function getStudentsForSubject() {
+  const subject = findSubjectById(currentSubjectId);
+  if (!subject) return [];
+  return filterAndSortStudentsForSubject(subject, studentState) || [];
+}
+
+// 共通: 選択科目モーダルを閉じる
+function closeElectiveModal() {
+  const modal = document.getElementById("electiveModal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+function determineElectiveModalSortMode(subject) {
+  if (!subject || subject.required !== false) return null;
+  if (String(subject.course ?? "").toUpperCase() !== "G") return null;
+  const grade = Number(subject.grade);
+  if (Number.isFinite(grade) && grade <= 2) return "group"; // 1–2年
+  return "course"; // 3年以上
+}
+
+function updateElectiveModalSortVisibility(subject) {
+  const sortArea = document.querySelector(".elective-group-filter");
+  if (!sortArea) return;
+
+  sortArea.style.display = electiveModalSortMode ? "flex" : "none";
+}
+
+function updateElectiveModalSortButtons() {
+  const buttons = document.querySelectorAll(".elective-group-filter button");
+  if (!buttons || buttons.length === 0) return;
+
+  const courseKeys = ["all", "M", "E", "I", "C", "A"];
+  const groupKeys = ["all", "1", "2", "3", "4", "5"];
+
+  // ボタン数が 6 個ある前提（HTMLは変更しない）
+  const keys = electiveModalSortMode === "course" ? courseKeys : groupKeys;
+
+  buttons.forEach((btn, idx) => {
+    const key = keys[idx] ?? null;
+    if (electiveModalSortMode === "group") {
+      btn.dataset.group = key || "";
+      btn.dataset.course = "";
+      btn.textContent = key === "all" ? "全員" : key || "";
+      btn.style.display = key ? "inline-flex" : "none";
+    } else if (electiveModalSortMode === "course") {
+      btn.dataset.course = key || "";
+      btn.dataset.group = "";
+      // 学部キーが足りなければ非表示
+      btn.textContent = key === "all" ? "全員" : key || "";
+      btn.style.display = key ? "inline-flex" : "none";
+    } else {
+      // モード無し: 全て非表示
+      btn.style.display = "none";
+      btn.dataset.group = btn.dataset.group || "";
+      btn.dataset.course = btn.dataset.course || "";
+    }
+    btn.classList.toggle("active", key === "all" && electiveModalSortMode !== null);
+  });
+}
+
+function handleElectiveModalSortClick(value) {
+  if (!electiveModalSortMode) return;
+  if (electiveModalSortMode === "group") {
+    applyElectiveGroupFilter(value);
+  } else if (electiveModalSortMode === "course") {
+    applyElectiveCourseFilter(value);
+  }
+}
+
+function renderElectiveStudentList(students) {
+  const tbody = document.getElementById("elective-table-body");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  (students || []).forEach((student) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" value="${student.studentId}">
+      </td>
+      <td>${student.studentId}</td>
+      <td>${student.grade}</td>
+      <td>${student.course}</td>
+      <td>${student.number}</td>
+      <td>${student.name}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function applyElectiveGroupFilter(value) {
+  if (!Array.isArray(electiveModalSourceStudents)) return;
+  const val = String(value || "all");
+  const filtered = val === "all"
+    ? electiveModalSourceStudents.slice()
+    : electiveModalSourceStudents.filter((stu) => String(stu.courseClass || stu.classGroup || stu.group || "") === val);
+  renderElectiveStudentList(filtered);
+}
+
+function applyElectiveCourseFilter(value) {
+  if (!Array.isArray(electiveModalSourceStudents)) return;
+  const val = String(value || "all").toUpperCase();
+  const filtered = val === "ALL"
+    ? electiveModalSourceStudents.slice()
+    : electiveModalSourceStudents.filter((stu) => String(stu.courseClass || stu.course || "").toUpperCase() === val);
+  renderElectiveStudentList(filtered);
+}
+
+async function confirmElectiveChange() {
+  const modal = document.getElementById("electiveModal");
+  if (!modal) return;
+
+  const checkboxes = modal.querySelectorAll("input[type=checkbox]:checked");
+  if (checkboxes.length === 0) {
+    alert("学生を選択してください。");
+    return;
+  }
+
+  const selectedIds = Array.from(checkboxes).map((cb) => String(cb.value));
+
+  // 注意: 指示に従い、今回の変更では Firestore への書き込み/削除は行いません。
+  // サーバー側へ反映する操作は管理者の承認後に実行してください。
+  try {
+    const registerBtn = document.getElementById("electiveRegisterBtn");
+    if (registerBtn) registerBtn.disabled = true;
+
+    if (electiveMode === "add") {
+      // クライアント側の表示用 state のみ更新（永続化は行わない）
+      enrolledStudentIds = Array.from(new Set((enrolledStudentIds || []).concat(selectedIds)));
+      alert("選択した学生はクライアント表示上で追加されます（サーバー未反映）。");
+    } else {
+      const ok = confirm("解除した学生の成績データはサーバー側で削除されません。クライアント表示上でのみ解除します。よろしいですか？");
+      if (!ok) return;
+      enrolledStudentIds = (enrolledStudentIds || []).filter((id) => !selectedIds.includes(String(id)));
+      alert("選択した学生はクライアント表示上で解除されます（サーバー未反映）。");
+    }
+
+    // モーダルを閉じ、表示を更新（ローカルのみ）
+    modal.style.display = "none";
+    await rerenderScoreTable();
+    updateStudentCount();
+  } catch (err) {
+    console.error(err);
+    alert("操作中にエラーが発生しました。コンソールを確認してください。");
+  } finally {
+    const registerBtn = document.getElementById("electiveRegisterBtn");
+    if (registerBtn) registerBtn.disabled = false;
+  }
+}
+
+async function rerenderScoreTable() {
+  if (!currentSubjectId) return;
+  await handleSubjectChange(currentSubjectId);
+}
+
+function updateStudentCount() {
+  const count = Array.isArray(studentState.currentStudents)
+    ? studentState.currentStudents.length
+    : 0;
+  updateStudentCountDisplay(count);
 }
 
 function showSaveErrorModal() {

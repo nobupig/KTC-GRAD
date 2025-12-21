@@ -39,9 +39,27 @@ export async function loadStudentsForGrade(db, grade, studentState) {
     }
   }
   const students = snap.docs.map((d) => d.data() || {});
-  studentState.allStudents = students;
+  // 正規化して UI 用フィールドを確実に持たせる
+  const normalize = (d) => {
+    const src = d || {};
+    const studentId = src.studentId ?? src.id ?? "";
+    const grade = src.grade ?? "";
+    const course = src.course ?? src.courseClass ?? "";
+    const group = src.group ?? src.class ?? src.classGroup ?? "";
+    return {
+      studentId: String(studentId),
+      grade,
+      group,
+      course,
+      courseClass: course,
+      classGroup: src.classGroup ?? "",
+      number: src.number ?? null,
+      name: src.name ?? "",
+    };
+  };
+  studentState.allStudents = students.map((d) => normalize(d));
   try {
-    sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: students }));
+    sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: studentState.allStudents }));
   } catch (e) {
     // sessionStorage容量超過等は無視
   }
@@ -160,7 +178,25 @@ export async function loadAllStudents(db, studentState) {
       throw err;
     }
   }
-  studentState.allStudents = snap.docs.map((d) => d.data() || {});
+  // 正規化して UI 用フィールドを確実に持たせる
+  const normalize = (d) => {
+    const src = d || {};
+    const studentId = src.studentId ?? src.id ?? "";
+    const grade = src.grade ?? "";
+    const course = src.course ?? src.courseClass ?? "";
+    const group = src.group ?? src.class ?? src.classGroup ?? "";
+    return {
+      studentId: String(studentId),
+      grade,
+      group,
+      course,
+      courseClass: course,
+      classGroup: src.classGroup ?? "",
+      number: src.number ?? null,
+      name: src.name ?? "",
+    };
+  };
+  studentState.allStudents = snap.docs.map((d) => normalize(d.data() || {}));
 }
 
 const STUDENT_IN_BATCH_SIZE = 10;
@@ -195,10 +231,22 @@ export async function loadStudentsByIds(db, studentIds) {
     fetched.push(...snap.docs.map((d) => d.data() || {}));
   }
   const byId = new Map();
+  // 正規化して byId に格納
   fetched.forEach((stu) => {
-    const key = stu.studentId != null ? String(stu.studentId) : null;
+    const src = stu || {};
+    const key = src.studentId != null ? String(src.studentId) : null;
     if (key !== null && !byId.has(key)) {
-      byId.set(key, stu);
+      const normalized = {
+        studentId: String(src.studentId ?? src.id ?? ""),
+        grade: src.grade ?? "",
+        group: src.group ?? src.class ?? src.classGroup ?? "",
+        course: src.course ?? src.courseClass ?? "",
+        courseClass: src.course ?? src.courseClass ?? "",
+        classGroup: src.classGroup ?? "",
+        number: src.number ?? null,
+        name: src.name ?? "",
+      };
+      byId.set(key, normalized);
     }
   });
   const ordered = [];
@@ -636,18 +684,48 @@ export function sortStudents(list) {
   });
 }
 
+// G科目対応の安定ソート（超過学生登録と同一の並び）
+export function sortStudentsSameAsExcess(students, subject) {
+  const COURSE_ORDER = ["M", "E", "I", "C", "A"];
+  const subj = subject || (typeof window !== "undefined" ? window.currentSubject : null);
+  const subjCourse = String(subj?.course ?? "").toUpperCase();
+
+  if (subjCourse === "G") {
+    return (students || []).slice().sort((a, b) => {
+      const aCourse = String(a.courseClass ?? a.course ?? "").toUpperCase();
+      const bCourse = String(b.courseClass ?? b.course ?? "").toUpperCase();
+      const ca = COURSE_ORDER.indexOf(aCourse);
+      const cb = COURSE_ORDER.indexOf(bCourse);
+      if (ca !== cb) return ca - cb;
+      const na = Number(a.number ?? 0);
+      const nb = Number(b.number ?? 0);
+      return na - nb;
+    });
+  }
+
+  return (students || []).slice().sort((a, b) => {
+    const ag = String(a.group ?? a.class ?? a.classGroup ?? "");
+    const bg = String(b.group ?? b.class ?? b.classGroup ?? "");
+    if (ag !== bg) return ag.localeCompare(bg, "ja");
+    const na = Number(a.number ?? 0);
+    const nb = Number(b.number ?? 0);
+    return na - nb;
+  });
+}
+
 // ===== STEP B-1: 選択科目のみ受講者登録ボタンを表示 =====
 export function updateElectiveRegistrationButtons(subject) {
   const electiveAddBtn = document.getElementById("electiveAddBtn");
   const electiveRemoveBtn = document.getElementById("electiveRemoveBtn");
+  const electiveArea = document.getElementById("electiveButtonArea");
 
-  if (electiveAddBtn && electiveRemoveBtn) {
-    electiveAddBtn.style.display = "none";
-    electiveRemoveBtn.style.display = "none";
+  if (!electiveAddBtn || !electiveRemoveBtn || !electiveArea) return;
 
-    if (subject && subject.required === false) {
-      electiveAddBtn.style.display = "";
-      electiveRemoveBtn.style.display = "";
-    }
+  // 初期状態：必ず非表示
+  electiveArea.classList.remove("is-visible");
+
+  // 選択科目であれば必ず表示（Gかどうかは関係なし）
+  if (subject && subject.required === false) {
+    electiveArea.classList.add("is-visible");
   }
 }
