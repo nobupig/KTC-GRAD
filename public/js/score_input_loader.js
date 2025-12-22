@@ -1019,10 +1019,13 @@ async function openElectiveRegistrationModal(subject) {
     return;
   }
 
-  // すでに登録済みならモーダルは出さない
-  if (studentState.electiveStudents && studentState.electiveStudents.length > 0) {
-    return;
-  }
+  // すでに登録済みならモーダルは出さない（正本＝electiveRegistrations を優先）
+if (Array.isArray(electiveRegistrations?.students) && electiveRegistrations.students.length > 0) {
+  return;
+}
+if (Array.isArray(studentState.electiveStudents) && studentState.electiveStudents.length > 0) {
+  return;
+}
 
 
   // 学年一致の全学生表示
@@ -1061,7 +1064,7 @@ filterButtons.forEach(btn => {
     filtered.forEach(s => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><input type="checkbox" data-studentid="${s.studentId}" /></td>
+        <td><input type="checkbox" value="${s.studentId}" /></td>
         <td>${s.studentId}</td>
         <td>${s.grade}</td>
         <td>${s.courseClass ?? ""}</td>
@@ -1079,7 +1082,7 @@ filterButtons.forEach(btn => {
   sortedStudents.forEach(s => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><input type="checkbox" data-studentid="${s.studentId}" /></td>
+      <td><input type="checkbox" value="${s.studentId}" /></td>
       <td>${s.studentId}</td>
       <td>${s.grade}</td>
       <td>${s.courseClass ?? ""}</td>
@@ -1089,6 +1092,10 @@ filterButtons.forEach(btn => {
     listEl.appendChild(tr);
   });
 
+
+  // フィルタUIの初期状態を必ず「全員」に戻す（初回のテレコ防止）
+modal.querySelectorAll(".eg-btn").forEach(b => b.classList.remove("active"));
+modal.querySelector(".eg-btn[data-group='all']")?.classList.add("active");
   modal.style.display = "flex";
 
   cancelBtn.onclick = () => {
@@ -1097,7 +1104,8 @@ filterButtons.forEach(btn => {
 
   registerBtn.onclick = async () => {
     const checked = Array.from(listEl.querySelectorAll("input[type='checkbox']:checked"))
-      .map(cb => cb.dataset.studentid);
+  .map(cb => String(cb.value))
+  .filter(Boolean);
 
     if (checked.length === 0) {
       alert("少なくとも1名を選択してください。");
@@ -1111,12 +1119,15 @@ filterButtons.forEach(btn => {
     const regRef = doc(db, colName, subject.subjectId);
 
     await setDoc(regRef, {
-      subjectId: subject.subjectId,
-      students: sortedSelected,
-      updatedAt: new Date(),
-    });
+  subjectId: subject.subjectId,
+  students: sortedSelected,
+  updatedAt: serverTimestamp(), // ついでに統一（任意だが推奨）
+}, { merge: true });
 
-    studentState.electiveStudents = sortedSelected;
+// ★正本を state & cache に同期（ここが重要）
+studentState.electiveStudents = sortStudents(sortedSelected);
+electiveRegistrations = { subjectId: subject.subjectId, students: studentState.electiveStudents, updatedAt: new Date() };
+
 
     // ハンドラ内で使うモーダルクローズ関数（ハンドラ内部の定義のみ）
     function closeElectiveModal() {
@@ -1212,9 +1223,7 @@ function setupScoresSnapshotListener(subjectId) {
 // ================================
 async function handleSubjectChange(subjectId) {
   setUnsavedChanges(false);
-  // ===== elective state reset (subject boundary) =====
-  studentState.electiveStudents = [];
-  studentState.lastElectiveGrade = null;
+ 
   const subject = findSubjectById(subjectId);
   try { window.currentSubject = subject; } catch (e) { /* noop */ }
 
@@ -2085,9 +2094,11 @@ function openElectiveModal() {
   const baseStudents = getStudentsForSubject();
 
   // ② electiveRegistrations の登録済 studentId を参照（electiveRegistrations doc を優先）
-  const regList = Array.isArray(electiveRegistrations?.students)
+  const regList =
+  (Array.isArray(electiveRegistrations?.students) && electiveRegistrations.students.length > 0)
     ? electiveRegistrations.students
     : (studentState.electiveStudents || []);
+
   const registeredIds = regList.map((s) => String(s.studentId));
 
   // ③ モード別に表示対象を決定
@@ -2227,46 +2238,118 @@ function applyElectiveCourseFilter(value) {
 }
 
 async function confirmElectiveChange() {
-  const modal = document.getElementById("electiveModal");
-  if (!modal) return;
+  console.log("=== confirmElectiveChange START ===");
+  console.log("currentSubject:", currentSubject);
+  console.log("CURRENT_YEAR:", CURRENT_YEAR);
+  console.log("electiveMode:", electiveMode);
 
-  const checkboxes = modal.querySelectorAll("input[type=checkbox]:checked");
-  if (checkboxes.length === 0) {
-    alert("学生を選択してください。");
+  if (!currentSubject || !currentSubject.subjectId) {
+    alert("科目情報が取得できません。");
     return;
   }
 
-  const selectedIds = Array.from(checkboxes).map((cb) => String(cb.value));
+  const subjectId = currentSubject.subjectId;
+  const year = CURRENT_YEAR;
+  const db = getFirestore();
 
-  // 注意: 指示に従い、今回の変更では Firestore への書き込み/削除は行いません。
-  // サーバー側へ反映する操作は管理者の承認後に実行してください。
-  try {
-    const registerBtn = document.getElementById("electiveRegisterBtn");
-    if (registerBtn) registerBtn.disabled = true;
+  // ✅ checkbox から studentId を取る：value を正本にする
+  const checkedBoxes = Array.from(
+    document.querySelectorAll("#electiveModal input[type='checkbox']:checked")
+  );
+  const selectedIds = checkedBoxes.map(cb => String(cb.value)).filter(Boolean);
 
-    if (electiveMode === "add") {
-      // クライアント側の表示用 state のみ更新（永続化は行わない）
-      enrolledStudentIds = Array.from(new Set((enrolledStudentIds || []).concat(selectedIds)));
-      alert("選択した学生はクライアント表示上で追加されます（サーバー未反映）。");
-    } else {
-      const ok = confirm("解除した学生の成績データはサーバー側で削除されません。クライアント表示上でのみ解除します。よろしいですか？");
-      if (!ok) return;
-      enrolledStudentIds = (enrolledStudentIds || []).filter((id) => !selectedIds.includes(String(id)));
-      alert("選択した学生はクライアント表示上で解除されます（サーバー未反映）。");
-    }
-
-    // モーダルを閉じ、表示を更新（ローカルのみ）
-    modal.style.display = "none";
-    await rerenderScoreTable();
-    updateStudentCount();
-  } catch (err) {
-    console.error(err);
-    alert("操作中にエラーが発生しました。コンソールを確認してください。");
-  } finally {
-    const registerBtn = document.getElementById("electiveRegisterBtn");
-    if (registerBtn) registerBtn.disabled = false;
+  console.log("selectedIds:", selectedIds);
+  if (selectedIds.length === 0) {
+    alert("学生が選択されていません。");
+    return;
   }
+
+  // ✅ 追加/解除に使う「学生オブジェクト」を作る（モーダルに表示している一覧から抜く）
+  // ※ ここがあなたのコードで別名なら置換してください
+  const sourceList = (typeof electiveModalSourceStudents !== "undefined")
+    ? electiveModalSourceStudents
+    : [];
+
+  // sourceList から対象学生を抽出（studentId一致）
+  const selectedStudents = sourceList
+    .filter(s => selectedIds.includes(String(s.studentId)))
+    .map(s => ({
+      // ✅ Firestoreの既存studentsが持っているキーに揃える（最低限このあたり）
+      studentId: String(s.studentId),
+      name: s.name ?? "",
+      grade: s.grade ?? "",
+      course: s.course ?? "",          // あるなら
+      courseClass: s.courseClass ?? "",// あるなら
+      number: s.number ?? "",
+      classGroup: s.classGroup ?? "",
+      group: s.group ?? ""
+    }));
+
+  if (selectedStudents.length === 0) {
+    // sourceList が空/不一致のときに気づけるように
+    alert("選択学生の詳細情報が取得できません（モーダル元リスト未取得）。");
+    console.error("sourceList missing or mismatch. sourceList length=", sourceList.length);
+    return;
+  }
+
+  const regRef = doc(db, `electiveRegistrations_${year}`, subjectId);
+  console.log("Firestore path:", `electiveRegistrations_${year}/${subjectId}`);
+
+   let nextStudents = null;
+  try {
+    // ✅ students配列は transaction で確定更新（IDベースで差分反映）
+       
+  await runTransaction(db, async (tx) => {
+  const snap = await tx.get(regRef);
+  const existing = snap.exists() ? (snap.data().students || []) : [];
+
+  const byId = new Map();
+  existing.forEach(stu => {
+    if (stu && stu.studentId != null) byId.set(String(stu.studentId), stu);
+  });
+
+if (electiveMode === "add") {
+    selectedStudents.forEach(stu => byId.set(String(stu.studentId), stu));
+  } else if (electiveMode === "remove") {
+    selectedStudents.forEach(stu => byId.delete(String(stu.studentId)));
+  } else {
+    throw new Error("Invalid electiveMode: " + electiveMode);
+  }
+
+
+   nextStudents = Array.from(byId.values());
+
+  tx.set(regRef, {
+    students: nextStudents,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+});
+
+  } catch (err) {
+    console.error("elective registration update failed:", err);
+    alert("登録情報の更新に失敗しました。");
+    return;
+  }
+
+    // transaction成功後に nextStudents を state/cache に同期（この変数が上で宣言されている前提）
+  if (Array.isArray(nextStudents)) {
+    studentState.electiveStudents = sortStudents(nextStudents);
+    electiveRegistrations = {
+      ...(electiveRegistrations || {}),
+      subjectId: subjectId,
+      students: studentState.electiveStudents,
+    };
+  }
+
+  // モーダルを閉じる
+  const modal = document.getElementById("electiveModal");
+  if (modal) modal.style.display = "none";
+
+  // 正本（electiveRegistrations.students）を基準に再描画
+  await handleSubjectChange(subjectId);
 }
+
+
 
 async function rerenderScoreTable() {
   if (!currentSubjectId) return;
