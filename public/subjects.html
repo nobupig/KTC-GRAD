@@ -387,6 +387,18 @@
     </div>
   </dialog>
 
+<!-- 担当科目登録 失敗/案内モーダル -->
+<dialog id="subjectRegisterInfoDialog">
+  <h3 id="subjectRegisterInfoTitle">担当科目登録の案内</h3>
+  <p id="subjectRegisterInfoMessage" style="white-space:pre-wrap; font-size:13px;"></p>
+  <div class="modal-actions">
+    <button id="subjectRegisterGoScoreBtn" class="btn btn-secondary" style="display:none;">成績入力へ進む</button>
+    <button id="subjectRegisterRetryBtn" class="btn btn-primary" style="display:none;">もう一度登録する</button>
+    <button id="subjectRegisterCloseBtn" class="btn btn-secondary">閉じる</button>
+  </div>
+</dialog>
+
+
   <!-- 教務連絡モーダル（新仕様） -->
   <dialog id="officeContactDialog">
     <h3>教務へ連絡</h3>
@@ -501,6 +513,38 @@
     const saveError = document.getElementById("saveError");
 
     const confirmDialog = document.getElementById("confirmDialog");
+    // ============================
+// 担当科目登録 案内ダイアログ
+// ============================
+function openSubjectRegisterInfoDialog({ title, message, showRetry, showGoScore }) {
+  const dlg = document.getElementById("subjectRegisterInfoDialog");
+  document.getElementById("subjectRegisterInfoTitle").textContent = title;
+  document.getElementById("subjectRegisterInfoMessage").textContent = message;
+
+  const retry = document.getElementById("subjectRegisterRetryBtn");
+  const go = document.getElementById("subjectRegisterGoScoreBtn");
+  retry.style.display = showRetry ? "inline-flex" : "none";
+  go.style.display = showGoScore ? "inline-flex" : "none";
+
+  dlg.showModal();
+}
+
+function closeSubjectRegisterInfoDialog() {
+  document.getElementById("subjectRegisterInfoDialog").close();
+}
+
+document.getElementById("subjectRegisterCloseBtn")?.addEventListener("click", closeSubjectRegisterInfoDialog);
+
+document.getElementById("subjectRegisterRetryBtn")?.addEventListener("click", () => {
+  closeSubjectRegisterInfoDialog();
+  okConfirmBtn.click(); // 既存の登録処理をそのまま再実行
+});
+
+document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", () => {
+  closeSubjectRegisterInfoDialog();
+  window.location.href = "score_input.html"; // ここは既存導線に合わせて必要ならsubjectId付与
+});
+
     const selectedList = document.getElementById("selectedList");
     const cancelConfirmBtn = document.getElementById("cancelConfirmBtn");
     const okConfirmBtn = document.getElementById("okConfirmBtn");
@@ -1024,13 +1068,27 @@ for (const s of addedSubjects) {
     saveStatus.textContent = "担当科目を登録しました。";
     saveError.textContent = "";
 
-  } catch (err) {
-    console.error(err);
-    saveError.textContent =
-      "担当科目の登録に失敗しました。ネットワークまたは Firestore 権限を確認してください。";
-  } finally {
-    confirmDialog.close();
-  }
+} catch (err) {
+  console.error(err);
+
+  // 画面下部の赤文字（任意で残す）
+  saveError.textContent =
+    "一時的に登録処理が完了しませんでした。案内をご確認ください。";
+
+  // ★ モーダルで案内を表示（alert廃止）
+  openSubjectRegisterInfoDialog({
+    title: "この科目はすでに評価基準が登録されています",
+    message:
+      "この科目は、すでに他の教員によって評価基準が登録されています。\n" +
+      "変更がなければ、そのまま成績入力に進んでください。\n\n" +
+      "登録を続行する場合は「もう一度登録する」を押してください。",
+    showRetry: true,
+    showGoScore: true
+  });
+
+} finally {
+  confirmDialog.close();
+}
 });
 
 

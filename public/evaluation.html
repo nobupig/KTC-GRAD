@@ -247,8 +247,18 @@
     <div style="margin-top:20px; display:flex; gap:8px;">
       <button id="saveBtn" class="btn btn-primary">保存する</button>
       <button id="goScoreBtn" class="btn btn-secondary" style="display:none;">
-        成績入力へ
+           成績入力へ
       </button>
+        <!-- ロック/登録済み通知ダイアログ -->
+<dialog id="criteriaInfoDialog">
+  <h3 id="criteriaInfoTitle" style="margin:0 0 8px 0;"></h3>
+  <p id="criteriaInfoMessage" style="white-space:pre-wrap; font-size:13px; margin:0 0 12px 0;"></p>
+  <div style="display:flex; gap:8px; justify-content:flex-end;">
+    <button id="criteriaInfoGoScoreBtn" class="btn btn-secondary" style="display:none;">成績入力へ進む</button>
+    <button id="criteriaInfoCloseBtn" class="btn btn-primary">閉じる</button>
+  </div>
+</dialog>
+   
     </div>
 
   </main>
@@ -477,6 +487,7 @@
       };
     }
 
+
     function isLockExpired(lock) {
       if (!lock || !lock.expiresAt) return true;
       const now = new Date();
@@ -485,6 +496,38 @@
         : new Date(lock.expiresAt);
       return now > exp;
     }
+
+// ================================
+// 評価基準 状態通知ダイアログ
+// ================================
+function showCriteriaInfoDialog({ title, message, showGoScore, subjectId }) {
+  const dlg = document.getElementById("criteriaInfoDialog");
+  document.getElementById("criteriaInfoTitle").textContent = title;
+  document.getElementById("criteriaInfoMessage").textContent = message;
+
+  const goBtn = document.getElementById("criteriaInfoGoScoreBtn");
+  goBtn.style.display = showGoScore ? "inline-flex" : "none";
+
+  if (showGoScore) {
+    goBtn.onclick = () => {
+      const id = encodeURIComponent(subjectId || "");
+      window.location.href = `score_input.html?subjectId=${id}`;
+    };
+  } else {
+    goBtn.onclick = null;
+  }
+
+  dlg.showModal();
+}
+
+function closeCriteriaInfoDialog() {
+  const dlg = document.getElementById("criteriaInfoDialog");
+  if (dlg.open) dlg.close();
+}
+
+// dialogボタン
+document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", closeCriteriaInfoDialog);
+
 
     async function acquireLockForSubject(subjectId, subjectLabelForMessage) {
       if (!currentUser || !subjectId) return false;
@@ -496,11 +539,7 @@
         currentLock.lockedBy &&
         currentLock.lockedBy !== currentUser.email
       ) {
-        const lockedByName = currentLock.lockedName || currentLock.lockedBy;
-        alert(
-          `この科目「${subjectLabelForMessage}」は現在 ${lockedByName} が編集中のため、評価基準を編集できません。\n` +
-          `編集が終了するまでお待ちいただくか、必要に応じて教務へ連絡してください。`
-        );
+       
         return false;
       }
 
@@ -874,11 +913,7 @@
         setupSchemeExamOnly();
       }
 
-      // ★ Firestore にデータがある場合は初期状態を「保存済み」に設定
-      if (hasCriteria && (data?.items?.length ?? 0) > 0) {
-        setSavedUI(true);
-      }
-
+     
       // 中身を上書き
       if (hasCriteria) {
         criteriaTbody.innerHTML = "";
@@ -1025,44 +1060,69 @@
         unlockUIForEdit();
       });
     }
+// dialog ボタン動作
+document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", closeCriteriaInfoDialog);
+document.getElementById("criteriaInfoGoScoreBtn")?.addEventListener("click", () => {
+  // 既存の subjectId 引き継ぎは URL で統一
+  const id = encodeURIComponent(currentSubjectId || "");
+  window.location.href = `score_input.html?subjectId=${id}`;
+});
 
     // ================================
     // 科目選択時
     // ================================
-    subjectSelect.addEventListener("change", async () => {
-      // 以前のロックを解放
-      await releaseCurrentLock();
+subjectSelect.addEventListener("change", async () => {
+  await releaseCurrentLock();
+  resetEvaluationUI();
+  if (goScoreBtn) goScoreBtn.style.display = "none";
 
+  const opt = subjectSelect.options[subjectSelect.selectedIndex];
+  const subjectId = opt ? opt.value : "";
+  const subjectLabel = opt ? opt.textContent : "";
+  currentSubjectId = subjectId;
 
-      resetEvaluationUI();
-      if (goScoreBtn) goScoreBtn.style.display = "none";
+  if (!subjectId) return;
 
-      const opt = subjectSelect.options[subjectSelect.selectedIndex];
-      const subjectId = opt ? opt.value : "";
-      const subjectLabel = opt ? opt.textContent : subjectId;
-      currentSubjectId = subjectId;
+  // ★① 評価基準の存在チェック（最優先）
+  const criteriaRef = doc(db, evalColName, subjectId);
+  const criteriaSnap = await getDoc(criteriaRef);
 
-      if (!subjectId) {
-        return;
-      }
+  if (criteriaSnap.exists()) {
+    // 保存済みUIで表示
+    await loadCriteria(subjectId, { editable: false });
+    setSavedUI(true);
 
-      // ロック取得を試みる
-      const lockAcquired = await acquireLockForSubject(subjectId, subjectLabel);
-
-      if (lockAcquired) {
-        await loadCriteria(subjectId, { editable: true });
-      } else {
-        await loadCriteria(subjectId, { editable: false });
-      }
-
-      const cnt = await checkMultiTeacher(subjectId);
-      multiTeacherWarning.style.display = cnt > 1 ? "block" : "none";
-
-      if (!lockAcquired) {
-        // 他人がロック中 → 完全閲覧専用
-        setSavedUI(false);
-      }
+    showCriteriaInfoDialog({
+      title: "評価基準はすでに登録されています",
+      message:
+        "この科目は、すでに評価基準が登録されています。\n" +
+        "変更がなければ、そのまま成績入力に進んでください。\n" +
+        "評価基準を変更する場合は、修正ボタンより理由を明記の上、修正してください。",
+      showGoScore: true,
+      subjectId
     });
+    return; // ★ここで終了
+  }
+
+  // ★② 新規作成時のみロック取得
+  const lockAcquired = await acquireLockForSubject(subjectId, subjectLabel);
+
+  if (!lockAcquired) {
+    showCriteriaInfoDialog({
+      title: "評価基準を作成中です",
+      message:
+        "現在、他の教員が評価基準を作成中です。\n" +
+        "しばらく待つか、必要に応じて教務に連絡してください。",
+      showGoScore: false
+    });
+    setSavedUI(false);
+    return;
+  }
+
+  // ★③ 新規作成UI
+  await loadCriteria(subjectId, { editable: true });
+});
+
 
     // ================================
     // 保存ボタン
