@@ -464,7 +464,8 @@
       setDoc,
       deleteDoc,
       serverTimestamp,
-      getDoc
+      getDoc,
+      increment
     } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
     // ★ここはご自身のプロジェクトの設定
@@ -888,25 +889,24 @@ function getSelectedSubjects() {
       // （renderRegisteredSubjects は既存STEP2で実装済み）
       renderRegisteredSubjects(newList);
 
-      // ★ teacherSubjects 更新後に追加する処理：
-      // この科目を担当している教員が何人いるかをチェックする
-      const colRef = collection(db, `teacherSubjects_${year}`);
-      const allSnaps = await getDocs(colRef);
+  
+   // ★ subjectStats を更新（担当教員数 -1）
+const statRef = doc(db, "subjectStats", subjectId);
+await setDoc(
+  statRef,
+  { teacherCount: increment(-1) },
+  { merge: true }
+);
 
-      let teacherCount = 0;
-      allSnaps.forEach(docSnap => {
-        const data = docSnap.data();
-        const subjects = data.subjects || [];
-        if (subjects.some(s => s.subjectId === subjectId)) {
-          teacherCount++;
-        }
-      });
+// ★ 0人になったら評価基準を削除（subjectStats を参照）
+const statSnap = await getDoc(statRef);
+const cnt = statSnap.exists() ? (statSnap.data().teacherCount || 0) : 0;
 
-      // ★ 担当教員が0人になったら評価基準を削除
-      if (teacherCount === 0) {
-        const evalCol = `evaluationCriteria_${year}`;
-        await deleteDoc(doc(db, evalCol, subjectId));
-      }
+if (cnt <= 0) {
+  const evalCol = `evaluationCriteria_${year}`;
+  await deleteDoc(doc(db, evalCol, subjectId));
+}
+
 
       // 「科目登録画面の科目選択部分」を最新にするため、既存関数を呼び出す
       if (typeof loadTeacherSubjects === "function") {
@@ -935,7 +935,7 @@ function getSelectedSubjects() {
       confirmDialog.close();
     });
 
-    okConfirmBtn.addEventListener("click", async () => {
+  okConfirmBtn.addEventListener("click", async () => {
   saveStatus.textContent = "";
   saveError.textContent = "";
 
@@ -996,6 +996,26 @@ function getSelectedSubjects() {
         subjects: unique,
         updatedAt: serverTimestamp()
       }, { merge: true });
+
+// === subjectStats を「本当に新規追加された科目」だけ +1 ===
+
+// 既存の subjectId 一覧
+const oldIds = new Set(oldSubjects.map(s => s.subjectId));
+
+// 今回新しく追加された科目だけ抽出
+const addedSubjects = newSubjects.filter(
+  s => !oldIds.has(s.subjectId)
+);
+
+// teacherCount を +1
+for (const s of addedSubjects) {
+  const statRef = doc(db, "subjectStats", s.subjectId);
+  await setDoc(
+    statRef,
+    { teacherCount: increment(1) },
+    { merge: true }
+  );
+}
 
 
     // ★ 登録後に最新の担当科目一覧を再読み込み

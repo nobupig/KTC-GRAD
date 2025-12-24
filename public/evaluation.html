@@ -458,21 +458,6 @@
         }
       }
 
-        // ★ 不要ロック全体のクリーンアップ（評価基準が無いもののみ削除）
-        // ★ 不要ロックのクリーンアップ（evaluationCriteria に無いものだけ削除）
-        const locksRef = collection(db, "evaluationLocks_2025");
-        const allLocks = await getDocs(locksRef);
-
-        for (const lock of allLocks.docs) {
-          const sid = lock.id;
-          const criteriaRef = doc(db, "evaluationCriteria_2025", sid);
-          const criteriaSnap = await getDoc(criteriaRef);
-
-          if (!criteriaSnap.exists()) {
-            console.log("不要ロック削除:", sid);
-            await deleteDoc(lock.ref);
-          }
-        }
     }
 
     // ================================
@@ -951,17 +936,23 @@
     // ================================
     // 複数担当チェック
     // ================================
-    async function checkMultiTeacher(subjectId) {
-      const colRef = collection(db, `teacherSubjects_${currentYear}`);
-      const snap = await getDocs(colRef);
-      let count = 0;
-      snap.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (!data.subjects) return;
-        if (data.subjects.some((s) => s.subjectId === subjectId)) count++;
-      });
-      return count;
-    }
+  async function checkMultiTeacher(subjectId) {
+  if (!subjectId) return 0;
+
+  try {
+    const ref = doc(db, "subjectStats", subjectId);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) return 0;
+
+    const count = snap.data().teacherCount || 0;
+    return count;
+  } catch (e) {
+    console.warn("checkMultiTeacher error:", e);
+    return 0;
+  }
+}
+
 
     // ================================
     // イベント：評価方式切替・行追加
