@@ -962,6 +962,11 @@ function findSubjectById(subjectId) {
 async function ensureElectiveRegistrationLoaded(subject) {
   if (!subject || !subject.subjectId) return;
 
+  // ★ 追加：同一科目なら Firestore を再読しない（reads削減）
+  if (electiveRegistrations?.subjectId === subject.subjectId) {
+    return;
+  }
+
   // "required: false" 以外なら何もしない
   if (subject.required !== false) return;
 
@@ -983,12 +988,16 @@ async function ensureElectiveRegistrationLoaded(subject) {
     const data = snap.data() || {};
     const students = Array.isArray(data.students) ? data.students : [];
     studentState.electiveStudents = sortStudents(students);
-    electiveRegistrations = data;
+
+    // ★ subjectId を必ずキャッシュに保持
+    electiveRegistrations = { ...data, subjectId: subject.subjectId };
+
   } else {
     studentState.electiveStudents = [];
-    electiveRegistrations = { students: [] };
+    electiveRegistrations = { subjectId: subject.subjectId, students: [] };
   }
 }
+
 
 function showElectivePostRegisterModal() {
   const modal = document.getElementById("electivePostRegisterModal");
@@ -1004,14 +1013,10 @@ function hideElectivePostRegisterModal() {
   modal.setAttribute("aria-hidden", "true");
 }
 
-// 新規追加: 選択科目受講者登録モーダル
+// ★初回登録も add/remove と同じモーダル・同じ登録処理(confirmElectiveChange)に統一する
 async function openElectiveRegistrationModal(subject) {
   const modal = document.getElementById("electiveModal");
-  const listEl = document.getElementById("elective-table-body");
-  const cancelBtn = document.getElementById("electiveCancelBtn");
-  const registerBtn = document.getElementById("electiveRegisterBtn");
-
-  if (!modal || !listEl) return;
+  if (!modal) return;
 
   // Reads 0 固定：モーダルは allStudents（学年名簿）だけを参照する
   if (!Array.isArray(studentState.allStudents) || studentState.allStudents.length === 0) {
@@ -1020,124 +1025,23 @@ async function openElectiveRegistrationModal(subject) {
   }
 
   // すでに登録済みならモーダルは出さない（正本＝electiveRegistrations を優先）
-if (Array.isArray(electiveRegistrations?.students) && electiveRegistrations.students.length > 0) {
-  return;
+  const hasRegistered =
+    (Array.isArray(electiveRegistrations?.students) && electiveRegistrations.students.length > 0) ||
+    (Array.isArray(studentState.electiveStudents) && studentState.electiveStudents.length > 0);
+
+  if (hasRegistered) return;
+
+  // 初回登録モード
+  electiveMode = "initial";
+
+  // 念のため currentSubjectId/currentSubject を揃える
+  if (subject?.subjectId) currentSubjectId = subject.subjectId;
+  window.currentSubject = subject || window.currentSubject;
+
+  // add/remove と同じ表示ロジックを使う（ソートボタン表示条件も統一される）
+  openElectiveModal();
 }
-if (Array.isArray(studentState.electiveStudents) && studentState.electiveStudents.length > 0) {
-  return;
-}
 
-
-  // 学年一致の全学生表示
-  const grade = String(subject.grade);
-  // 必ず最新の学年キャッシュ（allStudents）から候補配列を作る（以前の modal キャッシュを再利用しない）
-  const all = Array.isArray(studentState.allStudents) ? studentState.allStudents.slice() : [];
-  const students = all.filter(s => String(s.grade) === grade);
-  // 並び順を成績入力画面と揃える
-  const sortedStudents = sortStudents(students);
-
-// ===== モーダル内フィルタ用：元データ保持 =====
-const modalBaseStudents = sortedStudents.slice();
-
-// ===== モーダル内：組フィルタ処理 =====
-
-const filterButtons = modal.querySelectorAll(".eg-btn");
-
-filterButtons.forEach(btn => {
-  btn.onclick = () => {
-    // active 切替
-    filterButtons.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    const key = btn.dataset.group;
-
-    // 絞り込み
-    const filtered =
-      key === "all"
-        ? modalBaseStudents
-        : modalBaseStudents.filter(
-            s => String(s.courseClass) === String(key)
-          );
-
-    // 再描画（今ある描画ロジックをそのまま使う）
-    listEl.innerHTML = "";
-    filtered.forEach(s => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><input type="checkbox" value="${s.studentId}" /></td>
-        <td>${s.studentId}</td>
-        <td>${s.grade}</td>
-        <td>${s.courseClass ?? ""}</td>
-        <td>${s.number ?? ""}</td>
-        <td>${s.name}</td>
-      `;
-      listEl.appendChild(tr);
-    });
-  };
-});
-
-
-  
-  listEl.innerHTML = "";
-  sortedStudents.forEach(s => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><input type="checkbox" value="${s.studentId}" /></td>
-      <td>${s.studentId}</td>
-      <td>${s.grade}</td>
-      <td>${s.courseClass ?? ""}</td>
-      <td>${s.number ?? ""}</td>
-      <td>${s.name}</td>
-    `;
-    listEl.appendChild(tr);
-  });
-
-
-  // フィルタUIの初期状態を必ず「全員」に戻す（初回のテレコ防止）
-modal.querySelectorAll(".eg-btn").forEach(b => b.classList.remove("active"));
-modal.querySelector(".eg-btn[data-group='all']")?.classList.add("active");
-  modal.style.display = "flex";
-
-  cancelBtn.onclick = () => {
-    modal.style.display = "none";
-  };
-
-  registerBtn.onclick = async () => {
-    const checked = Array.from(listEl.querySelectorAll("input[type='checkbox']:checked"))
-  .map(cb => String(cb.value))
-  .filter(Boolean);
-
-    if (checked.length === 0) {
-      alert("少なくとも1名を選択してください。");
-      return;
-    }
-
-    const selected = modalBaseStudents.filter(s => checked.includes(String(s.studentId)));
-    const sortedSelected = sortStudents(selected);
-
-    const colName = `electiveRegistrations_${currentYear}`;
-    const regRef = doc(db, colName, subject.subjectId);
-
-    await setDoc(regRef, {
-  subjectId: subject.subjectId,
-  students: sortedSelected,
-  updatedAt: serverTimestamp(), // ついでに統一（任意だが推奨）
-}, { merge: true });
-
-// ★正本を state & cache に同期（ここが重要）
-studentState.electiveStudents = sortStudents(sortedSelected);
-electiveRegistrations = { subjectId: subject.subjectId, students: studentState.electiveStudents, updatedAt: new Date() };
-
-
-    // ハンドラ内で使うモーダルクローズ関数（ハンドラ内部の定義のみ）
-    function closeElectiveModal() {
-      try { modal.style.display = "none"; } catch (e) { /* noop */ }
-    }
-    closeElectiveModal();
-    console.log("[REGISTER] post register modal show");
-    showElectivePostRegisterModal();
-  };
-}
 
 // ================================
 // 受講者人数表示を更新
@@ -1250,10 +1154,10 @@ async function handleSubjectChange(subjectId) {
     return;
   }
   // ▼ 同一科目の再読込防止（Reads削減の核心）
-  if (subjectId === currentSubjectId && subject?.required !== false) {
-    if (DEBUG) console.log("[SKIP] same subject, Firestore reload skipped");
-    return;
-  }
+  if (subjectId === currentSubjectId) {
+  if (DEBUG) console.log("[SKIP] same subjectId, reload skipped");
+  return;
+}
   currentSubjectId = subjectId;
   setupScoresSnapshotListener(subjectId);
   const grade = String(subject?.grade ?? "");
@@ -1928,10 +1832,30 @@ export function initScoreInput() {
   }
 
   if (finishBtn) {
-    finishBtn.addEventListener("click", () => {
+  finishBtn.addEventListener("click", async () => {
+    // reload すると科目プルダウンが先頭に戻るため、同一科目のまま再描画する
+    hideElectivePostRegisterModal();
+
+    const sid =
+      currentSubjectId ||
+      window.currentSubject?.subjectId ||
+      document.getElementById("subjectSelect")?.value ||
+      null;
+
+    if (sid) {
+      try {
+        currentSubjectId = null; // ガード解除（同一科目でも再描画）
+        await handleSubjectChange(String(sid));
+      } catch (e) {
+        console.error("[elective finish] rerender failed:", e);
+        // 最終手段：subjectId 付きで遷移（状態保持）
+        location.href = `score_input.html?subjectId=${encodeURIComponent(String(sid))}`;
+      }
+    } else {
       location.reload();
-    });
-  }
+    }
+  });
+}
 
   if (!beforeUnloadListenerInitialized) {
     window.addEventListener("beforeunload", (e) => {
@@ -2088,7 +2012,7 @@ export function initScoreInput() {
 }
 
 function openElectiveModal() {
-  const isAddMode = electiveMode === "add";
+  const isAddMode = (electiveMode === "add" || electiveMode === "initial");
 
   // ① 超過学生登録と同じ名簿取得
   const baseStudents = getStudentsForSubject();
@@ -2308,16 +2232,20 @@ async function confirmElectiveChange() {
     if (stu && stu.studentId != null) byId.set(String(stu.studentId), stu);
   });
 
-if (electiveMode === "add") {
-    selectedStudents.forEach(stu => byId.set(String(stu.studentId), stu));
-  } else if (electiveMode === "remove") {
-    selectedStudents.forEach(stu => byId.delete(String(stu.studentId)));
-  } else {
-    throw new Error("Invalid electiveMode: " + electiveMode);
-  }
+if (electiveMode === "initial") {
+  // 初回登録：既存を見ず、選択した学生のみで置き換える
+  byId.clear();
+  selectedStudents.forEach(stu => byId.set(String(stu.studentId), stu));
+} else if (electiveMode === "add") {
+  selectedStudents.forEach(stu => byId.set(String(stu.studentId), stu));
+} else if (electiveMode === "remove") {
+  selectedStudents.forEach(stu => byId.delete(String(stu.studentId)));
+} else {
+  throw new Error("Invalid electiveMode: " + electiveMode);
+}
 
+nextStudents = Array.from(byId.values());
 
-   nextStudents = Array.from(byId.values());
 
   tx.set(regRef, {
     students: nextStudents,
@@ -2346,6 +2274,7 @@ if (electiveMode === "add") {
   if (modal) modal.style.display = "none";
 
   // 正本（electiveRegistrations.students）を基準に再描画
+  currentSubjectId = null;
   await handleSubjectChange(subjectId);
 }
 
