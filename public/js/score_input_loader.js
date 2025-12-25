@@ -717,6 +717,38 @@ export function getModeState() {
   return modeState;
 }
 
+
+function setModeTabsVisible(visible) {
+  // initModeTabs が生成している要素を広めに拾う（HTML改修なしで吸収）
+  const el =
+    document.getElementById("modeTabs") ||
+    document.querySelector(".mode-tabs") ||
+    document.querySelector(".score-mode-tabs") ||
+    document.querySelector("[data-mode-tabs]");
+  if (!el) return;
+  el.style.display = visible ? "" : "none";
+}
+
+function renderSpecialTableHeader(headerRow, meta) {
+  if (!headerRow) return;
+  headerRow.innerHTML = "";
+
+  const base = ["学籍番号", "学年", "組・コース", "番号", "氏名"];
+  base.forEach((t) => {
+    const th = document.createElement("th");
+    th.textContent = t;
+    headerRow.appendChild(th);
+  });
+
+  const thSpecial = document.createElement("th");
+  thSpecial.textContent = (meta?.specialType === 1) ? "合否" : "認定";
+  headerRow.appendChild(thSpecial);
+
+  const thFinal = document.createElement("th");
+  thFinal.textContent = "最終成績";
+  headerRow.appendChild(thFinal);
+}
+
 // ================================
 // 共通：メッセージ表示ヘルパ
 // ================================
@@ -844,11 +876,12 @@ function applySavedScoresToTable(savedStudentsMap, tbodyEl) {
   if (!savedStudentsMap || !tbodyEl) return;
 
   const inputs = tbodyEl.querySelectorAll(
-    "input[data-student-id][data-criteria-name]"
+    'input[data-student-id][data-criteria-name]'
   );
 
   isProgrammaticInput = true;
   try {
+    // ① 通常科目（数値 input）の復元
     inputs.forEach((input) => {
       if (input.classList.contains("skill-level-input")) return;
 
@@ -863,10 +896,41 @@ function applySavedScoresToTable(savedStudentsMap, tbodyEl) {
 
       input.value = String(value);
     });
+
+    // ② specialType=1：合／否 select の復元
+    const passFailSelects = tbodyEl.querySelectorAll(
+      'select.pass-fail-select[data-student-id]'
+    );
+    passFailSelects.forEach((sel) => {
+      const studentId = sel.dataset.studentId;
+      const studentData = savedStudentsMap[studentId];
+      const v = studentData?.scores?.passFail;
+      if (v === "pass" || v === "fail") {
+        sel.value = v;
+      } else {
+        sel.value = "pass";
+      }
+    });
+
+    // ③ specialType=2：認定 select の復元
+    const certSelects = tbodyEl.querySelectorAll(
+      'select.cert-select[data-student-id]'
+    );
+    certSelects.forEach((sel) => {
+      const studentId = sel.dataset.studentId;
+      const studentData = savedStudentsMap[studentId];
+      const v = studentData?.scores?.cert;
+      if (v === "cert1" || v === "cert2") {
+        sel.value = v;
+      } else {
+        sel.value = "cert1";
+      }
+    });
   } finally {
     isProgrammaticInput = false;
   }
 }
+
 
 
 // ================================
@@ -1194,6 +1258,10 @@ async function handleSubjectChange(subjectId) {
     specialType,
   };
 
+ // renderStudentRows 側が参照できるように subject にも載せる
+  subject.specialType = specialType;
+  subject.isSkillLevel = isSkillLevel;
+
   if (DEBUG) console.log("[DEBUG subjectMaster]", subjectMaster);
   if (DEBUG) console.log("[DEBUG isSkillLevel]", currentSubjectMeta.isSkillLevel);
   if (DEBUG) console.log(
@@ -1239,36 +1307,65 @@ async function handleSubjectChange(subjectId) {
 
   infoMessageEl?.classList.remove("warning-message");
   setInfoMessage("評価基準と名簿を読み込んでいます…");
-    // ===== specialType 分岐：特別科目は評価基準フローをスキップ =====
-  if (currentSubjectMeta.specialType === 1 || currentSubjectMeta.specialType === 2) {
-    console.log(
-      "[INFO] specialType subject -> skip criteria flow:",
-      currentSubjectMeta.specialType
-    );
+  // ===== 科目切替：UI完全初期化（DOMのみ / Firestore reads 0）=====
+// ===== 科目切替時：UIを必ず完全初期化（DOMのみ）=====
+headerRow.innerHTML = "";
+tbody.innerHTML = "";
 
-    // 評価基準は使わないので空にする（後続UIを壊さないため）
-    criteriaState.items = [];
+const filterArea = document.getElementById("groupFilterArea");
+if (filterArea) filterArea.innerHTML = "";
 
-    // ヘッダ・テーブルは通常どおり描画させるため、
-    // ここでは return せず「評価基準ロード部分だけ」を飛ばす
-  } else {
-  // 評価基準読み込み → ヘッダ生成（キャッシュ利用）
+// ===== specialType 判定 =====
+const isSpecial =
+  currentSubjectMeta.specialType === 1 ||
+  currentSubjectMeta.specialType === 2;
+
+if (isSpecial) {
+  console.log(
+    "[INFO] specialType subject -> skip criteria flow:",
+    currentSubjectMeta.specialType
+  );
+
+  // 評価基準は使わない
+  criteriaState.items = [];
+
+  // ★ここが一番重要（これが無かった）
+  renderSpecialTableHeader(headerRow, currentSubjectMeta);
+
+  // モードUIを非表示
+  setModeTabsVisible(false);
+  // ★ 追加①：評価基準UIを完全に隠す
+  document
+    .querySelectorAll(".evaluation-related")
+    .forEach(el => el.style.display = "none");
+  updateAdjustPointDisplay();
+
+} else {
+  // ★ 将来事故防止：通常科目では評価基準UIを必ず復帰
+document
+  .querySelectorAll(".evaluation-related")
+  .forEach(el => el.style.display = "");
+
+  // ===== 通常科目 =====
   if (criteriaCache.has(subjectId)) {
     Object.assign(criteriaState, structuredClone(criteriaCache.get(subjectId)));
   } else {
     await loadCriteria(db, currentYear, subjectId, criteriaState);
     criteriaCache.set(subjectId, structuredClone(criteriaState));
   }
-  // 評価基準ロード直後に調整点表示を更新
+
   updateAdjustPointDisplay();
   renderTableHeader(headerRow, criteriaState);
-  // isSkillLevel===true の場合のみ「習熟度」thを先頭に追加
+
   if (currentSubjectMeta.isSkillLevel) {
     const th = document.createElement("th");
     th.textContent = "習熟度";
     headerRow.insertBefore(th, headerRow.firstChild);
   }
-  }
+
+  setModeTabsVisible(true);
+}
+
 
  
   // 学生全件ロード（subjectRoster優先 → 学年キャッシュ）
@@ -1455,20 +1552,44 @@ if (savedScores) {
   }
 
 
-  if (!unsavedListenerInitialized && tbody) {
-    tbody.addEventListener("input", (ev) => {
-      if (isRenderingTable) return;
-      if (isProgrammaticInput) return;
-      const target = ev.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      if (target.classList.contains("skill-level-input")) return;
-      if (!target.dataset.index) return;
-      setUnsavedChanges(true);
-      const tr = target.closest("tr");
+if (!unsavedListenerInitialized && tbody) {
+  tbody.addEventListener("input", (ev) => {
+    if (isRenderingTable) return;
+    if (isProgrammaticInput) return;
+
+    const target = ev.target;
+
+    // ① スキル入力は除外（既存どおり）
+    if (target instanceof HTMLInputElement && target.classList.contains("skill-level-input")) {
+      return;
+    }
+
+    // ② 通常科目：数値 input のみ対象（既存の条件を維持）
+    const isNumberScoreInput =
+      target instanceof HTMLInputElement &&
+      target.type === "number" &&
+      !!target.dataset.index;
+
+    // ③ 特別科目：select を対象にする（new）
+    const isSpecialSelect =
+      target instanceof HTMLSelectElement &&
+      (target.classList.contains("pass-fail-select") || target.classList.contains("cert-select"));
+
+    if (!isNumberScoreInput && !isSpecialSelect) return;
+
+    setUnsavedChanges(true);
+
+    const tr = target.closest("tr");
+    // 特別科目は点数計算しないので、行再計算は呼ばなくてOK
+    // （呼んでも即死はしにくいが、無駄なので分岐）
+    if (!isSpecialSelect) {
       handleScoreInputChange(tr);
-    });
-    unsavedListenerInitialized = true;
-  }
+    }
+  });
+
+  unsavedListenerInitialized = true;
+}
+
   // --- 新規追加: 習熟度値の反映 ---
   if (currentSubjectMeta.isSkillLevel && studentState.skillLevelsMap) {
     const inputs = tbody.querySelectorAll('input.skill-level-input');
@@ -1524,16 +1645,28 @@ if (savedScores) {
     pasteInitialized = true;
   }
 
-  // 評価基準がない場合は注意メッセージ
-  if (!criteriaState.items.length) {
-    setInfoMessage(
-      "この科目には評価基準が登録されていません。評価基準画面で登録してください。"
-    );
-    infoMessageEl?.classList.add("warning-message");
-  } else {
-    infoMessageEl?.classList.remove("warning-message");
-    setInfoMessage("成績を入力してください。（モード：自動換算モードがデフォルトです）");
-  }
+// メッセージ表示（specialType は評価基準を使わない）
+if (currentSubjectMeta?.specialType === 1) {
+  infoMessageEl?.classList.remove("warning-message");
+  setInfoMessage("特別科目：合／否を選択してください。");
+} else if (currentSubjectMeta?.specialType === 2) {
+  infoMessageEl?.classList.remove("warning-message");
+  setInfoMessage("特別科目：認定(1)／認定(2)を選択してください。");
+} 
+// ★ 特別科目は初期値が確定値なので、初回表示時点で保存可能にする
+if (currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2) {
+  setUnsavedChanges(true);
+}
+else if (!criteriaState.items.length) {
+  setInfoMessage(
+    "この科目には評価基準が登録されていません。評価基準画面で登録してください。"
+  );
+  infoMessageEl?.classList.add("warning-message");
+} else {
+  infoMessageEl?.classList.remove("warning-message");
+  setInfoMessage("成績を入力してください。（モード：自動換算モードがデフォルトです）");
+}
+
 
   // 評価基準画面へのリンクを subjectId 付きに更新
   if (toEvaluationLink) {
@@ -1542,8 +1675,10 @@ if (savedScores) {
     )}`;
   }
 
-// STEP C：フィルタ UI を生成
-if (currentSubjectMeta.isSkillLevel) {
+;
+if (isSpecial) {
+  // 何も出さない（完全初期化済み）
+} else if (currentSubjectMeta.isSkillLevel) {
   renderSkillLevelFilter(subject);
 } else {
   renderGroupOrCourseFilter(subject);
@@ -1779,6 +1914,16 @@ function applyGroupOrCourseFilter(subject, filterKey) {
         (tr) => updateFinalScoreForRow(tr, criteriaState, modeState),                        
         studentState
       );
+
+// ===== 特別科目は初期値が有効なので、初回から保存可能にする =====
+if (
+  currentSubjectMeta &&
+  (currentSubjectMeta.specialType === 1 || currentSubjectMeta.specialType === 2)
+) {
+  setUnsavedChanges(true);
+}
+
+
     } finally {
       isRenderingTable = false;
     }
@@ -1908,6 +2053,31 @@ export function initScoreInput() {
         for (const tr of rows) {
           const studentId = String(tr.dataset.studentId || "");
           if (!studentId) continue;
+
+          // ===== specialType=1：合／否 保存 =====
+          if (currentSubjectMeta.specialType === 1) {
+            const sel = tr.querySelector("select.pass-fail-select");
+            const v = sel ? String(sel.value || "pass") : "pass";
+            bulkScores[studentId] = {
+              scores: { passFail: v },    // ←数値ではなく pass/fail を保存
+              finalScore: null,           // ←数値計算しない
+              isRed: false,
+              isOver: false,
+            };
+            continue;
+          }
+// ===== specialType=2：認定 保存 =====
+if (currentSubjectMeta.specialType === 2) {
+  const sel = tr.querySelector("select.cert-select");
+  const v = sel ? String(sel.value || "cert1") : "cert1";
+  bulkScores[studentId] = {
+    scores: { cert: v },        // ← cert1/cert2 を保存
+    finalScore: null,           // ←数値計算しない
+    isRed: false,
+    isOver: false,
+  };
+  continue;
+}
 
           const scoresObj = buildScoresObjFromRow(tr, criteriaState);
           if (!scoresObj || Object.keys(scoresObj).length === 0) {

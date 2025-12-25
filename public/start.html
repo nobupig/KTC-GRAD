@@ -283,15 +283,22 @@
         return;
       }
 
-      const subjects = tsSnap.data().subjects;
-      const notCompleted = [];
+const subjects = tsSnap.data().subjects;
 
-      for (const subj of subjects) {
-        const completed = await isCriteriaCompleted(subj.subjectId);
-        if (!completed) {
-          notCompleted.push(subj.subjectId);
-        }
-      }
+// ★ 通常科目（specialType=0）のみを対象にする
+const normalSubjects = subjects.filter(
+  s => Number(s.specialType ?? 0) === 0
+);
+
+const notCompleted = [];
+
+for (const subj of normalSubjects) {
+  const completed = await isCriteriaCompleted(subj.subjectId);
+  if (!completed) {
+    notCompleted.push(subj.subjectId);
+  }
+}
+
 
       if (notCompleted.length === 0) {
         const sid = encodeURIComponent(subjects[0].subjectId);

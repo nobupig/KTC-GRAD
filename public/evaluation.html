@@ -438,20 +438,25 @@
       const subjects = snap.data().subjects;
       let hasNormal = false;
 
-      subjects.forEach((s) => {
-        const opt = document.createElement("option");
-        opt.value = s.subjectId || "";
-        const baseLabel = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
-        const sp = Number(s.specialType ?? 0);           // 0/1/2 に正規化
-         opt.dataset.specialType = String(sp);            // 後で change ハンドラで参照する
-        if (sp !== 0) {
-          opt.textContent = `${baseLabel}（評価基準入力不要）`;
-          } else {
-             opt.textContent = baseLabel;
-            hasNormal = true;
-        }
-        subjectSelect.appendChild(opt);
-      });
+subjects.forEach((s) => {
+  const sp = Number(s.specialType ?? 0); // 0/1/2 に正規化
+
+  // specialType=1/2 は評価基準画面では扱わない
+  if (sp !== 0) {
+    return; // ← option 自体を作らない
+  }
+
+  const opt = document.createElement("option");
+  opt.value = s.subjectId || "";
+
+  const baseLabel = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
+  opt.textContent = baseLabel;
+
+  hasNormal = true; // 通常科目が存在するフラグ
+
+  subjectSelect.appendChild(opt);
+});
+
 
       if (!hasNormal) {
         subjectStatus.textContent =

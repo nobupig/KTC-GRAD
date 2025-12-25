@@ -468,6 +468,27 @@ export function renderStudentRows(
   onScoreInputChange,
   studentState
 ) {
+  // ===== 表の総列数を動的に計算（specialType/習熟度/評価基準の違いで崩れないようにする） =====
+  const getTotalColumnCount = () => {
+    let count = 0;
+    // 習熟度
+    if (subject && subject.isSkillLevel === true) count += 1;
+    // 基本情報（学籍番号, 学年, 組・コース, 番号, 氏名）
+    count += 5;
+    const sp = Number(subject?.specialType ?? 0);
+     // 評価入力列（通常: criteriaItems数 / 無し:"-" / 特別: 合否 or 認定）
+    if (sp === 1 || sp === 2) {
+      count += 1;
+    } else if (Array.isArray(criteriaItems) && criteriaItems.length > 0) {
+      count += criteriaItems.length;
+    } else {
+      count += 1;
+    }
+    // 最終成績
+    count += 1;
+    return count;
+  };
+
   const bodyTable = tbody?.closest("table");
   // 列幅を固定する colgroup をテーブル先頭に挿入（thead/tbody より前）
   if (bodyTable) {
@@ -490,7 +511,16 @@ export function renderStudentRows(
     addCol("56px");  // 番号
     addCol("160px"); // 氏名
 
-    (criteriaItems || []).forEach(() => addCol("140px")); // 評価入力列
+    const spForCols = Number(subject?.specialType ?? 0);
+
+    // 評価入力列（通常: criteriaItems数 / 無し:"-" / 特別: 合否 or 認定）
+    if (spForCols === 1 || spForCols === 2) {
+      addCol("140px");
+    } else if (Array.isArray(criteriaItems) && criteriaItems.length > 0) {
+      criteriaItems.forEach(() => addCol("140px"));
+    } else {
+      addCol("140px");
+    }
 
     addCol("90px"); // 最終成績
 
@@ -503,7 +533,7 @@ export function renderStudentRows(
   if (!subject) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 6;
+    td.colSpan = getTotalColumnCount();
     td.className = "no-data";
     td.textContent = "科目が選択されていません。";
     tr.appendChild(td);
@@ -515,7 +545,7 @@ export function renderStudentRows(
   if (!students || students.length === 0) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 6;
+    td.colSpan = getTotalColumnCount();
     td.className = "no-data";
     td.textContent = "学生情報が登録されていません。";
     tr.appendChild(td);
@@ -524,6 +554,7 @@ export function renderStudentRows(
   }
 
   for (const stu of students) {
+     let specialSelect = null; // ★ ここで宣言（行単位で共有）
     const tr = document.createElement("tr");
     tr.dataset.studentId = stu.studentId;
 
@@ -579,45 +610,130 @@ export function renderStudentRows(
     const nameTd = addCell(stu.name ?? "");
     if (nameTd) nameTd.classList.add("student-name");
 
-    if (!criteriaItems || criteriaItems.length === 0) {
-      const td = document.createElement("td");
-      td.textContent = "-";
-      tr.appendChild(td);
-    } else {
-      criteriaItems.forEach((item, index) => {
-        const td = document.createElement("td");
-        const input = document.createElement("input");
-          // ▼ 評価項目の満点（percent）を data に保持（素点モードの最大値判定に必要）
-          input.dataset.weightPercent = String(item.percent ?? 0);
+    // ===== specialType=1：合／否（評価基準は使わない） =====
+const sp = Number(subject?.specialType ?? 0);
 
-        input.type = "number";
-        input.min = "0";
-        input.max = "100";
-        input.step = "0.1";
-        input.dataset.index = String(index);
-        input.dataset.criteriaName = item.name;
-        input.dataset.studentId = String(stu.studentId);
-        input.dataset.itemName = item.name || "";
-        input.addEventListener("paste", (ev) => ev.preventDefault());
-        td.appendChild(input);
-        // ▼ 内部換算点表示用の <span>
-          const span = document.createElement("span");
-          span.className = "converted-score";
-          span.style.marginLeft = "4px";
-          span.textContent = "";  // 初期は空
-          td.appendChild(span);
-          tr.appendChild(td);
-      });
-    }
+// ===== specialType=1：合／否 =====
+if (sp === 1) {
+  const td = document.createElement("td");
+
+
+specialSelect = document.createElement("select");
+specialSelect.className = "pass-fail-select";
+specialSelect.dataset.studentId = String(stu.studentId ?? "");
+specialSelect.dataset.specialField = "passFail";
+
+specialSelect.innerHTML = `
+  <option value="pass">合</option>
+  <option value="fail">否</option>
+`;
+specialSelect.value = "pass";
+
+specialSelect.addEventListener("change", () => {
+  specialSelect.dispatchEvent(new Event("input", { bubbles: true }));
+});
+
+td.appendChild(specialSelect);
+tr.appendChild(td);
+
+// ===== specialType=2：認定(1)/(2) =====
+} else if (sp === 2) {
+  const td = document.createElement("td");
+
+  specialSelect = document.createElement("select");
+specialSelect.className = "cert-select";
+specialSelect.dataset.studentId = String(stu.studentId ?? "");
+specialSelect.dataset.specialField = "cert";
+
+specialSelect.innerHTML = `
+  <option value="cert1">認定(1)</option>
+  <option value="cert2">認定(2)</option>
+`;
+specialSelect.value = "cert1";
+
+specialSelect.addEventListener("change", () => {
+  specialSelect.dispatchEvent(new Event("input", { bubbles: true }));
+});
+
+td.appendChild(specialSelect);
+tr.appendChild(td);
+
+
+// ===== 通常科目（評価基準なし） =====
+} else if (!criteriaItems || criteriaItems.length === 0) {
+  const td = document.createElement("td");
+  td.textContent = "-";
+  tr.appendChild(td);
+
+// ===== 通常科目（数値入力） =====
+} else {
+  criteriaItems.forEach((item, index) => {
+    const td = document.createElement("td");
+    const input = document.createElement("input");
+    input.dataset.weightPercent = String(item.percent ?? 0);
+
+    input.type = "number";
+    input.min = "0";
+    input.max = "100";
+    input.step = "0.1";
+    input.dataset.index = String(index);
+    input.dataset.criteriaName = item.name;
+    input.dataset.studentId = String(stu.studentId);
+    input.dataset.itemName = item.name || "";
+    input.addEventListener("paste", (ev) => ev.preventDefault());
+    td.appendChild(input);
+
+    const span = document.createElement("span");
+    span.className = "converted-score";
+    span.style.marginLeft = "4px";
+    span.textContent = "";
+    td.appendChild(span);
+
+    tr.appendChild(td);
+  });
+}
 
     const finalTd = document.createElement("td");
-    finalTd.className = "final-score";
-    finalTd.textContent = "";
-    tr.appendChild(finalTd);
+finalTd.className = "final-score";
 
+// ===== 特別科目：最終成績は成績入力(select)の値をそのまま表示 =====
+if (subject?.specialType === 1 || subject?.specialType === 2) {
+  finalTd.textContent = toSpecialDisplay(
+    subject.specialType,
+    specialSelect?.value || ""
+  );
+
+  specialSelect?.addEventListener("input", () => {
+    finalTd.textContent = toSpecialDisplay(
+      subject.specialType,
+      specialSelect?.value || ""
+    );
+  });
+}
+
+tr.appendChild(finalTd);
     tbody.appendChild(tr);
   }
 }
+// ===== 特別科目用：表示文字変換 =====
+function toSpecialDisplay(specialType, value) {
+  if (specialType === 1) {
+    // 合否
+    if (value === "fail") return "否";
+    if (value === "pass") return "合";
+    return "";
+  }
+
+  if (specialType === 2) {
+    // 認定
+    if (value === "cert2") return "認定(2)";
+    if (value === "cert1") return "認定(1)";
+    return "";
+  }
+
+  return "";
+}
+
 // =============================================
 // STEP C：組/コースフィルタ関数
 // =============================================
