@@ -442,12 +442,13 @@
         const opt = document.createElement("option");
         opt.value = s.subjectId || "";
         const baseLabel = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
-        if (s.specialType === true) {
+        const sp = Number(s.specialType ?? 0);           // 0/1/2 に正規化
+         opt.dataset.specialType = String(sp);            // 後で change ハンドラで参照する
+        if (sp !== 0) {
           opt.textContent = `${baseLabel}（評価基準入力不要）`;
-          opt.disabled = true;
-        } else {
-          opt.textContent = baseLabel;
-          hasNormal = true;
+          } else {
+             opt.textContent = baseLabel;
+            hasNormal = true;
         }
         subjectSelect.appendChild(opt);
       });
@@ -460,7 +461,7 @@
       // URL の subjectId が有効なら自動選択
       if (initialSubjectId) {
         const opt = Array.from(subjectSelect.options).find(
-          (o) => o.value === initialSubjectId && !o.disabled
+           (o) => o.value === initialSubjectId
         );
         if (opt) {
           subjectSelect.value = initialSubjectId;
@@ -885,10 +886,10 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
     }
 
       if (!subjectId) return;
-      const lockRef = doc(db, "evaluationLocks_2025", subjectId);
+      const lockRef = doc(db, lockColName, subjectId);
       const lockSnap = await getDoc(lockRef);
       // ★ 評価基準が存在しないロックは自動削除（安全版）
-      const criteriaRef = doc(db, "evaluationCriteria_2025", subjectId);
+      const criteriaRef = doc(db, evalColName, subjectId);
       const criteriaSnap = await getDoc(criteriaRef);
       const criteriaExists = criteriaSnap.exists();
 
@@ -1082,7 +1083,12 @@ subjectSelect.addEventListener("change", async () => {
   currentSubjectId = subjectId;
 
   if (!subjectId) return;
-
+  // ===== specialType=1/2 は評価基準画面を使わない → 成績入力へ自動遷移 =====
+  const sp = Number(opt?.dataset?.specialType ?? 0);
+  if (sp !== 0) {
+    window.location.href = `score_input.html?subjectId=${encodeURIComponent(subjectId)}`;
+    return;
+  }
   // ★① 評価基準の存在チェック（最優先）
   const criteriaRef = doc(db, evalColName, subjectId);
   const criteriaSnap = await getDoc(criteriaRef);

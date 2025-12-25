@@ -724,8 +724,8 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
             course: data.course ?? "",
             semester: data.semester ?? "",
             required: data.required === true,
-            // ★ 特別科目フラグ（未設定は false）
-            specialType: data.specialType === true,
+          // ★ 特別科目: 0/1/2 を数値で保持（未設定は 0）
+            specialType: Number(data.specialType ?? 0),
             // ★ 習熟度科目フラグ（未設定は false）
             isSkillLevel: data.isSkillLevel === true
           });
@@ -735,7 +735,7 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
         for (const s of rows) {
           const tr = document.createElement("tr");
           tr.dataset.id = s.id;
-          tr.dataset.specialType = s.specialType ? "1" : "0";
+          tr.dataset.specialType = String(Number(s.specialType ?? 0));  // "0" | "1" | "2"
           tr.dataset.isSkillLevel = s.isSkillLevel === true ? "1" : "0";
 
           const tdCheck = document.createElement("td");
@@ -796,8 +796,8 @@ function getSelectedSubjects() {
         // ★ 必修/選択 のバッジ表示から required を判定
         // tds[5] には「必修」「選択」の文字が入っています
         required: tds[5].textContent.includes("必修"),
-        // ★ data-special-type を boolean に変換
-        specialType: tr.dataset.specialType === "1",
+       // ★ data-special-type を 0/1/2 の数値に変換
+        specialType: Number(tr.dataset.specialType ?? "0"),
         // ★ 追加：習熟度フラグを保持
         isSkillLevel: tr.dataset.isSkillLevel === "1"
       });
@@ -1009,6 +1009,12 @@ if (cnt <= 0) {
         oldSubjects = existingSnap.data().subjects || [];
       }
 
+      // ★ 過去データ互換：boolean / undefined を 0/1/2 数値へ正規化
+      oldSubjects = oldSubjects.map(s => ({
+      ...s,
+       specialType: Number(s?.specialType ?? 0),
+       isSkillLevel: s?.isSkillLevel === true
+      }));
 
   const newSubjects = selected.map((s) => ({
     subjectId: s.id,
@@ -1018,8 +1024,8 @@ if (cnt <= 0) {
     semester: s.semester,
     // ★ 必修/選択フラグ（なければ必修 true 扱い）
     required: s.required === false ? false : true,
-    // ★ 追加：特別科目フラグ
-    specialType: s.specialType === true,
+    // ★ 追加：特別科目（0/1/2）
+    specialType: Number(s.specialType ?? 0),
     // ★ 追加：習熟度科目フラグ（未定義は false）
     isSkillLevel: s.isSkillLevel === true
   }));
@@ -1071,19 +1077,32 @@ for (const s of addedSubjects) {
 } catch (err) {
   console.error(err);
 
-  // 画面下部の赤文字（任意で残す）
-  saveError.textContent =
-    "一時的に登録処理が完了しませんでした。案内をご確認ください。";
+    const code = err?.code || "";
+  // 画面下部の赤文字（任意）
+  saveError.textContent = "登録に失敗しました。案内をご確認ください。";
 
-  // ★ モーダルで案内を表示（alert廃止）
+  // permission 系は「権限/ルール」の案内にする
+  if (code.includes("permission-denied") || code.includes("insufficient")) {
+    openSubjectRegisterInfoDialog({
+      title: "登録できませんでした",
+      message:
+         "この科目を登録する権限がないため、処理を完了できませんでした。\n\n" +
+         "システム設定の問題の可能性がありますので、\n" +
+         "お手数ですが教務または管理者に連絡してください。",
+      showRetry: true,
+      showGoScore: false
+    });
+    return;
+  }
+
+  // それ以外は汎用エラー
   openSubjectRegisterInfoDialog({
-    title: "この科目はすでに評価基準が登録されています",
+    title: "登録に失敗しました",
     message:
-      "この科目は、すでに他の教員によって評価基準が登録されています。\n" +
-      "変更がなければ、そのまま成績入力に進んでください。\n\n" +
-      "登録を続行する場合は「もう一度登録する」を押してください。",
+      "一時的な通信エラーにより、科目の登録が完了しませんでした。\n\n" +
+       "時間をおいてから、もう一度登録してください。",
     showRetry: true,
-    showGoScore: true
+    showGoScore: false
   });
 
 } finally {

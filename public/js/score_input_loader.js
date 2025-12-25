@@ -1239,7 +1239,19 @@ async function handleSubjectChange(subjectId) {
 
   infoMessageEl?.classList.remove("warning-message");
   setInfoMessage("評価基準と名簿を読み込んでいます…");
+    // ===== specialType 分岐：特別科目は評価基準フローをスキップ =====
+  if (currentSubjectMeta.specialType === 1 || currentSubjectMeta.specialType === 2) {
+    console.log(
+      "[INFO] specialType subject -> skip criteria flow:",
+      currentSubjectMeta.specialType
+    );
 
+    // 評価基準は使わないので空にする（後続UIを壊さないため）
+    criteriaState.items = [];
+
+    // ヘッダ・テーブルは通常どおり描画させるため、
+    // ここでは return せず「評価基準ロード部分だけ」を飛ばす
+  } else {
   // 評価基準読み込み → ヘッダ生成（キャッシュ利用）
   if (criteriaCache.has(subjectId)) {
     Object.assign(criteriaState, structuredClone(criteriaCache.get(subjectId)));
@@ -1256,7 +1268,9 @@ async function handleSubjectChange(subjectId) {
     th.textContent = "習熟度";
     headerRow.insertBefore(th, headerRow.firstChild);
   }
+  }
 
+ 
   // 学生全件ロード（subjectRoster優先 → 学年キャッシュ）
   const targetGrade = String(subject?.grade ?? "");
   const currentAllGrade = studentState.allStudentsGrade ? String(studentState.allStudentsGrade) : null;

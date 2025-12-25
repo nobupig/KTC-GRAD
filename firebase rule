@@ -1,6 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+        // -----------------------------------------
+    // subjectStats（科目ごとの担当教員数など）
+    // -----------------------------------------
+    match /subjectStats/{subjectId} {
+      allow read, write: if isTeacher();
+    }
 
     // -----------------------------------------
     // 共通：教員判定
@@ -30,17 +36,11 @@ service cloud.firestore {
     }
 
     // -----------------------------------------
-    // teacherSubjects_YYYY（教員担当科目）
+    // students（学生マスタ）
     // -----------------------------------------
-    match /{col}/{email} {
-      allow read: if
-        isTeacher() &&
-        col.matches('teacherSubjects_\\d{4}');
-
-      allow write: if
-        isTeacher() &&
-        col.matches('teacherSubjects_\\d{4}') &&
-        request.auth.token.email == email;
+    match /students/{id} {
+      allow read: if isTeacher();
+      allow write: if false;
     }
 
     // -----------------------------------------
@@ -60,7 +60,50 @@ service cloud.firestore {
     }
 
     // -----------------------------------------
-    // 年度別 成績・評価・習熟度 系
+    // teacherSubjects_YYYY（教員担当科目）
+    // -----------------------------------------
+    match /{col}/{email} {
+      allow read: if
+        isTeacher() &&
+        col.matches('teacherSubjects_\\d{4}');
+
+      allow write: if
+        isTeacher() &&
+        col.matches('teacherSubjects_\\d{4}') &&
+        request.auth.token.email == email;
+    }
+
+  // -----------------------------------------
+// subjectRoster_YYYY（科目別受講者リスト）
+// -----------------------------------------
+match /{col}/{subjectId} {
+  allow read: if
+    isTeacher() &&
+    col.matches('subjectRoster_\\d{4}');
+
+  allow create, update, delete: if
+    isTeacher() &&
+    col.matches('subjectRoster_\\d{4}');
+}
+
+    // -----------------------------------------
+    // ✅ electiveRegistrations_YYYY（選択科目登録）
+    // ここが今回の重要修正ポイント：update/arrayUnion/arrayRemove を許可
+    // -----------------------------------------
+    match /{col}/{subjectId} {
+      allow read: if
+        isTeacher() &&
+        col.matches('electiveRegistrations_\\d{4}');
+
+      // ※ arrayUnion/arrayRemove は update として判定されるので update を許可する必要あり
+      // ※ 初回にドキュメントが無い場合もあるので create も許可（必要に応じて）
+      allow create, update, delete: if
+        isTeacher() &&
+        col.matches('electiveRegistrations_\\d{4}');
+    }
+
+    // -----------------------------------------
+    // 年度別 成績・評価・習熟度 系（electiveRegistrations は上で個別許可）
     // -----------------------------------------
     match /{col}/{docId} {
       allow read, write: if
@@ -69,18 +112,9 @@ service cloud.firestore {
           col.matches('evaluationCriteria_\\d{4}') ||
           col.matches('evaluationLocks_\\d{4}') ||
           col.matches('evaluationHistory') ||
-          col.matches('electiveRegistrations_\\d{4}') ||
           col.matches('skillLevels_\\d{4}') ||
-          col.matches('scores_\\d{4}')   // ← ★追加（最重要）
+          col.matches('scores_\\d{4}')
         );
-    }
-
-    // -----------------------------------------
-    // students（学生マスタ）
-    // -----------------------------------------
-    match /students/{id} {
-      allow read: if isTeacher();
-      allow write: if false;
     }
   }
 }
