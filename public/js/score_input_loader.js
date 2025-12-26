@@ -310,6 +310,7 @@ import { fetchIsSkillLevelFromSubjects } from "./fetch_isSkillLevel.js";
 
 import { applyPastedScores } from "./score_input_paste.js";
 import { CURRENT_YEAR } from "./config.js";
+import { initExcelDownloadFeature } from "./score_input_excel.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import {
   getAuth,
@@ -1692,6 +1693,19 @@ console.log("FINAL META", currentSubjectMeta);
 
 console.log("TEST: handleSubjectChange called");
 // ヘッダ側の受講者登録ボタン表示制御（科目変更時の最後に1回だけ）
+  // ✅ Excelダウンロードボタン：科目が成立したら有効化（Firestore read はしない）
+ const excelBtn = document.getElementById("excelDownloadBtn");
+if (excelBtn) {
+  const isNormal = Number(subject?.specialType ?? currentSubjectMeta?.specialType ?? 0) === 0;
+
+  // 表示／非表示
+  excelBtn.style.display = isNormal ? "" : "none";
+
+  // 念のため disable も同期
+  excelBtn.disabled = !isNormal;
+}
+
+
 updateElectiveRegistrationButtons(subject);
 
 }
@@ -2193,6 +2207,14 @@ if (currentSubjectMeta.specialType === 2) {
       window.location.href = "start.html";
     });
   }
+    // ✅ Excelダウンロード（Firestore read は追加しない：既存state/DOMのみ使用）
+  initExcelDownloadFeature({
+    getCurrentSubject: () => window.currentSubject, // handleSubjectChange 内でセット済み
+    getCurrentSubjectMeta: () => currentSubjectMeta,
+    criteriaState,
+    studentState,
+    modeState,
+  });
 }
 
 function openElectiveModal() {

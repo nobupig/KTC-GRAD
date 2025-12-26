@@ -57,6 +57,11 @@
         <button id="saveBtn" class="btn-primary" type="button" disabled>
           保存する
         </button>
+<!-- ✅ 追加：Excelダウンロード（科目選択後にJSで有効化） -->
+        <button id="excelDownloadBtn" class="btn-secondary" type="button" disabled>
+          Excelダウンロード
+        </button>
+
         <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
           ホームへ戻る
         </button>
@@ -160,6 +165,8 @@
   <!-- ========================================= -->
   <!-- JS 読み込み（あなたの public/js 構造に合わせたもの） -->
   <!-- ========================================= -->
+    <!-- ✅ 追加：SheetJS（Excel生成） -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module">
     import { initScoreInput } from "./js/score_input_loader.js";
     initScoreInput();

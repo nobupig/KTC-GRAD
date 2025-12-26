@@ -69,6 +69,22 @@ export function applyPastedScores(pastedText, tbody, criteriaState, modeState) {
     return false;
   }
 
+    // ===== 事故防止：Excelは「素点(0〜100)」前提 =====
+  // 貼り付け対象列に raw モードが混ざっていたら貼付をブロックする
+  const items = criteriaState.items || [];
+  const targetItems = items.slice(startCol, startCol + pasteColCount);
+
+  const hasRaw = targetItems.some(it => (it?.mode || "scaled") === "raw");
+  if (hasRaw) {
+    alert(
+      "【貼り付けできません】\n\n" +
+        "Excelは「素点入力(0〜100)」専用です。\n" +
+        "いま選択している貼り付け先の列に「素点モード（raw）」の評価項目が含まれています。\n\n" +
+        "対策：Web側で該当項目のモードを『自動換算（0〜100入力）』に揃えてから貼り付けしてください。"
+    );
+    return false;
+  }
+
   // 貼り付け開始行：学生の最初の行 or 現在の学生行（Excel 行とずらす運用はしない設計）
   let webRowIndex = studentRows.findIndex(tr => tr.contains(active));
   if (webRowIndex === -1) webRowIndex = 0;
