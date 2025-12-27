@@ -111,7 +111,7 @@ match /{col}/{subjectId} {
         (
           col.matches('evaluationCriteria_\\d{4}') ||
           col.matches('evaluationLocks_\\d{4}') ||
-          col.matches('evaluationHistory') ||
+          col.matches('evaluationHistory_\\d{4}') ||
           col.matches('skillLevels_\\d{4}') ||
           col.matches('scores_\\d{4}')
         );

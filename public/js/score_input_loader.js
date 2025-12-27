@@ -527,7 +527,7 @@ const criteriaState = createCriteriaState();
 const studentState = createStudentState();
 studentState.lastElectiveGrade = null;
 const modeState = createModeState();
-const scoreUpdatedAtBaseMap = new Map(); // key: studentId, value: Firestore Timestamp|null
+const scoreVersionBaseMap = new Map(); 
 let pasteInitialized = false;
 
 const currentYear = CURRENT_YEAR;
@@ -1125,23 +1125,23 @@ function updateStudentCountDisplay(count) {
 // ================================
 // スコア更新時刻（表示時点）を保持
 // ================================
-async function loadScoreUpdatedAtBase(subjectId, studentsList) {
-  scoreUpdatedAtBaseMap.clear();
+async function loadScoreVersionBase(subjectId, studentsList) {
+  scoreVersionBaseMap.clear();
   if (!subjectId) return;
 
   const list = Array.isArray(studentsList) ? studentsList : [];
   const ref = doc(db, `scores_${currentYear}`, subjectId);
+
   let snap;
   try {
     snap = await getDoc(ref);
   } catch (err) {
     if (err.code === "resource-exhausted" || String(err.message).includes("Quota exceeded")) {
       activateQuotaErrorState();
-      throw err;
-    } else {
-      throw err;
     }
+    throw err;
   }
+
   const data = snap.exists() ? snap.data() || {} : {};
   const studentsMap = data.students || {};
 
@@ -1149,9 +1149,11 @@ async function loadScoreUpdatedAtBase(subjectId, studentsList) {
     const sid = String(stu.studentId ?? "");
     if (!sid) return;
     const row = studentsMap[sid] || {};
-    scoreUpdatedAtBaseMap.set(sid, row.updatedAt ?? null);
+    // version が無い既存データは 0 扱い
+    scoreVersionBaseMap.set(sid, Number.isFinite(row.version) ? row.version : 0);
   });
 }
+
 
 function cleanupScoresSnapshotListener() {
   if (scoresSnapshotUnsubscribe) {
@@ -1166,7 +1168,7 @@ function setupScoresSnapshotListener(subjectId) {
   const ref = doc(db, `scores_${currentYear}`, subjectId);
   let initialized = false;
   scoresSnapshotUnsubscribe = onSnapshot(ref, (snapshot) => {
-    if (!snapshot || !snapshot.exists()) return;
+        if (!snapshot || !snapshot.exists()) return;
     if (!initialized) {
       initialized = true;
       return;
@@ -1177,13 +1179,30 @@ function setupScoresSnapshotListener(subjectId) {
     }
     const data = snapshot.data?.() || {};
     const currentUserEmail = currentUser?.email || "";
-    if (data.updatedBy && data.updatedBy === currentUserEmail) {
-      return;
-    }
+  const updatedBy =
+  data.updatedBy ||
+  Object.values(data.students || {})
+    .map(s => s?.updatedBy)
+    .find(Boolean);
+
+if (updatedBy === currentUserEmail) return;
     if (Date.now() - lastSavedByMeAt < 3000) {
       return;
     }
-    alert("他の教員がこのクラスの成績を更新しました。再読み込みしてください。");
+    const ok = !hasUnsavedChanges
+  ? true
+  : confirm("他の教員がこのクラスの成績を更新しました。\n未保存の入力がありますが、最新を再読み込みしますか？");
+
+if (ok) {
+  // 同一科目スキップを確実に避ける
+  currentSubjectId = null;
+  handleSubjectChange(subjectId);
+} else {
+  // 保存しない場合でも、誤保存防止のため警告は残す
+  setInfoMessage("他の教員が更新しました。保存前に再読み込みしてください。");
+  infoMessageEl?.classList.add("warning-message");
+}
+
   });
 }
 
@@ -1199,7 +1218,7 @@ async function handleSubjectChange(subjectId) {
   if (!subjectId) {
     cleanupScoresSnapshotListener();
     infoMessageEl?.classList.remove("warning-message");
-    scoreUpdatedAtBaseMap.clear();
+    scoreVersionBaseMap.clear();
     setInfoMessage("科目が選択されていません。");
     headerRow.innerHTML = "";
     tbody.innerHTML = `
@@ -1289,7 +1308,7 @@ async function handleSubjectChange(subjectId) {
   // NOTE: call moved below to ensure students (sourceStudents) are determined first
   if (!subject) {
     infoMessageEl?.classList.remove("warning-message");
-    scoreUpdatedAtBaseMap.clear();
+    scoreVersionBaseMap.clear();
     setInfoMessage("選択された科目情報が見つかりません。");
     headerRow.innerHTML = "";
     tbody.innerHTML = `
@@ -1463,7 +1482,7 @@ studentState.currentStudents = displayStudents.slice();
     displayStudents = sortStudentsBySkillLevel(displayStudents, studentState.skillLevelsMap);
     if (DEBUG) console.log('[DEBUG] displayStudents(after skill sort):', displayStudents);
   }
-  await loadScoreUpdatedAtBase(subjectId, displayStudents);
+  await loadScoreVersionBase(subjectId, displayStudents);
   if (DEBUG) console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
   // 学生行描画（入力時にその行の最終成績を計算）
   isRenderingTable = true;
@@ -1718,48 +1737,47 @@ export async function saveStudentScores(subjectId, studentId, scoresObj, teacher
   if (!subjectId || !studentId) {
     throw new Error("subjectId と studentId は必須です");
   }
-
+ const email = currentUser?.email || teacherEmail || ""; // ★追加（安全フォールバック）
   const sid = String(studentId);
   const ref = doc(db, `scores_${currentYear}`, subjectId);
-  const baseUpdatedAt = scoreUpdatedAtBaseMap.get(sid) ?? null;
-  const email = teacherEmail || currentUser?.email || "";
+ const baseVersion = scoreVersionBaseMap.get(sid) ?? 0;
 
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    const latestData = snap.exists() ? snap.data() || {} : {};
-    const latestUpdatedAt = latestData.students?.[sid]?.updatedAt ?? null;
+await runTransaction(db, async (tx) => {
+  const snap = await tx.get(ref);
+  const latestData = snap.exists() ? snap.data() || {} : {};
+  const latestRow = latestData.students?.[sid] || {};
+  const latestVersion = Number.isFinite(latestRow.version) ? latestRow.version : 0;
 
-    const baseMillis = typeof baseUpdatedAt?.toMillis === "function" ? baseUpdatedAt.toMillis() : null;
-    const latestMillis = typeof latestUpdatedAt?.toMillis === "function" ? latestUpdatedAt.toMillis() : null;
+  // 競合判定：version がズレたら即アウト
+  if (latestVersion !== baseVersion) {
+    throw new Error("SCORE_CONFLICT");
+  }
 
-    const conflict =
-      (baseMillis === null && latestMillis !== null) ||
-      (baseMillis !== null && latestMillis === null) ||
-      (baseMillis !== null && latestMillis !== null && baseMillis !== latestMillis);
+  const nextVersion = baseVersion + 1;
 
-    if (conflict) {
-      throw new Error("SCORE_CONFLICT");
-    }
-
-    tx.set(
-      ref,
-      {
-        students: {
-          [sid]: {
-            scores: scoresObj || {},
-            updatedAt: serverTimestamp(),
-            updatedBy: email,
-          },
+  tx.set(
+    ref,
+    {
+      students: {
+        [sid]: {
+          scores: scoresObj || {},
+          version: nextVersion,
+          updatedAt: serverTimestamp(), // ログ用途
+          updatedBy: email,
         },
-        // 保存時に超過学生情報を同時に書き込む
-        excessStudents: excessStudentsState,
       },
-      { merge: true }
-    );
-  });
-  ignoreNextSnapshot = true;
-  lastSavedByMeAt = Date.now();
-  scoreUpdatedAtBaseMap.set(sid, "SAVED");
+      // 単体保存時に超過情報もまとめて保存する設計は維持
+      excessStudents: excessStudentsState,
+    },
+    { merge: true }
+  );
+});
+
+// 保存成功後：base を更新（"SAVED"は禁止）
+ignoreNextSnapshot = true;
+lastSavedByMeAt = Date.now();
+scoreVersionBaseMap.set(sid, baseVersion + 1);
+
 }
 
 export async function saveBulkStudentScores(bulkScores) {
@@ -1785,25 +1803,23 @@ export async function saveBulkStudentScores(bulkScores) {
     const payload = {};
 
     for (const studentId of studentIds) {
-      const baseUpdatedAt = scoreUpdatedAtBaseMap.get(studentId) ?? null;
-      const latestUpdatedAt = latestStudents[studentId]?.updatedAt ?? null;
-      const baseMillis = typeof baseUpdatedAt?.toMillis === "function" ? baseUpdatedAt.toMillis() : null;
-      const latestMillis = typeof latestUpdatedAt?.toMillis === "function" ? latestUpdatedAt.toMillis() : null;
+const baseVersion = scoreVersionBaseMap.get(studentId) ?? 0;
+const latestRow = latestStudents[studentId] || {};
+const latestVersion = Number.isFinite(latestRow.version) ? latestRow.version : 0;
 
-      const conflict =
-        (baseMillis === null && latestMillis !== null) ||
-        (baseMillis !== null && latestMillis === null) ||
-        (baseMillis !== null && latestMillis !== null && baseMillis !== latestMillis);
+if (latestVersion !== baseVersion) {
+  throw new Error("SCORE_CONFLICT");
+}
 
-      if (conflict) {
-        throw new Error("SCORE_CONFLICT");
-      }
+const nextVersion = baseVersion + 1;
 
-      payload[studentId] = {
-        ...bulkScores[studentId],
-        updatedAt: serverTimestamp(),
-        updatedBy: email,
-      };
+payload[studentId] = {
+  ...bulkScores[studentId],
+  version: nextVersion,
+  updatedAt: serverTimestamp(),
+  updatedBy: email,
+};
+
     }
 
     const writeData = {
@@ -1823,7 +1839,10 @@ export async function saveBulkStudentScores(bulkScores) {
   ignoreNextSnapshot = true;
   lastSavedByMeAt = Date.now();
 
-  studentIds.forEach((sid) => scoreUpdatedAtBaseMap.set(sid, "SAVED"));
+ studentIds.forEach((sid) => {
+  const baseV = scoreVersionBaseMap.get(sid) ?? 0;
+  scoreVersionBaseMap.set(sid, baseV + 1);
+});
   if (excessDirty) {
     excessDirty = false;
   }

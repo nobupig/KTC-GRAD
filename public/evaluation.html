@@ -821,9 +821,14 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
           alert("科目が選択されていません。");
           return;
         }
+
+          // ★ 修正前スナップショットは「修正開始時」に1回だけ取る
+  historyBeforeCriteriaSnapshot =
+    captureCurrentCriteriaSnapshot(currentSubjectId);
+
         isEditingExistingCriteria = true;
         currentEditReason = null;
-        historyBeforeCriteriaSnapshot = null;
+        
         if (editReasonInput) editReasonInput.value = "";
         if (editReasonModal) editReasonModal.style.display = "flex";
       };
@@ -1057,10 +1062,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         }
 
         currentEditReason = reason;
-        historyBeforeCriteriaSnapshot =
-          captureCurrentCriteriaSnapshot(currentSubjectId);
-
-        if (editReasonModal) editReasonModal.style.display = "none";
+               if (editReasonModal) editReasonModal.style.display = "none";
 
         // ここで初めて編集可能にする
         unlockUIForEdit();
@@ -1158,7 +1160,7 @@ subjectSelect.addEventListener("change", async () => {
         alert("科目が選択されていません。");
         return;
       }
-
+ 
       const rows = criteriaTbody.querySelectorAll("tr");
       const items = [];
 
@@ -1198,6 +1200,13 @@ subjectSelect.addEventListener("change", async () => {
       const scheme = r ? r.value : currentScheme;
 
       try {
+        console.log("EVAL HISTORY TRY", {
+  isEditingExistingCriteria,
+  hasBefore: !!historyBeforeCriteriaSnapshot,
+  reason: currentEditReason,
+  year: currentYear,
+});
+
         const payload = {
           subjectId: currentSubjectId,
           method: scheme,
@@ -1208,37 +1217,38 @@ subjectSelect.addEventListener("change", async () => {
           savedBy: currentUser.email,
         };
 
-        // ★ docId は subjectId で統一（教員によらず1つだけ）
-        await setDoc(doc(db, evalColName, currentSubjectId), payload, { merge: true });
+await setDoc(doc(db, evalColName, currentSubjectId), payload, { merge: true });
 
-  // ★ 保存完了後に最新の評価基準を再読み込みしてボタン表示を反映
-  await loadCriteria(currentSubjectId, { editable: false });
+// 修正モードなら履歴を記録（UIをリセットする前に必ず実行）
+if (
+  isEditingExistingCriteria &&
+  currentEditReason &&
+  historyBeforeCriteriaSnapshot
+) {
+  try {
+    const histCol = collection(db, `evaluationHistory_${currentYear}`);
+    const histRef = doc(histCol);
+    const afterSnapshot =
+      captureCurrentCriteriaSnapshot(currentSubjectId);
 
-        // 修正モードなら履歴を記録
-        if (
-          isEditingExistingCriteria &&
-          currentEditReason &&
-          historyBeforeCriteriaSnapshot
-        ) {
-          try {
-            const histCol = collection(db, "evaluationHistory");
-            const histRef = doc(histCol);
-            const afterSnapshot =
-              captureCurrentCriteriaSnapshot(currentSubjectId);
+    await setDoc(histRef, {
+      subjectId: currentSubjectId,
+      teacherEmail: currentUser.email,
+      teacherName: currentTeacherName || null,
+      reason: currentEditReason,
+      before: historyBeforeCriteriaSnapshot,
+      after: afterSnapshot,
+      editedAt: serverTimestamp(),
+    });
+  } catch (e) {
+    alert("評価基準の履歴保存に失敗しました。\n" + e.message);
+    console.error("履歴保存エラー:", e);
+  }
+}
 
-            await setDoc(histRef, {
-              subjectId: currentSubjectId,
-              teacherEmail: currentUser.email,
-              teacherName: currentTeacherName || null,
-              reason: currentEditReason,
-              before: historyBeforeCriteriaSnapshot,
-              after: afterSnapshot,
-              editedAt: serverTimestamp(),
-            });
-          } catch (e) {
-            console.error("履歴保存エラー:", e);
-          }
-        }
+// ★ 最後にUIを再構築
+await loadCriteria(currentSubjectId, { editable: false });
+
 
         isEditingExistingCriteria = false;
         currentEditReason = null;
@@ -1247,6 +1257,7 @@ subjectSelect.addEventListener("change", async () => {
         showToast("評価基準を保存しました。", "success");
         setSavedUI(true);
       } catch (e) {
+        alert("評価基準ログ保存に失敗しました:\n" + e.message);
         console.error(e);
         showToast("保存に失敗しました。時間をおいて再度お試しください。", "error");
       }

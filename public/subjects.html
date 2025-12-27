@@ -398,6 +398,21 @@
   </div>
 </dialog>
 
+  <!-- 教務連絡：注意喚起モーダル（alert置換） -->
+  <dialog id="officeContactNoticeDialog">
+    <h3 style="color:#b91c1c;">⚠ 重要：教務への連絡について</h3>
+
+    <p style="font-size:13px; line-height:1.7; white-space:pre-wrap;">
+科目一覧に担当科目が見つからない場合は、教務へ連絡してください。
+登録は可能ですが、未連絡のままだと運用上の漏れが発生します。
+
+Slackで担当者までDM連絡をしてください。
+
+    <div class="modal-actions">
+      <button id="officeContactNoticeClose" class="btn btn-secondary">閉じる</button>
+      <button id="officeContactNoticeGo" class="btn btn-primary">教務連絡フォームへ進む</button>
+    </div>
+  </dialog>
 
   <!-- 教務連絡モーダル（新仕様） -->
   <dialog id="officeContactDialog">
@@ -1125,7 +1140,27 @@ for (const s of addedSubjects) {
       }
     });
 
-    // 「教務へ連絡」ボタン → モーダル表示
+    // 「教務へ連絡」ボタン → 注意喚起 → 教務連絡フォーム
+    const officeContactNoticeDialog = document.getElementById("officeContactNoticeDialog");
+    const officeContactNoticeClose = document.getElementById("officeContactNoticeClose");
+    const officeContactNoticeGo = document.getElementById("officeContactNoticeGo");
+
+    function prepareOfficeContactFormDefaults() {
+      // 初期値をフォームに反映（あれば）
+      contactGradeSelect.value = gradeSelect.value || "";
+      contactCourseSelect.value = courseSelect.value || "";
+      if (contactGradeSelect.value === "1" || contactGradeSelect.value === "2") {
+        contactCourseSelect.value = "G";
+        contactCourseSelect.disabled = true;
+      } else {
+        contactCourseSelect.disabled = false;
+      }
+
+      contactSubjectName.value = "";
+      contactTeacherName.value = currentTeacherName || "";
+      contactMessage.value = "";
+    }
+
     if (contactOfficeAnytimeBtn) {
       contactOfficeAnytimeBtn.addEventListener("click", () => {
         if (!currentUser) {
@@ -1133,23 +1168,29 @@ for (const s of addedSubjects) {
           return;
         }
 
-        // 初期値をフォームに反映（あれば）
-        contactGradeSelect.value = gradeSelect.value || "";
-        contactCourseSelect.value = courseSelect.value || "";
-        if (contactGradeSelect.value === "1" || contactGradeSelect.value === "2") {
-          contactCourseSelect.value = "G";
-          contactCourseSelect.disabled = true;
+        // まず注意喚起を出す（登録強制ではない）
+        if (officeContactNoticeDialog) {
+          officeContactNoticeDialog.showModal();
         } else {
-          contactCourseSelect.disabled = false;
+          // 万一dialogが無い場合でも既存動線は維持（保険）
+          prepareOfficeContactFormDefaults();
+          officeContactDialog.showModal();
         }
-
-        contactSubjectName.value = "";
-        contactTeacherName.value = currentTeacherName || "";
-        contactMessage.value = "";
-
-        officeContactDialog.showModal();
       });
     }
+
+    // 注意喚起：閉じる（何もしない）
+    officeContactNoticeClose?.addEventListener("click", () => {
+      officeContactNoticeDialog?.close();
+    });
+
+    // 注意喚起：フォームへ進む
+    officeContactNoticeGo?.addEventListener("click", () => {
+      officeContactNoticeDialog?.close();
+      prepareOfficeContactFormDefaults();
+      officeContactDialog.showModal();
+    });
+
 
     officeContactCancel.addEventListener("click", () => {
       officeContactDialog.close();
