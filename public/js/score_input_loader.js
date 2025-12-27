@@ -296,7 +296,8 @@ import {
   sortStudents,
   sortStudentsBySkillLevel,
   sortStudentsSameAsExcess,
-  updateElectiveRegistrationButtons
+  updateElectiveRegistrationButtons,
+  canSubmitScoresByVisibleRows
 } from "./score_input_students.js";
 
 import {
@@ -1162,14 +1163,122 @@ function cleanupScoresSnapshotListener() {
   }
 }
 
+// ============================================
+// 提出UI更新（提出済み表示 / 再提出表示 / 期間外ロック）
+// ============================================
+window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
+  try {
+    const btn = document.getElementById("submitScoresBtn");
+    if (!btn) return;
+
+    const data = subjectDocData || {};
+    const submitted = data.submittedSnapshot || null;
+
+    // ---- 期間チェック（settings/period の持ち方が揺れても落ちないようにする）
+    const now = Date.now();
+    const toMillis = (v) => {
+      if (!v) return null;
+      // Firestore Timestamp 対応
+      if (typeof v.toMillis === "function") return v.toMillis();
+      // 文字列/数値も一応
+      const n = (typeof v === "number") ? v : Date.parse(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const p = periodData || {};
+    const submitStart =
+      toMillis(p.submitStart) ?? toMillis(p.submitStartAt) ?? toMillis(p.submit_from) ?? null;
+    const submitEnd =
+      toMillis(p.submitEnd) ?? toMillis(p.submitEndAt) ?? toMillis(p.submit_to) ?? null;
+
+    const inSubmitPeriod =
+      (submitStart == null || now >= submitStart) &&
+      (submitEnd == null || now <= submitEnd);
+
+    // ---- ステータス表示用の小さなラベル（無ければ作る）
+    let badge = document.getElementById("submitStatusBadge");
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.id = "submitStatusBadge";
+      badge.style.marginLeft = "10px";
+      badge.style.fontSize = "12px";
+      badge.style.opacity = "0.9";
+      btn.insertAdjacentElement("afterend", badge);
+    }
+
+    // ---- 提出済み判定（submittedSnapshot が存在すれば提出済み扱い）
+    const isSubmitted = !!submitted;
+
+    // ---- UI反映
+    if (!inSubmitPeriod) {
+      // 期間外：完全ロック
+      btn.disabled = true;
+      btn.textContent = isSubmitted ? "提出済み（期間外）" : "提出（期間外）";
+      badge.textContent = "提出期間外です";
+      badge.style.color = "#666";
+      return;
+    }
+
+    // 期間内：提出済みなら「再提出する」へ
+    btn.disabled = !canSubmitScoresByVisibleRows().ok; // 既存ロジックに寄せる
+    if (isSubmitted) {
+      btn.textContent = "再提出する";
+      badge.textContent = "提出済み";
+      badge.style.color = "#0b6"; // 緑系（CSSで調整してOK）
+    } else {
+      btn.textContent = "教務へ送信";
+      badge.textContent = "";
+    }
+  } catch (e) {
+    console.warn("[updateSubmitUI]", e);
+  }
+};
+
+
+
 function setupScoresSnapshotListener(subjectId) {
   cleanupScoresSnapshotListener();
   if (!subjectId) return;
   const ref = doc(db, `scores_${currentYear}`, subjectId);
   let initialized = false;
   scoresSnapshotUnsubscribe = onSnapshot(ref, (snapshot) => {
+    console.log("[scores snapshot fired]", subjectId);
+
+  // ★★★ ここ（最重要）★★★
+  console.log(
+    "[SNAPSHOT FIRED]",
+    "exists=", snapshot?.exists?.(),
+    "hasPendingWrites=", snapshot?.metadata?.hasPendingWrites
+  );
+
         if (!snapshot || !snapshot.exists()) return;
-    if (!initialized) {
+        const data = snapshot.data?.() || {};
+   // ★ 送信用に students.js に渡す（グローバル登録）
+window.__latestScoresDocData = data;
+
+// ===== 送信後UIロック／再提出判定 =====
+(async () => {
+  try {
+    const periodRef = doc(db, "settings", "period");
+    const periodSnap = await getDoc(periodRef);
+    if (!periodSnap.exists()) return;
+
+    const periodData = periodSnap.data();
+
+  if (typeof window.updateSubmitUI === "function") {
+  window.updateSubmitUI({
+    subjectDocData: data,
+    periodData
+  });
+} else {
+  console.warn("[updateSubmitUI missing] window.updateSubmitUI is not a function");
+}
+  } catch (e) {
+    console.warn("[updateSubmitUI skipped]", e);
+  }
+})();
+
+if (!initialized) {
       initialized = true;
       return;
     }
@@ -1177,7 +1286,7 @@ function setupScoresSnapshotListener(subjectId) {
       ignoreNextSnapshot = false;
       return;
     }
-    const data = snapshot.data?.() || {};
+    
     const currentUserEmail = currentUser?.email || "";
   const updatedBy =
   data.updatedBy ||

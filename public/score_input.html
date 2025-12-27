@@ -55,13 +55,20 @@
       </div>
       <div class="top-btn-area" style="display: flex; align-items: center; gap: 8px;">
         <button id="saveBtn" class="btn-primary" type="button" disabled>
-          保存する
+          一時保存
         </button>
 <!-- ✅ 追加：Excelダウンロード（科目選択後にJSで有効化） -->
         <button id="excelDownloadBtn" class="btn-secondary" type="button" disabled>
           Excelダウンロード
         </button>
-
+        <button
+  id="submitScoresBtn"
+  class="btn-danger"
+  type="button"
+  disabled
+>
+  教務へ提出
+</button>
         <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
           ホームへ戻る
         </button>
@@ -69,11 +76,25 @@
       </div>
     </div>
 
-    <!-- 関連ページへのリンク -->
-    <div class="link-row">
-      <a id="toEvaluationLink" href="#">評価基準へ</a>
-      <a id="toSubjectsLink" href="subjects.html">科目登録へ</a>
-    </div>
+<!-- 設定ナビゲーション（ボタン化） -->
+<div class="settings-panel">
+  <div class="settings-title">⚙ 設定</div>
+
+  <div class="settings-actions">
+    <a id="toEvaluationLink" href="#" class="btn-setting" role="button">
+      評価基準を編集
+    </a>
+
+    <a id="toSubjectsLink" href="subjects.html" class="btn-setting" role="button">
+      科目情報を確認・登録
+    </a>
+  </div>
+
+  <div class="settings-note">
+    ※ 成績入力の前に、評価基準と科目情報を必ず確認してください
+  </div>
+</div>
+
 
     <div class="grade-header-row" style="
   display: flex;
@@ -152,13 +173,7 @@
       </table>
     </div>
 
-    <!-- 保存ボタンは上に移動。注意書きは残す -->
-    <div class="footer-actions">
-      <div class="note">
-        ※ 現時点では「名簿表示」と「最終成績の自動計算」のみ実装済みです。<br>
-        &nbsp;&nbsp;Firestore への本保存はこのあと段階的に実装していきます。
-      </div>
-    </div>
+
     <button id="skillSaveBtn" style="display:none;">習熟度を保存</button>
   </main>
 

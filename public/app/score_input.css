@@ -1684,3 +1684,98 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
     justify-content: flex-end;
   }
 }
+
+/* ============================
+   設定ナビゲーション（成績入力画面）
+   ============================ */
+.settings-panel {
+  margin-top: 12px;
+  padding: 12px 12px 10px;
+  border: 1px solid #d7dde6;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.settings-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #223;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-setting {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #cdd6e0;
+  background: #ffffff;
+  color: #004a99;
+  text-decoration: none;   /* aタグの下線を消す */
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-setting:hover {
+  background: #eef4ff;
+}
+
+.btn-setting:active {
+  transform: translateY(1px);
+}
+
+.settings-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #556;
+}
+/* ============================
+   送信（教務提出）：btn-setting 系＋注意色
+   ============================ */
+#submitScoresBtn {
+  /* 形は btn-setting に揃える */
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+
+  /* 送信専用の色 */
+  background: #fff7e6;
+  color: #8a5a00;
+  border: 2px solid #f4b400;
+}
+
+#submitScoresBtn:hover:enabled {
+  background: #fff1cc;
+}
+
+#submitScoresBtn:disabled {
+  background: #f0f0f0;
+  border-color: #ddd;
+  color: #999;
+}
+/* ============================
+   ホームへ戻る：btn-setting 系＋弱調
+   ============================ */
+#backHomeBtn {
+  padding: 10px 12px;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #667;
+  border: 1px solid #d7dde6;
+  font-weight: 500;
+  font-size: 0.9em;
+}
+
+#backHomeBtn:hover {
+  background: #f6f8fb;
+}

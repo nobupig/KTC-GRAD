@@ -72,11 +72,14 @@ import {
   getFirestore,
   setDoc,
   serverTimestamp,
+  updateDoc,
   query,
   where,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { activateQuotaErrorState } from "./quota_banner.js";
 import { CURRENT_YEAR } from "./config.js";
+import { db } from "./score_input_loader.js";
+
 
 /**
  * 習熟度・コース・番号・ID順でソート
@@ -467,7 +470,8 @@ export function renderStudentRows(
   criteriaItems,
   onScoreInputChange,
   studentState
-) {
+)
+ {
   // ===== 表の総列数を動的に計算（specialType/習熟度/評価基準の違いで崩れないようにする） =====
   const getTotalColumnCount = () => {
     let count = 0;
@@ -635,6 +639,14 @@ specialSelect.addEventListener("change", () => {
 
 td.appendChild(specialSelect);
 tr.appendChild(td);
+// ★ 特別科目（合/否）は選択式：初期値あり＝入力済みにする（送信可否判定用）
+const selectEl1 = specialSelect;
+const setFilled1 = () => {
+  tr.dataset.allFilled = selectEl1.value ? "1" : "0";
+};
+setFilled1();
+selectEl1.addEventListener("input", setFilled1);
+
 
 // ===== specialType=2：認定(1)/(2) =====
 } else if (sp === 2) {
@@ -657,6 +669,13 @@ specialSelect.addEventListener("change", () => {
 
 td.appendChild(specialSelect);
 tr.appendChild(td);
+// ★ 特別科目（認定）は選択式：初期値あり＝入力済みにする（送信可否判定用）
+const selectEl2 = specialSelect;
+const setFilled2 = () => {
+  tr.dataset.allFilled = selectEl2.value ? "1" : "0";
+};
+setFilled2();
+selectEl2.addEventListener("input", setFilled2);
 
 
 // ===== 通常科目（評価基準なし） =====
@@ -845,3 +864,225 @@ export function updateElectiveRegistrationButtons(subject) {
     electiveArea.classList.add("is-visible");
   }
 }
+
+export function canSubmitScoresByVisibleRows() {
+  const rows = document.querySelectorAll("#scoreTableBody tr");
+
+  let total = 0;
+  let filled = 0;
+
+  rows.forEach(tr => {
+    // 表示されていない行は対象外（保険）
+    if (tr.offsetParent === null) return;
+
+    total++;
+
+    if (tr.dataset.allFilled === "1") {
+      filled++;
+    }
+  });
+
+  return {
+    ok: total > 0 && total === filled,
+    total,
+    filled
+  };  
+}
+
+
+function buildSubmittedSnapshot({ scoresDocData, scope }) {
+  const rows = document.querySelectorAll("#scoreTableBody tr");
+
+  const students = {};
+
+  rows.forEach(tr => {
+    if (tr.offsetParent === null) return;
+
+    const studentId = String(tr.dataset.studentId);
+    if (!studentId) return;
+
+    const studentData = scoresDocData.students?.[studentId];
+    if (!studentData || typeof studentData !== "object") return;
+
+    // submittedSnapshot や updatedAt などの非学生キーを除外
+    if (studentId === "submittedSnapshot" || studentId === "updatedAt") return;
+
+    students[studentId] = { ...studentData };
+
+  });
+
+  return {
+    scope,
+    students,
+    submittedAt: new Date()
+  };
+}
+
+// ================================
+// STEP C: 成績送信（教務提出）
+// ================================
+window.submitScoresForSubject =async function () {
+  // 1) 送信可否チェック（既存ロジック）
+  const check = canSubmitScoresByVisibleRows();
+  if (!check.ok) {
+    alert("未入力の学生がいます。表示中の全員分を入力してから送信してください。");
+    return;
+  }
+
+  // 2) 最新の成績データ取得（STEP B で確認済み）
+  if (!window.__latestScoresDocData || !window.__latestScoresDocData.students) {
+  alert("成績データを取得できません。画面を再読み込みしてください。");
+  return;
+}
+
+const subjectId = window.currentSubject?.subjectId;
+if (!subjectId) {
+  alert("科目情報を取得できません。画面を再読み込みしてください。");
+  return;
+}
+
+const submittedSnapshot = buildSubmittedSnapshot({
+  scoresDocData: window.__latestScoresDocData,
+  scope: {
+    subjectId,
+    filter: "currentView"
+  }
+});
+
+  // 4) Firestore 更新（1回だけ）
+  try {
+    const ref = doc(db, `scores_${currentYear}`, subjectId);
+
+        await updateDoc(ref, {
+      submittedSnapshot: {
+        ...submittedSnapshot,
+        submittedAt: serverTimestamp(),
+      },
+      updatedAt: serverTimestamp(),
+    });
+
+    // ✅ 提出成功直後にUIを即時反映（snapshot待ちにしない）
+    try {
+      const periodRef = doc(db, "settings", "period");
+      const periodSnap = await getDoc(periodRef);
+      const periodData = periodSnap.exists() ? periodSnap.data() : null;
+
+      if (typeof window.updateSubmitUI === "function") {
+        window.updateSubmitUI({
+          subjectDocData: {
+            ...(window.__latestScoresDocData || {}),
+            submittedSnapshot: {
+              ...submittedSnapshot,
+              submittedAt: new Date(), // 表示用（Firestore側は serverTimestamp が入る）
+            },
+          },
+          periodData,
+        });
+      }
+    } catch (e) {
+      console.warn("[submitScoresForSubject] immediate updateSubmitUI skipped", e);
+    }
+
+    alert("成績を送信しました（教務提出）。");
+  } catch (e) {
+    console.error(e);
+    alert("成績送信に失敗しました。時間をおいて再度お試しください。");
+  }
+}
+
+// ================================
+// UI: 送信（教務提出）ボタン
+// ================================
+const submitBtn = document.getElementById("submitScoresBtn");
+if (submitBtn) {
+  submitBtn.addEventListener("click", async () => {
+    const ok = confirm(
+      "この操作は教務への正式提出です。\n" +
+      "送信後は原則として修正できません。\n\n" +
+      "本当に送信しますか？"
+    );
+    if (!ok) return;
+
+    await window.submitScoresForSubject();
+  });
+}
+
+// ============================================
+// 自己完結型：送信ボタン状態の自動監視
+// ============================================
+(function setupSubmitButtonAutoWatcher() {
+  const btn = document.getElementById("submitScoresBtn");
+  if (!btn) return;
+
+  // 初期状態
+  try {
+    btn.disabled = !canSubmitScoresByVisibleRows().ok;
+  } catch (_) {}
+
+  // 成績表全体を監視（再描画・入力変更をすべて拾う）
+  const tbody = document.getElementById("scoreTableBody");
+  if (!tbody) return;
+
+  const update = () => {
+    try {
+      const check = canSubmitScoresByVisibleRows();
+      btn.disabled = !check.ok;
+    } catch (e) {
+      btn.disabled = true;
+    }
+  };
+
+  // ① 行の追加・削除・再描画を監視
+  const observer = new MutationObserver(update);
+  observer.observe(tbody, {
+    childList: true,
+    subtree: true,
+  });
+
+  // ② 入力変更をすべて拾う（input / change）
+  tbody.addEventListener("input", update, true);
+  tbody.addEventListener("change", update, true);
+})();
+
+// ============================================
+// 提出状態に応じた送信ボタンUI制御
+// ============================================
+window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
+  const btn = document.getElementById("submitScoresBtn");
+  if (!btn) return;
+
+  const submitted = !!subjectDocData?.submittedSnapshot;
+
+  // period は settings/period をそのまま想定
+  const now = Date.now();
+  const toMs = (v) => {
+    if (!v) return null;
+    if (typeof v.toMillis === "function") return v.toMillis();
+    return Date.parse(v);
+  };
+
+  const p = periodData || {};
+  const start = toMs(p.submitStart ?? p.submit_from);
+  const end   = toMs(p.submitEnd   ?? p.submit_to);
+
+  const inPeriod =
+    (!start || now >= start) &&
+    (!end   || now <= end);
+
+  // ===== 状態別UI =====
+  if (!inPeriod) {
+    btn.textContent = submitted ? "提出済み（期間外）" : "提出（期間外）";
+    btn.disabled = true;
+    return;
+  }
+
+  if (submitted) {
+    btn.textContent = "再提出する";
+    btn.disabled = false;
+    return;
+  }
+
+  // 未提出・期間内
+  btn.textContent = "教務へ提出";
+  btn.disabled = !canSubmitScoresByVisibleRows().ok;
+};
