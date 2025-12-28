@@ -207,12 +207,10 @@ export function renderTableHeader(headerRow, criteriaState) {
     }
   });
   // ▲▲▲ STEP3追加ここまで ▲▲▲
-
-    import("./score_input_modes.js").then(
-      ({ updateAllFinalScores }) => {
-        const tbody = document.getElementById("scoreTableBody");
-        updateAllFinalScores(tbody, criteriaState, { currentMode: "scaled" });
-      }
-    );
+  
+import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
+  const tbody = document.getElementById("scoreTableBody");
+  recalcFinalScoresAfterRestore(tbody);
+});
   });
 }

@@ -1493,6 +1493,45 @@ document
   }
 
   setModeTabsVisible(true);
+  // ================================
+// ★ モード切替時に平均点・調整点を必ず再計算
+//   （initModeTabs が DOM を再生成するため毎回フックが必要）
+// ================================
+requestAnimationFrame(() => {
+  const tabsEl =
+    document.getElementById("modeTabs") ||
+    document.querySelector(".mode-tabs") ||
+    document.querySelector(".score-mode-tabs") ||
+    document.querySelector("[data-mode-tabs]");
+
+  if (!tabsEl) return;
+
+  // 二重登録防止
+  if (tabsEl.__avgRecalcHooked) return;
+  tabsEl.__avgRecalcHooked = true;
+
+   // モード切替は click だけでなく change（radio等）でも起きる。
+  // また、initModeTabs 側の modeState 更新「後」に再計算したいので、
+  // capture は使わず、次のターンに回してから実行する。
+  const scheduleModeRecalc = () => {
+    if (tabsEl.__avgRecalcPending) return;
+    tabsEl.__avgRecalcPending = true;
+
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        tabsEl.__avgRecalcPending = false;
+        recalcFinalScoresAfterRestore(tbody);
+        applyRiskClassesToAllRows();
+        updateAveragePointDisplay();
+      });
+    }, 0);
+  };
+
+  tabsEl.addEventListener("click", scheduleModeRecalc, false);
+  tabsEl.addEventListener("change", scheduleModeRecalc, false);
+
+});
+
 }
 
 
@@ -1690,11 +1729,86 @@ if (savedScores) {
 
 
 if (!unsavedListenerInitialized && tbody) {
+   // ==========================================
+  // ★ 数値欄に「e」「-」「+」などが入るのを事前にブロック
+  //   type="number" は value と表示がズレることがあるため
+  //   beforeinput で「入る前」に止めるのが確実
+  // ==========================================
+  tbody.addEventListener("beforeinput", (ev) => {
+    const t = ev.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (t.type !== "number") return;
+    if (!t.dataset.index) return; // 点数欄だけ対象
+
+    // IME系や削除系は通す
+    const it = ev.inputType || "";
+    if (it.startsWith("delete") || it === "historyUndo" || it === "historyRedo") return;
+
+    const data = ev.data ?? "";
+    // 1文字入力（insertText）で、数字と . 以外は拒否
+    if (it === "insertText") {
+      if (!/^[0-9.]$/.test(data)) {
+        ev.preventDefault();
+        return;
+      }
+      // 小数点は1つだけ
+      if (data === "." && (t.value || "").includes(".")) {
+        ev.preventDefault();
+        return;
+      }
+    }
+  }, true);
+
+  tbody.addEventListener("keydown", (ev) => {
+    const t = ev.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (t.type !== "number") return;
+    if (!t.dataset.index) return;
+
+    // 操作キーは許可
+    if (
+      ev.key === "Backspace" || ev.key === "Delete" ||
+      ev.key === "Tab" || ev.key === "Enter" ||
+      ev.key === "ArrowLeft" || ev.key === "ArrowRight" ||
+      ev.key === "Home" || ev.key === "End"
+    ) return;
+
+    // 禁止キー
+    if (ev.key === "e" || ev.key === "E" || ev.key === "+" || ev.key === "-") {
+      ev.preventDefault();
+      return;
+    }
+  }, true);
+
+  
   tbody.addEventListener("input", (ev) => {
     if (isRenderingTable) return;
     if (isProgrammaticInput) return;
 
     const target = ev.target;
+      // ================================
+  // ★ 数値入力の正規化（e / - / -- 防止）
+  // ================================
+  if (
+    target instanceof HTMLInputElement &&
+    target.type === "number" &&
+    target.dataset.index
+  ) {
+    let v = target.value ?? "";
+
+    // 数字と小数点以外を除去
+    v = v.replace(/[^0-9.]/g, "");
+
+    // 小数点は1つまで
+    const parts = v.split(".");
+    if (parts.length > 2) {
+      v = parts[0] + "." + parts.slice(1).join("");
+    }
+
+    if (target.value !== v) {
+      target.value = v;
+    }
+  }
 
     // ① スキル入力は除外（既存どおり）
     if (target instanceof HTMLInputElement && target.classList.contains("skill-level-input")) {
@@ -1777,6 +1891,9 @@ if (!unsavedListenerInitialized && tbody) {
         )
       ) {
         setUnsavedChanges(true);
+         // ★ 貼り付け直後に必ず再評価
+        recalcFinalScoresAfterRestore(tbody);
+        applyRiskClassesToAllRows();
       }
     });
     pasteInitialized = true;
@@ -2092,7 +2209,8 @@ if (
 export function initScoreInput() {
   // モードタブを生成（infoMessage の直下）
   initModeTabs({ infoMessageEl }, modeState);
-
+ 
+  
   if (electiveAddBtn) {
     electiveAddBtn.addEventListener("click", () => {
       electiveMode = "add";
