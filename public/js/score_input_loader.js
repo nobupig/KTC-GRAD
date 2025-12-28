@@ -1497,55 +1497,63 @@ document
 
 
  
-  // 学生全件ロード（subjectRoster優先 → 学年キャッシュ）
+  // 学年名簿は「学年キャッシュ」からのみ供給する（subjectRosterは混ぜない）
   const targetGrade = String(subject?.grade ?? "");
-  const currentAllGrade = studentState.allStudentsGrade ? String(studentState.allStudentsGrade) : null;
 
-  let rosterStudents = [];
-
-  // まず学年キャッシュを参照（grade をキーに Map を確認）
+  // === ① 学年名簿（正本）を確保：gradeStudentsCache → なければ Firestore（学年クエリ） ===
   try {
-    const cached = studentState.gradeStudentsCache?.get(targetGrade);
-    if (Array.isArray(cached) && cached.length > 0) {
-      if (DEBUG) console.log("[CACHE HIT] gradeStudentsCache for grade=", targetGrade);
-      const sourceStudents = studentState.gradeStudentsCache.get(grade);
-      rosterStudents = Array.isArray(sourceStudents) ? sourceStudents.slice() : cached.slice();
-      // キャッシュから取得した配列を必ず allStudents / allStudentsGrade に設定
-      studentState.allStudents = sourceStudents;
-      studentState.allStudentsGrade = grade;
-    } else {
-      // キャッシュ無ければ従来どおり取得してキャッシュに保存
-      console.log("[GRADE CACHE] FETCH students for grade=", grade);
-      const rosterIds = await loadSubjectRoster(db, currentYear, subjectId);
-      if (DEBUG) console.group(`📊 [READ CHECK] subject=${subjectId}`);
-      if (DEBUG) console.log("📘 subjectRoster read = 1");
-      if (DEBUG) console.log("👥 rosterIds length =", Array.isArray(rosterIds) ? rosterIds.length : 0);
+    const cachedGradeStudents = studentState.gradeStudentsCache?.get(targetGrade);
 
-      if (Array.isArray(rosterIds) && rosterIds.length > 0) {
-        rosterStudents = await loadStudentsByIds(db, rosterIds);
-        if (DEBUG) console.log("🎓 students read by IDs =", rosterStudents.length);
-        // 取得結果を学年キャッシュと allStudents に保存
-        try { studentState.gradeStudentsCache.set(targetGrade, rosterStudents); } catch (e) { /* noop */ }
-        studentState.allStudents = rosterStudents;
-        studentState.allStudentsGrade = targetGrade;
-      } else {
-        alert("名簿データが未生成です。教務に連絡してください。");
-        throw new Error("subjectRoster missing");
-      }
-      if (DEBUG) console.groupEnd();
-    }
+    if (Array.isArray(cachedGradeStudents) && cachedGradeStudents.length > 0) {
+      if (DEBUG) console.log("[CACHE HIT] gradeStudentsCache for grade=", targetGrade);
+
+      // 参照汚染防止：必ずコピーで持つ
+      studentState.allStudents = cachedGradeStudents.slice();
+      
+    } else {
+      console.log("[GRADE CACHE] FETCH students for grade=", targetGrade);
+
+      // ★ 学年名簿は「学年で取得」する（subjectRosterで代用しない）
+      // loadStudentsForGrade は studentState.allStudents に正規化済み配列を入れてくれる
+      await loadStudentsForGrade(db, targetGrade, studentState);
+      console.log(
+  "[CHECK allStudents]",
+  "grade=", studentState.allStudentsGrade,
+  "len=", studentState.allStudents.length,
+  "grades=", [...new Set(studentState.allStudents.map(s => s.grade))]
+);
+      // gradeStudentsCache には「学年名簿」だけを保存する
+      try {
+        studentState.gradeStudentsCache.set(targetGrade, studentState.allStudents.slice());
+      } catch (e) { /* noop */ }
+
+          }
   } catch (e) {
-    // 取得処理でエラーがあればそのまま投げる
     throw e;
   }
-  const rosterList = Array.isArray(rosterStudents) ? rosterStudents : [];
+
+  // === ② subjectRoster は「enrolledStudentIds」用にだけ読む（学年キャッシュには保存しない） ===
+  let rosterIds = null;
+  try {
+    rosterIds = await loadSubjectRoster(db, currentYear, subjectId);
+  } catch (e) {
+    // subjectRoster 取得エラーはここでは握りつぶさず上に投げる運用に合わせる
+    throw e;
+  }
+
+  if (!Array.isArray(rosterIds) || rosterIds.length === 0) {
+    alert("名簿データが未生成です。教務に連絡してください。");
+    throw new Error("subjectRoster missing");
+  }
+
   enrolledStudentIds = Array.from(
     new Set(
-      rosterList
-        .map((stu) => String(stu.studentId ?? "").trim())
+      rosterIds
+        .map((id) => String(id ?? "").trim())
         .filter((id) => id.length > 0)
     )
   );
+
   // 科目に応じて学生フィルタ＆ソート
   const students = filterAndSortStudentsForSubject(subject, studentState);
 

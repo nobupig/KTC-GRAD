@@ -14,7 +14,8 @@ export async function loadStudentsForGrade(db, grade, studentState) {
       if (parsed && Array.isArray(parsed.data) && typeof parsed.ts === "number") {
         const now = Date.now();
         if (now - parsed.ts < 6 * 60 * 60 * 1000) {
-          studentState.allStudents = parsed.data;
+                   studentState.allStudents = parsed.data;
+                   studentState.allStudentsGrade = String(grade);
           return;
         }
       }
@@ -25,7 +26,7 @@ export async function loadStudentsForGrade(db, grade, studentState) {
   const q = query(
     collection(db, "students"),
     where("isActive", "==", true),
-    where("grade", "==", String(grade))
+    where("grade", "==", Number(grade))
   );
   let snap;
   try {
@@ -57,12 +58,24 @@ export async function loadStudentsForGrade(db, grade, studentState) {
       name: src.name ?? "",
     };
   };
-  studentState.allStudents = students.map((d) => normalize(d));
+studentState.allStudents = students.map((d) => normalize(d));
+studentState.allStudentsGrade = String(grade);
+
+// ★ 0件はキャッシュしない（重要）
+if (studentState.allStudents.length > 0) {
   try {
-    sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: studentState.allStudents }));
+    sessionStorage.setItem(
+      cacheKey,
+      JSON.stringify({ ts: Date.now(), data: studentState.allStudents })
+    );
   } catch (e) {
-    // sessionStorage容量超過等は無視
+    // ignore
   }
+} else {
+  // 念のため壊れたキャッシュを削除
+  sessionStorage.removeItem(cacheKey);
+}
+
 }
 import {
   collection,
