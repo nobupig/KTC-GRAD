@@ -749,10 +749,8 @@ tr.appendChild(finalTd);
 // ================================
 const lockedInfo = studentState?.lockedUnitInfo;
 if (lockedInfo) {
-  const unitKey =
-    stu.courseClass ||
-    stu.class ||
-    "";
+ const unitKey = getUnitKeyForStudent(stu, subject);
+
 
   const isLocked = lockedInfo.lockedUnits?.has(unitKey);
   const isEditable = lockedInfo.editableUnits?.has(unitKey);
@@ -930,10 +928,10 @@ export function canSubmitScoresByVisibleRows() {
 }
 
 
-function buildSubmittedSnapshot({ scoresDocData, scope }) {
+function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope }) {
   const rows = document.querySelectorAll("#scoreTableBody tr");
 
-  const students = {};
+  const units = {};
 
   rows.forEach(tr => {
     if (tr.offsetParent === null) return;
@@ -943,104 +941,102 @@ function buildSubmittedSnapshot({ scoresDocData, scope }) {
 
     const studentData = scoresDocData.students?.[studentId];
     if (!studentData || typeof studentData !== "object") return;
+// student 情報は DOM 行（stu）ではなく students マスタから引く
+const student = {
+  courseClass: tr.querySelector("td:nth-child(3)")?.textContent || "",
+  classGroup: tr.querySelector("td:nth-child(3)")?.textContent || "",
+};
 
-    // submittedSnapshot や updatedAt などの非学生キーを除外
-    if (studentId === "submittedSnapshot" || studentId === "updatedAt") return;
+const unitKey = getUnitKeyForStudent(student, subject);
 
-    students[studentId] = { ...studentData };
+    if (!unitKey) return;
 
+    if (!units[unitKey]) {
+      units[unitKey] = {
+        students: {}
+      };
+    }
+
+    units[unitKey].students[studentId] = { ...studentData };
   });
 
   return {
-    scope,
-    students,
-    submittedAt: new Date()
+    units,
+    scope
   };
 }
+
+
 
 // ================================
 // STEP C: 成績送信（教務提出）
 // ================================
-window.submitScoresForSubject =async function () {
-  // 1) 送信可否チェック（既存ロジック）
+window.submitScoresForSubject = async function () {
+  // 1) 送信可否チェック（既存）
   const check = canSubmitScoresByVisibleRows();
   if (!check.ok) {
     alert("未入力の学生がいます。表示中の全員分を入力してから送信してください。");
     return;
   }
 
-  // 2) 最新の成績データ取得（STEP B で確認済み）
+  // 2) 成績データ確認
   if (!window.__latestScoresDocData || !window.__latestScoresDocData.students) {
-  alert("成績データを取得できません。画面を再読み込みしてください。");
-  return;
-}
-
-const subjectId = window.currentSubject?.subjectId;
-if (!subjectId) {
-  alert("科目情報を取得できません。画面を再読み込みしてください。");
-  return;
-}
-
-const submittedSnapshot = buildSubmittedSnapshot({
-  scoresDocData: window.__latestScoresDocData,
-  scope: {
-    subjectId,
-    filter: "currentView"
+    alert("成績データを取得できません。画面を再読み込みしてください。");
+    return;
   }
-});
-// ★ Firestore 送信用：undefined を完全に除去
-const cleanSubmittedSnapshot = JSON.parse(
-  JSON.stringify(submittedSnapshot)
-);
-// ★ 再提出時の安全装置：送信対象が空なら中断
-if (
-  !cleanSubmittedSnapshot.students ||
-  cleanSubmittedSnapshot.students.length === 0
-) {
-  alert("再提出する成績データがありません。表示条件を確認してください。");
-  return;
-}
 
-  // 4) Firestore 更新（1回だけ）
+  const subject = window.currentSubject;
+  const subjectId = subject?.subjectId;
+  if (!subjectId) {
+    alert("科目情報を取得できません。画面を再読み込みしてください。");
+    return;
+  }
+
+  // 3) 表示中データを unitKey 単位で分解
+  const snapshotByUnit = buildSubmittedSnapshotByUnit({
+    scoresDocData: window.__latestScoresDocData,
+    subject,
+    scope: {
+      subjectId,
+      filter: "currentView"
+    }
+  });
+
+  // 4) Firestore 更新
   try {
     const ref = doc(db, `scores_${currentYear}`, subjectId);
 
-       await updateDoc(ref, {
-  submittedSnapshot: {
-    ...cleanSubmittedSnapshot,
-    submittedAt: serverTimestamp(),
-  },
-  updatedAt: serverTimestamp(),
-});
+    const updatePayload = {};
+    const now = serverTimestamp();
+    const userEmail = window.currentUser?.email || "";
 
-    // ✅ 提出成功直後にUIを即時反映（snapshot待ちにしない）
-    try {
-      const periodRef = doc(db, "settings", "period");
-      const periodSnap = await getDoc(periodRef);
-      const periodData = periodSnap.exists() ? periodSnap.data() : null;
+    Object.entries(snapshotByUnit.units).forEach(([unitKey, unitData]) => {
+      updatePayload[`submittedSnapshot.units.${unitKey}`] = {
+        students: unitData.students,
+        submittedAt: now,
+        submittedBy: userEmail,
+        scope: snapshotByUnit.scope
+      };
+    });
 
-      if (typeof window.updateSubmitUI === "function") {
-        window.updateSubmitUI({
-          subjectDocData: {
-            ...(window.__latestScoresDocData || {}),
-            submittedSnapshot: {
-              ...submittedSnapshot,
-              submittedAt: new Date(), // 表示用（Firestore側は serverTimestamp が入る）
-            },
-          },
-          periodData,
-        });
-      }
-    } catch (e) {
-      console.warn("[submitScoresForSubject] immediate updateSubmitUI skipped", e);
+    if (Object.keys(updatePayload).length === 0) {
+      alert("送信対象の成績データがありません。");
+      return;
     }
 
+    await updateDoc(ref, {
+      ...updatePayload,
+      updatedAt: now,
+    });
+
     alert("成績を送信しました（教務提出）。");
+
   } catch (e) {
     console.error(e);
     alert("成績送信に失敗しました。時間をおいて再度お試しください。");
   }
-}
+};
+
 
 // ================================
 // UI: 送信（教務提出）ボタン
@@ -1110,5 +1106,17 @@ try {
   tbody.addEventListener("change", update, true);
 })();
 
+// ★ unitKey 決定関数（確定仕様）
+function getUnitKeyForStudent(student, subject) {
+  if (!student || !subject) return null;
+
+  // 1・2年 → 組
+  if (["1", "2"].includes(String(subject.grade))) {
+    return String(student.classGroup || student.courseClass || "");
+  }
+
+  // 3年以上 → コース
+  return String(student.courseClass || "");
+}
 
 
