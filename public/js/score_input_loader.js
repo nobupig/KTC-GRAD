@@ -1246,12 +1246,21 @@ const okByRows = !!rowCheck.ok;
 // 「最後の修正以降に一時保存されている」ことが必須
 if (!isSavedAfterLastEdit) {
   btn.disabled = true;
+
+  // ✅ 提出済みだが、まだ一切修正していない（＝未保存変更ではない）
+  if (isSubmitted && !hasUnsavedChanges) {
+    btn.textContent = "再提出する";
+    badge.textContent = "提出済みです。修正→一時保存すると再提出できます。";
+    badge.style.color = "#666";
+    return;
+  }
+
+  // ✅ 通常の未保存変更
   btn.textContent = "保存してから提出";
   badge.textContent = "未保存の変更があります";
   badge.style.color = "#c00";
   return;
 }
-
     // ★ 行条件NG（未入力など）はここで止める（文言も出す）
 if (!okByRows) {
   btn.disabled = true;
@@ -1267,8 +1276,7 @@ btn.disabled = false;
 
 if (isSubmitted) {
   btn.textContent = "再提出する";
-  badge.textContent = "提出済み";
-  badge.style.color = "#0b6";
+  badge.textContent = ""; // ←「提出済み」は表示しない（分かりづらいので削除）
 } else {
   btn.textContent = "教務へ送信";
   badge.textContent = "";
@@ -1298,6 +1306,7 @@ function setupScoresSnapshotListener(subjectId) {
         if (!snapshot || !snapshot.exists()) return;
         const data = snapshot.data?.() || {};
    // ★ 送信用に students.js に渡す（グローバル登録）
+   const subjectDocData = window.__latestScoresDocData || {};
 window.__latestScoresDocData = data;
 
 // ===== 送信後UIロック／再提出判定 =====
@@ -1365,6 +1374,7 @@ if (ok) {
 // ================================
 async function handleSubjectChange(subjectId) {
   setUnsavedChanges(false);
+  
   hasSavedSnapshot = false; // ★科目切替直後はいったん未保存扱い（復元でtrueにする）
  
   const subject = findSubjectById(subjectId);
@@ -1693,6 +1703,40 @@ studentState.currentStudents = displayStudents.slice();
   }
   await loadScoreVersionBase(subjectId, displayStudents);
   if (DEBUG) console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
+
+
+// ================================
+// 提出済ユニット判定（UI用）
+// ================================
+
+// ★ snapshot listener が保存している最新データを使う
+const subjectDocData = window.__latestScoresDocData || {};
+
+const submittedByUnit =
+  subjectDocData.submittedByUnit ||
+  subjectDocData.submittedSnapshot?.submittedByUnit ||
+  {};
+
+
+const lockedUnits = new Set(Object.keys(submittedByUnit));
+
+// 現在ログイン教員
+const currentUserEmail = currentUser?.email || "";
+
+// 「自分が提出したユニット」だけを再提出可能にする
+const editableUnits = new Set(
+  Object.entries(submittedByUnit)
+    .filter(([_, info]) => info?.submittedBy === currentUserEmail)
+    .map(([unit]) => unit)
+);
+
+// UI 用にまとめて students.js に渡す
+studentState.lockedUnitInfo = {
+  lockedUnits,      // すべての提出済ユニット
+  editableUnits     // 自分が提出したユニット（再提出用）
+};
+
+
   // 学生行描画（入力時にその行の最終成績を計算）
   isRenderingTable = true;
   const handleScoreInputChange = (tr) => {
@@ -2478,6 +2522,8 @@ if (currentSubjectMeta.specialType === 2) {
 
         try {
           await saveBulkStudentScores(bulkScores);
+          isSavedAfterLastEdit = true;   // ★これがないと再提出が壊れる
+           hasSavedSnapshot = true;      // ★提出判定用
         } catch (err) {
           const isQuotaError =
             err?.code === "resource-exhausted" ||

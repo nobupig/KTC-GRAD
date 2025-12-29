@@ -744,6 +744,33 @@ if (subject?.specialType === 1 || subject?.specialType === 2) {
 }
 
 tr.appendChild(finalTd);
+// ================================
+// 提出済ユニットの編集ロックUI
+// ================================
+const lockedInfo = studentState?.lockedUnitInfo;
+if (lockedInfo) {
+  const unitKey =
+    stu.courseClass ||
+    stu.class ||
+    "";
+
+  const isLocked = lockedInfo.lockedUnits?.has(unitKey);
+  const isEditable = lockedInfo.editableUnits?.has(unitKey);
+
+  // 他人提出済みユニット → 完全ロック
+  if (isLocked && !isEditable) {
+    tr.classList.add("locked-row");
+
+    // 行内の input / select を全て無効化
+    tr.querySelectorAll("input, select").forEach(el => {
+      el.disabled = true;
+    });
+
+    // 視覚的ヒント（任意）
+    tr.title = "このユニットは既に提出済みのため編集できません";
+  }
+}
+
     tbody.appendChild(tr);
   }
 }
@@ -961,18 +988,30 @@ const submittedSnapshot = buildSubmittedSnapshot({
     filter: "currentView"
   }
 });
+// ★ Firestore 送信用：undefined を完全に除去
+const cleanSubmittedSnapshot = JSON.parse(
+  JSON.stringify(submittedSnapshot)
+);
+// ★ 再提出時の安全装置：送信対象が空なら中断
+if (
+  !cleanSubmittedSnapshot.students ||
+  cleanSubmittedSnapshot.students.length === 0
+) {
+  alert("再提出する成績データがありません。表示条件を確認してください。");
+  return;
+}
 
   // 4) Firestore 更新（1回だけ）
   try {
     const ref = doc(db, `scores_${currentYear}`, subjectId);
 
-        await updateDoc(ref, {
-      submittedSnapshot: {
-        ...submittedSnapshot,
-        submittedAt: serverTimestamp(),
-      },
-      updatedAt: serverTimestamp(),
-    });
+       await updateDoc(ref, {
+  submittedSnapshot: {
+    ...cleanSubmittedSnapshot,
+    submittedAt: serverTimestamp(),
+  },
+  updatedAt: serverTimestamp(),
+});
 
     // ✅ 提出成功直後にUIを即時反映（snapshot待ちにしない）
     try {
@@ -1027,24 +1066,38 @@ if (submitBtn) {
   const btn = document.getElementById("submitScoresBtn");
   if (!btn) return;
 
-  // 初期状態
-  try {
+ // 初期状態（提出UIの最終判定に委譲）
+try {
+  if (typeof window.updateSubmitUI === "function") {
+    window.updateSubmitUI({
+      subjectDocData: window.__latestScoresDocData || {},
+      periodData: window.__latestPeriodData || {},
+    });
+  } else {
     btn.disabled = !canSubmitScoresByVisibleRows().ok;
-  } catch (_) {}
+  }
+} catch (_) {}
+
 
   // 成績表全体を監視（再描画・入力変更をすべて拾う）
   const tbody = document.getElementById("scoreTableBody");
   if (!tbody) return;
 
-  const update = () => {
-    try {
+ const update = () => {
+  try {
+    if (typeof window.updateSubmitUI === "function") {
+      window.updateSubmitUI({
+        subjectDocData: window.__latestScoresDocData || {},
+        periodData: window.__latestPeriodData || {},
+      });
+    } else {
       const check = canSubmitScoresByVisibleRows();
       btn.disabled = !check.ok;
-    } catch (e) {
-      btn.disabled = true;
     }
-  };
-
+  } catch (e) {
+    btn.disabled = true;
+  }
+};
   // ① 行の追加・削除・再描画を監視
   const observer = new MutationObserver(update);
   observer.observe(tbody, {

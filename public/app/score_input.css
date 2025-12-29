@@ -1779,3 +1779,12 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
 #backHomeBtn:hover {
   background: #f6f8fb;
 }
+
+.locked-row {
+  background-color: #f2f2f2;
+  opacity: 0.7;
+}
+
+.locked-row td {
+  pointer-events: none;
+}
