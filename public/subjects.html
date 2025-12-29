@@ -729,6 +729,23 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
         const q = query(collection(db, "subjects"), ...constraints);
         const snap = await getDocs(q);
 
+        // ===== 提出済科目マップを作成 =====
+const submittedMap = {};
+const year = new Date().getFullYear();
+
+for (const docSnap of snap.docs) {
+  const subjectId = docSnap.id;
+  try {
+    const scoreRef = doc(db, `scores_${year}`, subjectId);
+    const scoreSnap = await getDoc(scoreRef);
+    if (scoreSnap.exists() && scoreSnap.data()?.submittedSnapshot) {
+      submittedMap[subjectId] = true;
+    }
+  } catch (e) {
+    console.warn("[WARN] 提出済判定失敗:", subjectId, e);
+  }
+}
+
         const rows = [];
         snap.forEach((docSnap) => {
           const data = docSnap.data();
@@ -756,11 +773,27 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
           const tdCheck = document.createElement("td");
           const checkbox = document.createElement("input");
           checkbox.type = "checkbox";
+          const isSubmitted = submittedMap[s.id] === true;
+
+          if (isSubmitted) {
+            checkbox.disabled = true;
+          }
+
           checkbox.addEventListener("change", updateSelectedCount);
           tdCheck.appendChild(checkbox);
 
           const tdName = document.createElement("td");
           tdName.textContent = s.name;
+
+          if (submittedMap[s.id] === true) {
+           const badge = document.createElement("span");
+           badge.textContent = "提出済";
+              badge.className = "badge";
+              badge.style.marginLeft = "6px";
+              badge.style.background = "#e5e7eb";
+              badge.style.color = "#374151";
+              tdName.appendChild(badge);
+            }
 
           const tdGrade = document.createElement("td");
           tdGrade.textContent = s.grade + "年";
@@ -801,6 +834,7 @@ function getSelectedSubjects() {
   trs.forEach((tr) => {
     const check = tr.querySelector("input[type='checkbox']");
     if (check && check.checked) {
+      if (check.disabled) return;
       const tds = tr.querySelectorAll("td");
       result.push({
         id: tr.dataset.id,

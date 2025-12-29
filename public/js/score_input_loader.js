@@ -335,6 +335,7 @@ import {
 import { deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { activateQuotaErrorState } from "./quota_banner.js";
 
+
 // ================================
 // ★ 科目マスタ（subjects）を正本として取得
 // ================================
@@ -1618,7 +1619,8 @@ requestAnimationFrame(() => {
       // ★ 学年名簿は「学年で取得」する（subjectRosterで代用しない）
       // loadStudentsForGrade は studentState.allStudents に正規化済み配列を入れてくれる
       await loadStudentsForGrade(db, targetGrade, studentState);
-      console.log(
+
+         console.log(
   "[CHECK allStudents]",
   "grade=", studentState.allStudentsGrade,
   "len=", studentState.allStudents.length,
@@ -1763,7 +1765,22 @@ studentState.lockedUnitInfo = {
       handleScoreInputChange,
       studentState
     );
-    
+// ===============================
+// STEP.4（FIX）：描画後に提出済ロック＋文言表示
+// ===============================
+
+// ★ まず前科目の状態を必ず解除（文言も消える）
+unlockScoreInputUI();
+
+// ★ 提出済判定
+const isSubmitted = await checkIfSubmitted(db, subjectId);
+
+// ★ 提出済なら：ロック＋注意文言を表示
+if (isSubmitted) {
+  lockScoreInputUI();
+  showSubmittedNotice();
+}
+
 
 // ================================
 // STEP1: 提出単位・完了条件の確定
@@ -2975,3 +2992,89 @@ function showSaveSuccessToast() {
     }, 300);
   }, 1800);
 }
+
+export async function checkIfSubmitted(db, subjectId) {
+  if (!subjectId) return false;
+
+  const year = new Date().getFullYear();
+  const ref = doc(db, `scores_${year}`, subjectId);
+
+  try {
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return false;
+
+ const data = snap.data();
+const submitted = data.submittedSnapshot;
+if (!submitted) return false;
+
+// ★ students が1人以上いる場合のみ「提出済」とみなす
+const students = submitted.students;
+if (!students || Object.keys(students).length === 0) {
+  return false;
+}
+return true;
+  } catch (e) {
+    console.error("[checkIfSubmitted] Firestore error:", e);
+    return false;
+  }
+}
+
+// ===============================
+// 成績入力UIをロックする
+// ===============================
+function lockScoreInputUI() {
+  // 入力ロック
+  document.querySelectorAll("input[type='number']").forEach(el => {
+    el.disabled = true;
+  });
+
+  const saveBtn = document.getElementById("saveTempBtn");
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (saveBtn) saveBtn.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
+}
+
+function showSubmittedNotice() {
+  // 既存削除（保険）
+  document.querySelectorAll(".submitted-lock-notice").forEach(el => el.remove());
+
+  const notice = document.createElement("div");
+  notice.className = "submitted-lock-notice";
+  notice.innerHTML = `
+    <div style="background:#fff3e0;border:1px solid #ffb74d;
+                border-radius:6px;padding:10px 12px;margin:8px 0;">
+      ⚠ この科目の成績は
+      <strong style="color:#c62828;">【すでに提出済み】</strong>
+      のため、この画面では編集できません。<br>
+      再提出・修正は
+      <strong>トップ画面の「成績入力済み一覧」</strong>
+      から操作してください。
+    </div>
+  `;
+
+  const select = document.querySelector("select");
+  if (!select) return;
+
+  const row = select.closest("div");
+  if (row) {
+    row.insertAdjacentElement("afterend", notice);
+  }
+}
+
+// ===============================
+// UI ロック解除（提出済み → 未提出 切替用）
+// ===============================
+function unlockScoreInputUI() {
+  document.querySelectorAll("input[type='number']").forEach(el => {
+    el.disabled = false;
+  });
+
+  const saveBtn = document.getElementById("saveTempBtn");
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (saveBtn) saveBtn.disabled = false;
+  if (submitBtn) submitBtn.disabled = false;
+
+  document.querySelectorAll(".submitted-lock-notice").forEach(el => el.remove());
+  document.querySelectorAll(".submitted-view-only-note").forEach(el => el.remove());
+}
+
