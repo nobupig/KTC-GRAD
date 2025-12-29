@@ -1057,45 +1057,5 @@ if (submitBtn) {
   tbody.addEventListener("change", update, true);
 })();
 
-// ============================================
-// 提出状態に応じた送信ボタンUI制御
-// ============================================
-window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
-  const btn = document.getElementById("submitScoresBtn");
-  if (!btn) return;
 
-  const submitted = !!subjectDocData?.submittedSnapshot;
 
-  // period は settings/period をそのまま想定
-  const now = Date.now();
-  const toMs = (v) => {
-    if (!v) return null;
-    if (typeof v.toMillis === "function") return v.toMillis();
-    return Date.parse(v);
-  };
-
-  const p = periodData || {};
-  const start = toMs(p.submitStart ?? p.submit_from);
-  const end   = toMs(p.submitEnd   ?? p.submit_to);
-
-  const inPeriod =
-    (!start || now >= start) &&
-    (!end   || now <= end);
-
-  // ===== 状態別UI =====
-  if (!inPeriod) {
-    btn.textContent = submitted ? "提出済み（期間外）" : "提出（期間外）";
-    btn.disabled = true;
-    return;
-  }
-
-  if (submitted) {
-    btn.textContent = "再提出する";
-    btn.disabled = false;
-    return;
-  }
-
-  // 未提出・期間内
-  btn.textContent = "教務へ提出";
-  btn.disabled = !canSubmitScoresByVisibleRows().ok;
-};

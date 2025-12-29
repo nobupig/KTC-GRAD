@@ -12,6 +12,7 @@ function getCurrentAdjustPointNumber() {
 // 科目メタ情報の単一状態
 let currentSubjectMeta = {
   subjectId: null,
+  isCommon: false,
   isSkillLevel: false,
   usesAdjustPoint: false, // isSkillLevel と同義（将来拡張用）
   passRule: null,
@@ -22,6 +23,7 @@ let currentSubjectMeta = {
 // "group" | "course" | null
 let electiveModalSortMode = null;
 let electiveModalSourceStudents = [];
+let isSavedAfterLastEdit = false;
 // ===== 受講者登録ボタン：安全無効化制御 =====
 const electiveAddBtn = document.getElementById("electiveAddBtn");
 const electiveRemoveBtn = document.getElementById("electiveRemoveBtn");
@@ -535,6 +537,7 @@ const currentYear = CURRENT_YEAR;
 let teacherSubjects = []; // 教員の担当科目リスト（teacherSubjects_YYYY の subjects 配列）
 let currentUser = null;
 let hasUnsavedChanges = false;
+let hasSavedSnapshot = false; // ★一時保存（Firestore保存）済みかどうか
 let unsavedListenerInitialized = false;
 let beforeUnloadListenerInitialized = false;
 let currentSubjectId = null;
@@ -760,7 +763,11 @@ function setInfoMessage(text) {
 }
 
 function setUnsavedChanges(flag) {
-  hasUnsavedChanges = !!flag;
+   hasUnsavedChanges = !!flag;
+  // ★未保存の変更が入った瞬間に「保存済み」状態を解除する（提出事故防止）
+   if (hasUnsavedChanges) {
+     hasSavedSnapshot = false;
+  }
 
   if (hasUnsavedChanges) {
     infoMessageEl?.classList.add("warning-message");
@@ -773,6 +780,17 @@ function setUnsavedChanges(flag) {
   if (saveBtn) {
     saveBtn.disabled = !hasUnsavedChanges;
   }
+  // ★提出ボタンUIも即時更新
+ try {
+     if (typeof window.updateSubmitUI === "function") {
+       window.updateSubmitUI({
+         subjectDocData: window.__latestScoresDocData || {},
+         periodData: window.__latestPeriodData || {},
+       });
+     }
+   } catch (e) {
+     // noop
+   }
 }
 
 function buildScoresObjFromRow(tr, criteriaState) {
@@ -1219,16 +1237,42 @@ window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
       return;
     }
 
-    // 期間内：提出済みなら「再提出する」へ
-    btn.disabled = !canSubmitScoresByVisibleRows().ok; // 既存ロジックに寄せる
-    if (isSubmitted) {
-      btn.textContent = "再提出する";
-      badge.textContent = "提出済み";
-      badge.style.color = "#0b6"; // 緑系（CSSで調整してOK）
-    } else {
-      btn.textContent = "教務へ送信";
-      badge.textContent = "";
-    }
+const rowCheck = canSubmitScoresByVisibleRows();
+const okByRows = !!rowCheck.ok;
+    const okBySave = !!hasSavedSnapshot;     // ★保存済みであること
+    const okByDirty = !hasUnsavedChanges;    // ★未保存変更が無いこと
+
+// ★提出可能条件（最終基準）
+// 「最後の修正以降に一時保存されている」ことが必須
+if (!isSavedAfterLastEdit) {
+  btn.disabled = true;
+  btn.textContent = "保存してから提出";
+  badge.textContent = "未保存の変更があります";
+  badge.style.color = "#c00";
+  return;
+}
+
+    // ★ 行条件NG（未入力など）はここで止める（文言も出す）
+if (!okByRows) {
+  btn.disabled = true;
+  btn.textContent = isSubmitted ? "再提出する" : "教務へ送信";
+  badge.textContent = rowCheck.reason || "未入力があります。全員分入力してください。";
+  badge.style.color = "#c00";
+  return;
+}
+
+// ここまで来たら「保存済み」「未保存変更なし」「行条件OK」
+// → 提出ボタンを有効化
+btn.disabled = false;
+
+if (isSubmitted) {
+  btn.textContent = "再提出する";
+  badge.textContent = "提出済み";
+  badge.style.color = "#0b6";
+} else {
+  btn.textContent = "教務へ送信";
+  badge.textContent = "";
+}
   } catch (e) {
     console.warn("[updateSubmitUI]", e);
   }
@@ -1264,6 +1308,7 @@ window.__latestScoresDocData = data;
     if (!periodSnap.exists()) return;
 
     const periodData = periodSnap.data();
+    window.__latestPeriodData = periodData; // ★提出UI再計算用に保持
 
   if (typeof window.updateSubmitUI === "function") {
   window.updateSubmitUI({
@@ -1320,6 +1365,7 @@ if (ok) {
 // ================================
 async function handleSubjectChange(subjectId) {
   setUnsavedChanges(false);
+  hasSavedSnapshot = false; // ★科目切替直後はいったん未保存扱い（復元でtrueにする）
  
   const subject = findSubjectById(subjectId);
   try { window.currentSubject = subject; } catch (e) { /* noop */ }
@@ -1338,12 +1384,14 @@ async function handleSubjectChange(subjectId) {
     currentSubjectId = null;
     currentSubjectMeta = {
       subjectId: null,
+      isCommon,    
       isSkillLevel: false,
       usesAdjustPoint: false,
       passRule: null,
       required: false,
       specialType: 0,
     };
+    
     return;
   }
   // ▼ 同一科目の再読込防止（Reads削減の核心）
@@ -1378,8 +1426,13 @@ async function handleSubjectChange(subjectId) {
   const required = subjectMaster?.required ?? subject?.required ?? false;
   const usesAdjustPoint = passRule === "adjustment" || required === true;
   const specialType = Number(subjectMaster?.specialType ?? subject?.specialType ?? 0);
+
+// ★ 共通判定は「ここで1回だけ」
+const isCommon = String(subjectId).includes("_G_");
+
   currentSubjectMeta = {
     subjectId,
+    isCommon, 
     isSkillLevel,
     usesAdjustPoint,
     passRule,
@@ -1666,6 +1719,29 @@ studentState.currentStudents = displayStudents.slice();
       handleScoreInputChange,
       studentState
     );
+    
+
+// ================================
+// STEP1: 提出単位・完了条件の確定
+// （名簿描画が完了した直後）
+// ================================
+window.__submissionContext = {
+  requiredUnits: resolveRequiredUnits({
+    grade,          // loader.js で既に使っている学年変数
+    subjectMeta: currentSubjectMeta // 科目メタ（isCommon を含む）
+  }),
+  unitKey: resolveCurrentUnitKey({
+    grade,
+    subjectMeta: currentSubjectMeta,
+    visibleStudents: displayStudents
+  })
+};
+
+console.log(
+  "[STEP1] submissionContext",
+  window.__submissionContext
+);
+
   } finally {
     isRenderingTable = false;
   }
@@ -1722,7 +1798,8 @@ if (savedScores) {
         excessStudentsState = {};
         excessDirty = false;
       }
-    setUnsavedChanges(false);
+      hasSavedSnapshot = !!savedData; // ★保存済みデータがある科目は「保存済み」とみなす
+      setUnsavedChanges(false);
   } catch (e) {
     console.warn("[WARN] failed to restore saved scores", e);
   }
@@ -1829,6 +1906,7 @@ if (!unsavedListenerInitialized && tbody) {
     if (!isNumberScoreInput && !isSpecialSelect) return;
 
     setUnsavedChanges(true);
+    isSavedAfterLastEdit = false;
 
     const tr = target.closest("tr");
     // 特別科目は点数計算しないので、行再計算は呼ばなくてOK
@@ -1960,9 +2038,33 @@ if (excelBtn) {
 
 
 updateElectiveRegistrationButtons(subject);
-
 }
 
+// =====================================================
+// 【最終安全ガード】未保存のまま教務送信を絶対にさせない
+// =====================================================
+(() => {
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (!submitBtn) return;
+
+  // 二重登録防止
+  if (submitBtn.__finalGuardInstalled) return;
+  submitBtn.__finalGuardInstalled = true;
+
+  submitBtn.addEventListener(
+    "click",
+    (e) => {
+      // 🔴 未保存なら絶対に止める
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        alert("未保存の変更があります。\n先に一時保存してください。");
+        return false;
+      }
+    },
+    true // ★ capture=true（これが無いと意味がない）
+  );
+})();
 
 // ================================
 // スコア保存（楽観ロック付き・学生単位）
@@ -2369,6 +2471,8 @@ if (currentSubjectMeta.specialType === 2) {
           showSaveSuccessToast();
           setInfoMessage(`保存しました（0件）`);
           setUnsavedChanges(false);
+          isSavedAfterLastEdit = true;
+          hasSavedSnapshot = true; // ★0件でも「保存済み」状態にする
           return;
         }
 
@@ -2395,6 +2499,7 @@ if (currentSubjectMeta.specialType === 2) {
         scoresCache.delete(currentSubjectId);
         setInfoMessage(`保存しました（${saveCount}件）`);
         setUnsavedChanges(false);
+        hasSavedSnapshot = true; // ★保存成功 → 提出可能状態へ
       } catch (e) {
         console.error("[save click]", e);
         alert("保存中にエラーが発生しました。コンソールログを確認してください。");
@@ -2509,6 +2614,50 @@ function openElectiveModal() {
   const modal = document.getElementById("electiveModal");
   if (modal) modal.style.display = "flex";
 }
+
+// ================================
+// STEP1: 提出単位・完了条件の解決
+// ================================
+
+function resolveRequiredUnits({ grade, subjectMeta }) {
+  // 非共通・非共通選択・特別科目
+  if (!subjectMeta?.isCommon) {
+    return ["ALL"];
+  }
+
+  // 共通・共通選択
+  if (Number(grade) <= 2) {
+    // 1・2年 共通
+    return ["1", "2", "3", "4", "5"];
+  }
+
+  // 3年以上 共通（CA は統合）
+  return ["M", "E", "I", "CA"];
+}
+
+function resolveCurrentUnitKey({ grade, subjectMeta, visibleStudents }) {
+  // 非共通・非共通選択・特別科目
+  if (!subjectMeta?.isCommon) {
+    return "ALL";
+  }
+
+  if (!visibleStudents || visibleStudents.length === 0) {
+    return null; // 念のため
+  }
+
+  // 1・2年 共通
+  if (Number(grade) <= 2) {
+    // class は "1"〜"5" を想定（現コード仕様）
+    return String(visibleStudents[0].class);
+  }
+
+  // 3年以上 共通・共通選択
+  const c = visibleStudents[0].course;
+  // C / A は CA に正規化
+  if (c === "C" || c === "A") return "CA";
+  return c; // "M","E","I"
+}
+
 
 // getStudentsForSubject: 超過学生登録等と共通の名簿取得ラッパー
 function getStudentsForSubject() {
