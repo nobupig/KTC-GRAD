@@ -763,7 +763,9 @@ if (lockedInfo) {
     tr.querySelectorAll("input, select").forEach(el => {
       el.disabled = true;
     });
-
+  if (typeof showSubmittedLockNotice === "function") {
+   showSubmittedLockNotice();
+  }
     // 視覚的ヒント（任意）
     tr.title = "このユニットは既に提出済みのため編集できません";
   }
@@ -1028,8 +1030,48 @@ window.submitScoresForSubject = async function () {
       ...updatePayload,
       updatedAt: now,
     });
+    // ★ 送信直後フラグ（自動UI更新による復活防止）
+    window.__justSubmitted = true;
 
-    alert("成績を送信しました（教務提出）。");
+// ===============================
+// STEP3-1：送信直後に即ロック
+// ===============================
+try {
+  // 提出ボタンを即ロック
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "提出済み";
+  }
+
+  // 一時保存も無効化
+  const saveBtn = document.getElementById("saveTempBtn");
+  if (saveBtn) saveBtn.disabled = true;
+
+  // 表示中の行を即ロック
+  const tbody = document.getElementById("scoreTableBody");
+  if (tbody) {
+    tbody.querySelectorAll("tr").forEach((tr) => {
+      if (tr.offsetParent === null) return;
+      tr.classList.add("locked-row");
+      tr.querySelectorAll("input, select, textarea").forEach((el) => {
+        el.disabled = true;
+      });
+    });
+    showSubmittedLockNotice();
+  }
+} catch (e) {
+  console.warn("[STEP3-1] immediate lock skipped:", e);
+}
+const goNext = window.confirm(
+  "送信しました。\n別の組・コースの入力を続けますか？"
+);
+if (!goNext) {
+  document.getElementById("backHomeBtn")?.click();
+  return;
+}
+
+    // 送信完了案内は confirm 済み
 
   } catch (e) {
     console.error(e);
@@ -1081,6 +1123,13 @@ try {
 
  const update = () => {
   try {
+        // ★ 送信直後は自動更新を完全停止（即ロック維持）
+    if (window.__justSubmitted) {
+      btn.disabled = true;
+      btn.textContent = "提出済み";
+      
+    }
+
     if (typeof window.updateSubmitUI === "function") {
       window.updateSubmitUI({
         subjectDocData: window.__latestScoresDocData || {},
