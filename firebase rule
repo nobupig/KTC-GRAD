@@ -55,66 +55,44 @@ service cloud.firestore {
     // settings（成績期間設定）
     // -----------------------------------------
     match /settings/{doc} {
-      allow read: if isTeacher();
+      allow read: if request.auth != null;
       allow write: if false;
     }
-
-    // -----------------------------------------
-    // teacherSubjects_YYYY（教員担当科目）
-    // -----------------------------------------
-    match /{col}/{email} {
-      allow read: if
-        isTeacher() &&
-        col.matches('teacherSubjects_\\d{4}');
-
-      allow write: if
-        isTeacher() &&
-        col.matches('teacherSubjects_\\d{4}') &&
-        request.auth.token.email == email;
-    }
-
-  // -----------------------------------------
-// subjectRoster_YYYY（科目別受講者リスト）
 // -----------------------------------------
-match /{col}/{subjectId} {
+// 年度付きコレクション（衝突防止のため 1 本に集約）
+// -----------------------------------------
+match /{col}/{docId} {
+
+  // teacherSubjects_YYYY（教員本人のみ書込み）
   allow read: if
     isTeacher() &&
-    col.matches('subjectRoster_\\d{4}');
+    col.matches('teacherSubjects_\\d{4}');
 
-  allow create, update, delete: if
+  allow write: if
+    isTeacher() &&
+    col.matches('teacherSubjects_\\d{4}') &&
+    request.auth.token.email == docId;
+
+  // subjectRoster_YYYY（教員なら OK）
+  allow read, create, update, delete: if
     isTeacher() &&
     col.matches('subjectRoster_\\d{4}');
+
+  // electiveRegistrations_YYYY（教員なら OK）
+  allow read, create, update, delete: if
+    isTeacher() &&
+    col.matches('electiveRegistrations_\\d{4}');
+
+  // scores / evaluation / skillLevels（教員なら OK）
+  allow read, write: if
+    isTeacher() &&
+    (
+      col.matches('evaluationCriteria_\\d{4}') ||
+      col.matches('evaluationLocks_\\d{4}') ||
+      col.matches('evaluationHistory_\\d{4}') ||
+      col.matches('skillLevels_\\d{4}') ||
+      col.matches('scores_\\d{4}')
+    );
 }
-
-    // -----------------------------------------
-    // ✅ electiveRegistrations_YYYY（選択科目登録）
-    // ここが今回の重要修正ポイント：update/arrayUnion/arrayRemove を許可
-    // -----------------------------------------
-    match /{col}/{subjectId} {
-      allow read: if
-        isTeacher() &&
-        col.matches('electiveRegistrations_\\d{4}');
-
-      // ※ arrayUnion/arrayRemove は update として判定されるので update を許可する必要あり
-      // ※ 初回にドキュメントが無い場合もあるので create も許可（必要に応じて）
-      allow create, update, delete: if
-        isTeacher() &&
-        col.matches('electiveRegistrations_\\d{4}');
-    }
-
-    // -----------------------------------------
-    // 年度別 成績・評価・習熟度 系（electiveRegistrations は上で個別許可）
-    // -----------------------------------------
-    match /{col}/{docId} {
-      allow read, write: if
-        isTeacher() &&
-        (
-          col.matches('evaluationCriteria_\\d{4}') ||
-          col.matches('evaluationLocks_\\d{4}') ||
-          col.matches('evaluationHistory_\\d{4}') ||
-          col.matches('skillLevels_\\d{4}') ||
-          col.matches('scores_\\d{4}')
-        );
-    }
   }
 }

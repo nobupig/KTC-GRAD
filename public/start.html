@@ -195,6 +195,11 @@
   </main>
 
   <script type="module">
+  import { initSchoolYear } from "./js/schoolYear.js";
+
+  // 年度を最初に確定（全ページ共通）
+  initSchoolYear();
+
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import {
       getAuth,
@@ -232,7 +237,7 @@
     const viewModeBtn = document.getElementById("viewModeBtn");
     const statusMessage = document.getElementById("statusMessage");
 
-    const currentYear = new Date().getFullYear();
+    const currentYear = window.CURRENT_YEAR;
     const teacherSubjectsCol = `teacherSubjects_${currentYear}`;
 
     let currentUser = null;
@@ -293,11 +298,22 @@ const normalSubjects = subjects.filter(
 const notCompleted = [];
 
 for (const subj of normalSubjects) {
-  const completed = await isCriteriaCompleted(subj.subjectId);
-  if (!completed) {
+  const cs = subj.completionSummary || null;
+
+  console.log(
+    "[START MENU SUBJECT]",
+    subj.subjectId,
+    cs?.isCompleted ?? null,
+    cs?.completedUnits ?? null,
+    cs?.requiredUnits ?? null
+  );
+
+  // 🔴 未完了は notCompleted 扱い
+  if (!cs || cs.isCompleted !== true) {
     notCompleted.push(subj.subjectId);
   }
 }
+
 
 
       if (notCompleted.length === 0) {

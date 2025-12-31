@@ -474,6 +474,12 @@ Slackで担当者までDM連絡をしてください。
 
   <!-- Firebase & ロジック -->
   <script type="module">
+  import { initSchoolYear } from "./js/schoolYear.js";
+
+  // 年度を最初に確定（全ページ共通）
+  initSchoolYear();
+
+
     // ===== Firebase 初期化 =====
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import {
@@ -731,7 +737,7 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
 
         // ===== 提出済科目マップを作成 =====
 const submittedMap = {};
-const year = new Date().getFullYear();
+const year = window.CURRENT_YEAR;
 
 for (const docSnap of snap.docs) {
   const subjectId = docSnap.id;
@@ -912,7 +918,7 @@ function getSelectedSubjects() {
 
     async function loadTeacherSubjects() {
       if (!currentUser) return;
-      const year = new Date().getFullYear();
+      const year = window.CURRENT_YEAR;
       const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
       const snap = await getDoc(ref);
       if (!snap.exists()) {
@@ -962,8 +968,8 @@ function getSelectedSubjects() {
     // ▼ STEP3-2：科目削除（Firestore 更新のみ。UIとは未接続）
     async function deleteSubject(subjectId) {
       if (!currentUser) return;
-      const evalCol = `evaluationCriteria_${new Date().getFullYear()}`;
-      const year = new Date().getFullYear();
+       const evalCol = `evaluationCriteria_${window.CURRENT_YEAR}`;
+      const year = window.CURRENT_YEAR;
       const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
       const snap = await getDoc(ref);
 
@@ -1047,7 +1053,7 @@ if (cnt <= 0) {
 
     try {
       // ★ 追加：年度を取得
-      const currentYear = new Date().getFullYear();
+      const currentYear = window.CURRENT_YEAR;
 
       // ★ teacherSubjects_2025 / teacherSubjects_2026 …へ書き込み
       const ref = doc(db, `teacherSubjects_${currentYear}`, currentUser.email);
@@ -1294,7 +1300,7 @@ for (const s of addedSubjects) {
         return;
       }
 
-      const year = new Date().getFullYear();
+      const year = window.CURRENT_YEAR;
       const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
       const snap = await getDoc(ref);
 
@@ -1321,7 +1327,7 @@ for (const s of addedSubjects) {
     evalOkBtn.addEventListener("click", async () => {
       // ▼ 正しい subjectId を選択して評価基準画面に渡す処理
       let subjectId = null;
-      const year = new Date().getFullYear();
+      const year = window.CURRENT_YEAR;
       const ref = doc(db, `teacherSubjects_${year}`, currentUser.email);
       const snap = await getDoc(ref);
 

@@ -181,11 +181,15 @@
   <!-- JS 読み込み（あなたの public/js 構造に合わせたもの） -->
   <!-- ========================================= -->
     <!-- ✅ 追加：SheetJS（Excel生成） -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module">
-    import { initScoreInput } from "./js/score_input_loader.js";
-    initScoreInput();
-  </script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script type="module">
+  import { initSchoolYear } from "./js/schoolYear.js";
+  import { initScoreInput } from "./js/score_input_loader.js";
+
+  initSchoolYear();     // ← 年度はここで一度だけ確定
+  initScoreInput();
+</script>
 
   <div id="electiveModal" class="ktc-modal" style="display:none;">
     <div class="ktc-modal-content">

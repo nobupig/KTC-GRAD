@@ -283,6 +283,10 @@
   </div>
 
   <script type="module">
+      import { initSchoolYear } from "./js/schoolYear.js";
+
+  // 年度を最初に確定（全ページ共通）
+  initSchoolYear();
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import {
       getAuth,
@@ -348,7 +352,7 @@
     // ================================
     // グローバル状態
     // ================================
-    const currentYear = new Date().getFullYear();
+    const currentYear = window.CURRENT_YEAR;
     const evalColName = `evaluationCriteria_${currentYear}`;
     const lockColName = `evaluationLocks_${currentYear}`;
 

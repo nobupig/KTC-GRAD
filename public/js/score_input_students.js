@@ -154,7 +154,7 @@ async function performSkillLevelSave(subjectId, studentId, value) {
     },
     { merge: true }
   );
-}
+ }
 // js/score_input_students.js
 // STEP A：学生名簿の取得・フィルタ・テーブル行レンダリング専用モジュール
 
@@ -966,12 +966,42 @@ const unitKey = getUnitKeyForStudent(student, subject);
   };
 }
 
+// ==========================================
+// completion 用：requiredUnits 解決関数
+// loader.js と同一ロジック（students.js 用）
+// ==========================================
+function resolveRequiredUnits({ grade, subjectMeta }) {
+  const isCommon = subjectMeta?.isCommon === true;
+
+  // ★ 単一科目：提出が1回でもあれば完了扱い
+  if (!isCommon) {
+    return ["__SINGLE__"];
+  }
+
+  // 共通科目
+  if (grade === "1" || grade === "2") {
+    return ["1", "2", "3", "4", "5"];
+  }
+
+  return ["M", "E", "I", "CA"];
+}
+
+
 
 
 // ================================
 // STEP C: 成績送信（教務提出）
 // ================================
 window.submitScoresForSubject = async function () {
+  // ================================
+// ★ Auth 完了保証（teacherEmail missing 対策）
+// ================================
+if (!window.currentUser || !window.currentUser.email) {
+  console.error("[submit] currentUser not ready", window.currentUser);
+  alert("ログイン情報の取得が完了していません。\n数秒待ってから再度送信してください。");
+  return;
+}
+
   // 1) 送信可否チェック（既存）
   const check = canSubmitScoresByVisibleRows();
   if (!check.ok) {
@@ -1024,10 +1054,107 @@ window.submitScoresForSubject = async function () {
       return;
     }
 
-    await updateDoc(ref, {
-      ...updatePayload,
-      updatedAt: now,
+   // ================================
+// completion 再計算（提出成功前に確定値を作って一緒に保存）
+// 目的：共通科目で「全unit揃ったか」をFirestore側で正本化する
+// ================================
+
+// requiredUnits（科目メタから機械的に決める：UI/フィルタは見ない）
+const requiredUnits = resolveRequiredUnits({
+  grade: String(subject?.grade ?? ""),
+  subjectMeta: window.currentSubjectMeta
+});
+
+// completedUnits（既存 + 今回提出分を合成して確定）
+const existingUnits = Object.keys(window.__latestScoresDocData?.submittedSnapshot?.units || {});
+const newUnits = Object.keys(snapshotByUnit?.units || {});
+const completedUnits = Array.from(new Set([...existingUnits, ...newUnits]));
+
+// isCompleted（毎回フル再計算）
+const isCompleted =
+  requiredUnits.length > 0 &&
+  requiredUnits.every(u => completedUnits.includes(u));
+
+const completion = {
+  requiredUnits,
+  completedUnits,
+  isCompleted,
+  completedAt: isCompleted ? now : null,
+  completedBy: isCompleted ? userEmail : null,
+};
+
+await updateDoc(ref, {
+  ...updatePayload,
+  completion,      // ★これを追加
+  updatedAt: now,
+});
+
+// ================================
+// STEP3-B: completion を teacherSubjects に複写（確実版）
+// ================================
+try {
+  const teacherEmail = window.currentUser?.email || "";
+  if (!teacherEmail) throw new Error("teacherEmail missing (window.currentUser.email)");
+
+  const tsRef = doc(db, `teacherSubjects_${currentYear}`, teacherEmail);
+
+  // まず読めるか確認（読めないならルール or 認証）
+  const tsSnap = await getDoc(tsRef);
+  if (!tsSnap.exists()) {
+    throw new Error(`teacherSubjects doc not found: ${teacherEmail}`);
+  }
+
+  const data = tsSnap.data() || {};
+  const subjects = Array.isArray(data.subjects) ? data.subjects : [];
+
+  // subjectId 一致を “ログで” 必ず確認
+  const hitIndex = subjects.findIndex(s => s?.subjectId === subjectId);
+  console.log("[completion copy] subjectId=", subjectId, "hitIndex=", hitIndex);
+
+  if (hitIndex < 0) {
+    console.warn("[completion copy] subjectId not found in teacherSubjects.subjects", {
+      teacherEmail,
+      subjectId,
+      existingSubjectIds: subjects.map(s => s?.subjectId).filter(Boolean),
     });
+  }
+
+  const completionSummary = {
+    isCompleted: completion?.isCompleted === true,
+    completedUnits: Array.isArray(completion?.completedUnits) ? completion.completedUnits : [],
+    requiredUnits: Array.isArray(completion?.requiredUnits) ? completion.requiredUnits : [],
+    // scores 側が serverTimestamp のままだと start.html で扱いづらいので null 許容でOK
+    completedAt: completion?.completedAt ?? null,
+    
+  };
+
+  const updatedSubjects = subjects.map(s => {
+    if (s?.subjectId === subjectId) {
+      return {
+        ...s,
+        completionSummary, // ★ここが start.html の唯一の正本になる
+      };
+    }
+    return s;
+  });
+
+ await setDoc(
+  tsRef,
+  {
+    subjects: updatedSubjects,
+    completionUpdatedAt: serverTimestamp(), // ★ 配列の外
+  },
+  { merge: true }
+);
+
+  console.log("[completion copy] DONE", { teacherEmail, subjectId, completionSummary });
+
+} catch (e) {
+  // ★ 握りつぶさず “エラー” にする（あなたが気づけるように）
+  console.error("[completion copy] FAILED", e);
+}
+
+
     // ★ 送信直後フラグ（自動UI更新による復活防止）
     window.__justSubmitted = true;
 
@@ -1056,7 +1183,9 @@ try {
         el.disabled = true;
       });
     });
-    showSubmittedLockNotice();
+    if (typeof window.showSubmittedLockNotice === "function") {
+  window.showSubmittedLockNotice();
+}
   }
 } catch (e) {
   console.warn("[STEP3-1] immediate lock skipped:", e);

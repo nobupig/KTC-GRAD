@@ -1829,19 +1829,6 @@ window.__submissionContext = {
   })
 };
 
-// ===============================
-// 提出済み文言の表示（暫定：単一科目のみ）
-// 共通科目は「一部提出で誤表示」しやすいので今回は出さない
-// ===============================
-const __unitsMap = window.__latestScoresDocData?.submittedSnapshot?.units || {};
-const __unitKey = window.__submissionContext?.unitKey; // 単一科目はここが "5" や "M" などになる
-
-if (!currentSubjectMeta?.isCommon && __unitKey != null && hasSubmittedUnit(__unitsMap, String(__unitKey))) {
-  showSubmittedLockNotice();
-  lockScoreInputUI();
-}
-
-
 
 console.log(
   "[STEP1] submissionContext",
@@ -2146,7 +2133,13 @@ updateElectiveRegistrationButtons(subject);
 const isScoreLocked = document.body.classList.contains("score-locked");
 // ※ ここで handleSubjectChange を終了しない（下の「提出済み文言再表示」まで必ず到達させる）
 
-
+// ===============================
+// 提出済み文言の最終判定（completion 正本）
+// ===============================
+if (window.__latestScoresDocData?.completion?.isCompleted === true) {
+  showSubmittedLockNotice();
+  lockScoreInputUI();
+}
 }
 
 // =====================================================
@@ -2653,6 +2646,7 @@ if (currentSubjectMeta.specialType === 2) {
     }
 
     currentUser = user;
+    window.currentUser = user; // ★追加：score_input_students.js が参照する
 
     // 教員名表示
     const teacherName = await loadTeacherName(user);
@@ -3071,7 +3065,7 @@ function showSaveSuccessToast() {
 export async function checkIfSubmitted(db, subjectId, unitKey) {
   if (!subjectId) return false;
 
-  const year = new Date().getFullYear();
+  const year = window.CURRENT_YEAR;
   const ref = doc(db, `scores_${year}`, subjectId);
 
   try {
@@ -3206,6 +3200,8 @@ function showSubmittedLockNotice() {
   }
  
 }
+
+window.showSubmittedLockNotice = showSubmittedLockNotice; // ★追加：students.js から呼べるようにする
 function hideSubmittedLockNotice() {
   document
     .querySelectorAll(".submitted-lock-notice")
