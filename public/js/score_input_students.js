@@ -763,9 +763,7 @@ if (lockedInfo) {
     tr.querySelectorAll("input, select").forEach(el => {
       el.disabled = true;
     });
-  if (typeof showSubmittedLockNotice === "function") {
-   showSubmittedLockNotice();
-  }
+
     // 視覚的ヒント（任意）
     tr.title = "このユニットは既に提出済みのため編集できません";
   }

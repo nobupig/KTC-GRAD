@@ -1830,17 +1830,17 @@ window.__submissionContext = {
 };
 
 // ===============================
-// 提出済み文言の表示（確定位置）
+// 提出済み文言の表示（暫定：単一科目のみ）
+// 共通科目は「一部提出で誤表示」しやすいので今回は出さない
 // ===============================
-const submittedUnits =
-  window.__latestScoresDocData?.submittedSnapshot?.units || {};
+const __unitsMap = window.__latestScoresDocData?.submittedSnapshot?.units || {};
+const __unitKey = window.__submissionContext?.unitKey; // 単一科目はここが "5" や "M" などになる
 
-const currentUnitKey = window.__submissionContext?.unitKey;
-
-if (currentUnitKey && hasSubmittedUnit(submittedUnits, String(currentUnitKey))) {
+if (!currentSubjectMeta?.isCommon && __unitKey != null && hasSubmittedUnit(__unitsMap, String(__unitKey))) {
   showSubmittedLockNotice();
   lockScoreInputUI();
-} 
+}
+
 
 
 console.log(
@@ -2146,18 +2146,6 @@ updateElectiveRegistrationButtons(subject);
 const isScoreLocked = document.body.classList.contains("score-locked");
 // ※ ここで handleSubjectChange を終了しない（下の「提出済み文言再表示」まで必ず到達させる）
 
-const submissionContext = window.__submissionContext;
-const unitKey = submissionContext?.unitKey;
-
-const submittedUnits =
-  window.__latestScoresDocData?.submittedSnapshot?.units || {};
-
-// unitKey が取れた場合のみ判定（単一科目は "ALL" 等が入る想定）
-if (unitKey != null && hasSubmittedUnit(submittedUnits, String(unitKey))) {
-  showSubmittedLockNotice();
-  lockScoreInputUI(); // 提出済みは必ずロック
-}
-
 
 }
 
@@ -2427,12 +2415,24 @@ if (
     applyRiskClassesToAllRows();
   });
   // ★ 提出済みユニット判定（正本ベース）
+// ★ 提出済みユニット判定（正本ベース）
+// 単一科目では filterKey="all" になりがちなので submissionContext.unitKey を救済する
 const unitsMap =
   window.__latestScoresDocData?.submittedSnapshot?.units || {};
 
-if (filterKey && filterKey !== "all" && hasSubmittedUnit(unitsMap, String(filterKey))) {
+const isCommon = !!window.currentSubjectMeta?.isCommon;
+
+// 単一科目：all のときは unitKey を使う（例："5","M"など）
+// 共通科目：all のときは判定しない（今回の方針：文言を出さない）
+const effectiveKey =
+  (!isCommon && (filterKey === "all" || filterKey == null))
+    ? window.__submissionContext?.unitKey
+    : filterKey;
+
+if (effectiveKey && effectiveKey !== "all" && hasSubmittedUnit(unitsMap, String(effectiveKey))) {
   lockScoreInputUI();
-  showSubmittedLockNotice();
+  // 文言は単一科目のみ表示（共通科目は今回は出さない）
+  if (!isCommon) showSubmittedLockNotice();
 } else {
   unlockScoreInputUI();
 }
@@ -2772,27 +2772,29 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
 }
 
 function resolveCurrentUnitKey({ grade, subjectMeta, visibleStudents }) {
-  // 非共通・非共通選択・特別科目
-  if (!subjectMeta?.isCommon) {
-    return "ALL";
-  }
+  if (!visibleStudents || visibleStudents.length === 0) return null;
 
-  if (!visibleStudents || visibleStudents.length === 0) {
-    return null; // 念のため
-  }
+  const first = visibleStudents[0] || {};
 
-  // 1・2年 共通
+  // 1・2年：組（1〜5）を unitKey にする
   if (Number(grade) <= 2) {
-    // class は "1"〜"5" を想定（現コード仕様）
-    return String(visibleStudents[0].class);
+    const g = first.classGroup ?? first.courseClass ?? first.group ?? first.class ?? "";
+    return g ? String(g) : null;
   }
 
-  // 3年以上 共通・共通選択
-  const c = visibleStudents[0].course;
-  // C / A は CA に正規化
-  if (c === "C" || c === "A") return "CA";
-  return c; // "M","E","I"
+  // 3年以上：コース（M/E/I/C/A）を unitKey にする
+  // ※重要：単一科目では C/A を CA にまとめない（提出済キーが 'C' だから）
+  const c = String(first.courseClass ?? first.course ?? "").toUpperCase();
+  if (!c) return null;
+
+  // 共通科目だけ C/A を CA にまとめる（将来の完成形用）
+  if (subjectMeta?.isCommon && (c === "C" || c === "A")) return "CA";
+
+  // 単一科目（または共通以外）では 'C' / 'A' をそのまま返す
+  return c;
 }
+
+
 
 
 // getStudentsForSubject: 超過学生登録等と共通の名簿取得ラッパー
@@ -3208,4 +3210,35 @@ function hideSubmittedLockNotice() {
   document
     .querySelectorAll(".submitted-lock-notice")
     .forEach((el) => el.remove());
+}
+
+/**
+ * 科目が「全 unit 提出済」かどうかを判定する
+ * ※ 文言表示・UI制御専用（ロック処理には使わない）
+ */
+/**
+ * 科目が「全 unit 提出済」かどうかを判定する
+ * ※ 文言表示・UI制御専用（ロック処理には使わない）
+ */
+function isSubjectFullySubmitted(subjectDocData) {
+  if (!subjectDocData) return false;
+
+  const completion = subjectDocData.completion;
+  if (!completion) return false;
+
+  const required = completion.requiredUnits;
+  const completed = completion.completedUnits || [];
+
+  // ----------------------------------------
+  // 単一科目（requiredUnits が無い or 空）
+  // ----------------------------------------
+  if (!Array.isArray(required) || required.length === 0) {
+    return completion.isCompleted === true;
+  }
+
+  // ----------------------------------------
+  // 共通科目（複数 unit）
+  // ----------------------------------------
+  // 全 requiredUnits が completedUnits に含まれているか
+  return required.every(unit => completed.includes(unit));
 }
