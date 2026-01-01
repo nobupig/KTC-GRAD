@@ -19,6 +19,9 @@ let currentSubjectMeta = {
   required: false,
   specialType: 0,
 };
+
+window.currentSubjectMeta = currentSubjectMeta;
+
 // 選択科目モーダル用ソートモード
 // "group" | "course" | null
 let electiveModalSortMode = null;
@@ -1458,6 +1461,8 @@ async function handleSubjectChange(subjectId) {
     };
     
     return;
+    window.currentSubjectMeta = currentSubjectMeta;
+
   }
   // ▼ 同一科目の再読込防止（Reads削減の核心）
   if (subjectId === currentSubjectId) {
@@ -2424,11 +2429,21 @@ const effectiveKey =
 
 if (effectiveKey && effectiveKey !== "all" && hasSubmittedUnit(unitsMap, String(effectiveKey))) {
   lockScoreInputUI();
+
   // 文言は単一科目のみ表示（共通科目は今回は出さない）
-  if (!isCommon) showSubmittedLockNotice();
+  if (!isCommon) {
+    showSubmittedLockNotice();
+  } else {
+    // 共通科目で過去に出た文言が残らないように必ず消す
+    hideSubmittedLockNotice();
+  }
 } else {
   unlockScoreInputUI();
+
+  // ★重要：未提出側へ切り替えた瞬間に、提出済文言を必ず消す
+  hideSubmittedLockNotice();
 }
+
 
 }
 
@@ -2752,8 +2767,8 @@ function openElectiveModal() {
 function resolveRequiredUnits({ grade, subjectMeta }) {
   // 非共通・非共通選択・特別科目
   if (!subjectMeta?.isCommon) {
-    return ["ALL"];
-  }
+  return ["__SINGLE__"];
+}
 
   // 共通・共通選択
   if (Number(grade) <= 2) {
@@ -3120,10 +3135,11 @@ function unlockScoreInputUI() {
   // ================================
    const activeFilterBtn =
     document.querySelector("#groupFilterArea .filter-btn.active");
-     const unitKey =
-    activeFilterBtn?.dataset?.filterKey ??
-    window.__submissionContext?.unitKey ??
-    "ALL";
+   const rawKey = activeFilterBtn?.dataset?.filterKey;
+const unitKey =
+  (rawKey && rawKey !== "all")
+    ? rawKey
+    : (window.__submissionContext?.unitKey ?? "ALL");
 
   const unitsMap =
     window.__latestScoresDocData?.submittedSnapshot?.units || {};
@@ -3228,6 +3244,11 @@ function isSubjectFullySubmitted(subjectDocData) {
   // ----------------------------------------
   // 単一科目（requiredUnits が無い or 空）
   // ----------------------------------------
+
+if (Array.isArray(required) && required[0] === "__SINGLE__") {
+  return completion.isCompleted === true || (completed && completed.length > 0);
+}
+
   if (!Array.isArray(required) || required.length === 0) {
     return completion.isCompleted === true;
   }

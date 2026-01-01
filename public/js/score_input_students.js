@@ -1068,12 +1068,22 @@ const requiredUnits = resolveRequiredUnits({
 // completedUnits（既存 + 今回提出分を合成して確定）
 const existingUnits = Object.keys(window.__latestScoresDocData?.submittedSnapshot?.units || {});
 const newUnits = Object.keys(snapshotByUnit?.units || {});
-const completedUnits = Array.from(new Set([...existingUnits, ...newUnits]));
+const submittedAny = Array.from(new Set([...existingUnits, ...newUnits]));
 
-// isCompleted（毎回フル再計算）
-const isCompleted =
-  requiredUnits.length > 0 &&
-  requiredUnits.every(u => completedUnits.includes(u));
+// ★ 単一科目は「1回でも提出があれば完了」
+let completedUnits;
+let isCompleted;
+
+if (requiredUnits?.[0] === "__SINGLE__") {
+  isCompleted = submittedAny.length > 0;
+  // ★提出済みの実キーを保持（例: ["C"] や ["5"]）
+  completedUnits = submittedAny;
+} else {
+  completedUnits = submittedAny;
+  isCompleted =
+    requiredUnits.length > 0 &&
+    requiredUnits.every(u => completedUnits.includes(u));
+}
 
 const completion = {
   requiredUnits,
@@ -1109,43 +1119,48 @@ try {
 
   // subjectId 一致を “ログで” 必ず確認
   const hitIndex = subjects.findIndex(s => s?.subjectId === subjectId);
-  console.log("[completion copy] subjectId=", subjectId, "hitIndex=", hitIndex);
+console.log("[completion copy] subjectId=", subjectId, "hitIndex=", hitIndex);
 
-  if (hitIndex < 0) {
-    console.warn("[completion copy] subjectId not found in teacherSubjects.subjects", {
-      teacherEmail,
-      subjectId,
-      existingSubjectIds: subjects.map(s => s?.subjectId).filter(Boolean),
-    });
-  }
+const completionSummary = {
+  isCompleted,
+  completedUnits,
+  requiredUnits,
+   completedAt: isCompleted ? true : null,
+};
 
-  const completionSummary = {
-    isCompleted: completion?.isCompleted === true,
-    completedUnits: Array.isArray(completion?.completedUnits) ? completion.completedUnits : [],
-    requiredUnits: Array.isArray(completion?.requiredUnits) ? completion.requiredUnits : [],
-    // scores 側が serverTimestamp のままだと start.html で扱いづらいので null 許容でOK
-    completedAt: completion?.completedAt ?? null,
-    
-  };
+// ★ ここが唯一の修正点
+const updatedSubjects =
+  hitIndex >= 0
+    ? subjects.map(s => {
+        if (s?.subjectId === subjectId) {
+          return {
+            ...s,
+            completionSummary,
+          };
+        }
+        return s;
+      })
+    : [
+        ...subjects,
+        {
+          subjectId,
+          completionSummary,
+        },
+      ];
 
-  const updatedSubjects = subjects.map(s => {
-    if (s?.subjectId === subjectId) {
-      return {
-        ...s,
-        completionSummary, // ★ここが start.html の唯一の正本になる
-      };
-    }
-    return s;
-  });
-
- await setDoc(
+await setDoc(
   tsRef,
   {
     subjects: updatedSubjects,
-    completionUpdatedAt: serverTimestamp(), // ★ 配列の外
   },
   { merge: true }
 );
+
+// ★ 配列と分けて更新する
+await updateDoc(tsRef, {
+  completionUpdatedAt: serverTimestamp(),
+});
+
 
   console.log("[completion copy] DONE", { teacherEmail, subjectId, completionSummary });
 

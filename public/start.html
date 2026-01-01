@@ -167,6 +167,10 @@
           評価基準が未入力の科目がある場合は、評価基準入力画面から再開します。<br>
           すべての科目の評価基準が確定済みの場合は、成績入力画面に遷移します。
         </p>
+
+          <div class="unit-status-area" id="unitStatusArea">
+    <!-- JSで動的に挿入 -->
+  </div>       
         <button id="continueBtn" class="btn-primary">途中再開する</button>
       </div>
 
@@ -237,6 +241,90 @@
     const viewModeBtn = document.getElementById("viewModeBtn");
     const statusMessage = document.getElementById("statusMessage");
 
+    // ★ teacherSubjects に completionSummary が無い場合の保険
+async function fetchCompletionSummaryFromScores(subjectId) {
+  try {
+    const ref = doc(db, `scores_${window.CURRENT_YEAR}`, subjectId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+
+    const completion = snap.data()?.completion;
+    if (!completion) return null;
+
+    return {
+      isCompleted: completion.isCompleted ?? null,
+      completedUnits: completion.completedUnits ?? null,
+      requiredUnits: completion.requiredUnits ?? null,
+      completedAt: completion.completedAt ?? null,
+      completedBy: completion.completedBy ?? null,
+    };
+  } catch (e) {
+    console.warn("[Start] fallback fetch failed:", subjectId, e);
+    return null;
+  }
+}
+
+
+    /**
+ * 共通科目の unit 提出状況を表示する（フェーズ1：表示のみ）
+ *
+ * @param {HTMLElement|null} area
+ * @param {object|null} completionSummary
+ * @param {string} currentUserEmail
+ */
+function renderUnitStatus(area, completionSummary, currentUserEmail) {
+  if (!area) return;
+
+  // 初期化（引きずり防止）
+  area.innerHTML = "";
+
+  if (!completionSummary) return;
+
+  const {
+    isCompleted,
+    completedUnits = [],
+    requiredUnits = [],
+  } = completionSummary;
+
+  // 完全提出なら unit 表示は出さない
+  if (isCompleted === true) return;
+
+  // 共通科目以外（単一科目）は表示しない
+  if (
+    !Array.isArray(requiredUnits) ||
+    requiredUnits.length <= 1 ||
+    requiredUnits[0] === "__SINGLE__"
+  ) {
+    return;
+  }
+
+  // 一部提出のみ表示
+  if (!Array.isArray(completedUnits) || completedUnits.length === 0) return;
+
+  const title = document.createElement("div");
+  title.textContent = "提出状況：";
+  title.style.fontSize = "13px";
+  title.style.marginBottom = "4px";
+  area.appendChild(title);
+
+  const ul = document.createElement("ul");
+  ul.style.margin = "0";
+  ul.style.paddingLeft = "18px";
+  ul.style.fontSize = "13px";
+
+  completedUnits.forEach((unitKey) => {
+    const li = document.createElement("li");
+
+    // ★ 今フェーズでは提出者名は placeholder
+    // 次フェーズで submittedBy → 教員名に変換
+    li.textContent = `${unitKey}組：提出済`;
+
+    ul.appendChild(li);
+  });
+
+  area.appendChild(ul);
+}
+
     const currentYear = window.CURRENT_YEAR;
     const teacherSubjectsCol = `teacherSubjects_${currentYear}`;
 
@@ -298,7 +386,12 @@ const normalSubjects = subjects.filter(
 const notCompleted = [];
 
 for (const subj of normalSubjects) {
-  const cs = subj.completionSummary || null;
+  let cs = subj.completionSummary || null;
+
+  // ★ teacherSubjects に無ければ scores から補完
+  if (!cs) {
+    cs = await fetchCompletionSummaryFromScores(subj.subjectId);
+  }
 
   console.log(
     "[START MENU SUBJECT]",
@@ -308,13 +401,24 @@ for (const subj of normalSubjects) {
     cs?.requiredUnits ?? null
   );
 
-  // 🔴 未完了は notCompleted 扱い
   if (!cs || cs.isCompleted !== true) {
     notCompleted.push(subj.subjectId);
   }
 }
 
 
+// ★ フェーズ1：最初の未完了科目の unit 提出状況を表示
+const firstNotCompletedId = notCompleted[0];
+if (firstNotCompletedId) {
+  const target = normalSubjects.find(
+    s => s.subjectId === firstNotCompletedId
+  );
+  renderUnitStatus(
+    document.getElementById("unitStatusArea"),
+     unitCs,
+    currentUser?.email || ""
+  );
+}
 
       if (notCompleted.length === 0) {
         const sid = encodeURIComponent(subjects[0].subjectId);
