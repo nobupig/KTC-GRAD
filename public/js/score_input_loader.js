@@ -1453,19 +1453,26 @@ async function handleSubjectChange(subjectId) {
         <td class="no-data" colspan="6">科目が選択されていません。</td>
       </tr>
     `;
-    currentSubjectId = null;
+      currentSubjectId = null;
     currentSubjectMeta = {
       subjectId: null,
-      isCommon,    
+      isCommon: false,
       isSkillLevel: false,
       usesAdjustPoint: false,
       passRule: null,
       required: false,
       specialType: 0,
     };
-    
-    return;
+
+    // ★ 重要：window 側も必ず最新参照に更新
     window.currentSubjectMeta = currentSubjectMeta;
+    // ★ 任意①：dataset にも反映（mode 側の最優先参照）
+try {
+  document.body.dataset.subjectType = "unknown";
+} catch (e) {}
+    window.__currentSubjectMeta = currentSubjectMeta;
+
+    return;
 
   }
   // ▼ 同一科目の再読込防止（Reads削減の核心）
@@ -1503,16 +1510,26 @@ async function handleSubjectChange(subjectId) {
 
 // ★ 共通判定は「ここで1回だけ」
 const isCommon = String(subjectId).includes("_G_");
+// ★【ここが不足していた】科目メタをここで確定させる
+currentSubjectMeta = {
+  subjectId,
+  isCommon,
+  isSkillLevel,
+  usesAdjustPoint,
+  passRule,
+  required,
+  specialType,
+};
 
-  currentSubjectMeta = {
-    subjectId,
-    isCommon, 
-    isSkillLevel,
-    usesAdjustPoint,
-    passRule,
-    required,
-    specialType,
-  };
+// ★ mode / 赤点 / 貼り付けの正本をここで同期
+window.currentSubjectMeta = currentSubjectMeta;
+window.__currentSubjectMeta = currentSubjectMeta;
+
+// ★ 任意①：dataset にも反映（最優先参照）
+try {
+  document.body.dataset.subjectType = getSubjectType(currentSubjectMeta);
+} catch (e) {}
+
 
  // renderStudentRows 側が参照できるように subject にも載せる
   subject.specialType = specialType;
