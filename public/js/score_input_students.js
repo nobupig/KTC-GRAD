@@ -929,6 +929,11 @@ export function canSubmitScoresByVisibleRows() {
 
 
 function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope }) {
+    // ★ 現在選択中ユニット（UI単位）を保持
+  if (scope && scope.unitKey) {
+    window.currentUnitKey = scope.unitKey;
+  }
+  
   const rows = document.querySelectorAll("#scoreTableBody tr");
 
   const units = {};
@@ -965,6 +970,8 @@ const unitKey = getUnitKeyForStudent(student, subject);
     scope
   };
 }
+
+
 
 // ==========================================
 // completion 用：requiredUnits 解決関数

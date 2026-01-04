@@ -176,43 +176,37 @@ export function renderTableHeader(headerRow, criteriaState) {
   ths.forEach((th) => headerRow.appendChild(th));
 
   // ▼ ミニタブイベント
-  headerRow.addEventListener("click", (e) => {
-    const btn = e.target;
-    if (!(btn instanceof HTMLButtonElement)) return;
-    if (!btn.classList.contains("crit-mode-btn")) return;
+headerRow.addEventListener("click", (e) => {
+  const btn = e.target;
+  if (!(btn instanceof HTMLButtonElement)) return;
+  if (!btn.classList.contains("crit-mode-btn")) return;
 
-    const idx = Number(btn.dataset.index);
-    const item = criteriaState.items[idx];
-    if (!item) return;
+// ★ 表示中の行がロックされている場合はモード切替不可
+const tbody = document.getElementById("scoreTableBody");
+if (tbody && tbody.querySelector("tr.locked-row")) {
+  console.warn("[crit-mode] blocked: locked rows visible");
+  return;
+}
 
-    item.mode = btn.textContent === "素点" ? "raw" : "scaled";
 
-    btn.parentElement.querySelectorAll("button").forEach((b) =>
-      b.classList.toggle("active", b === btn)
-    );
 
- // ▼▼▼ 【ここがSTEP3追加部分】 ▼▼▼
-  const tbody = document.getElementById("scoreTableBody");
-  const inputs = tbody.querySelectorAll(`input[data-index="${idx}"]`);
+  // ===== ここから先は未提出時のみ =====
+  const idx = Number(btn.dataset.index);
+  const item = criteriaState.items[idx];
+  if (!item) return;
 
-  inputs.forEach((input) => {
-    const weight = Number(item.percent || 0);
+  item.mode = btn.textContent === "素点" ? "raw" : "scaled";
 
-    if (item.mode === "raw") {
-      input.max = String(weight);
-      input.placeholder = `0〜${weight}`;
-    } else {
-      input.max = "100";
-      input.placeholder = "0〜100";
-    }
-  });
-  // ▲▲▲ STEP3追加ここまで ▲▲▲
+  btn.parentElement.querySelectorAll("button").forEach((b) =>
+    b.classList.toggle("active", b === btn)
+  );
+
   
-import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
-  const tbody = document.getElementById("scoreTableBody");
-  recalcFinalScoresAfterRestore(tbody);
-});
+  import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
+    recalcFinalScoresAfterRestore(tbody);
   });
+});
+
 }
 /**
  * 評価基準が「単一・100%」かどうかを判定

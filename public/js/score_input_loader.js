@@ -2166,6 +2166,8 @@ const isScoreLocked = document.body.classList.contains("score-locked");
 if (window.__latestScoresDocData?.completion?.isCompleted === true) {
   showSubmittedLockNotice();
   lockScoreInputUI();
+    // ★ 追加：提出後はモード切替を完全停止
+  disableModeTabs();
 }
 }
 
@@ -3335,3 +3337,17 @@ if (Array.isArray(required) && required[0] === "__SINGLE__") {
   // 全 requiredUnits が completedUnits に含まれているか
   return required.every(unit => completed.includes(unit));
 }
+
+function disableModeTabs() {
+  // 評価基準ヘッダにある「自動換算／素点」ボタンを全て無効化
+  const buttons = document.querySelectorAll(".crit-mode-btn");
+
+  buttons.forEach(btn => {
+    btn.disabled = true;
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0.4";
+    btn.title = "提出済みのため変更できません";
+  });
+}
+
+
