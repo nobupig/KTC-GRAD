@@ -748,15 +748,38 @@ tr.appendChild(finalTd);
 // ================================
 // 提出済ユニットの編集ロックUI（completion基準）
 // ================================
-const unitKey = getUnitKeyForStudent(stu, subject);
 
-// ★ completion を唯一の真実とする
+let unitKey = null;
+
+// 習熟度科目では unitKey（組）を生成しない
+if (!subject?.isSkillLevel) {
+  unitKey = getUnitKeyForStudent(stu, subject);
+}
+
+
 const completedUnits =
   Array.isArray(completion?.completedUnits)
     ? completion.completedUnits
     : [];
 
-const isLocked = completedUnits.includes(unitKey);
+
+// ================================
+// ★ ロック判定（科目タイプ別）
+// ================================
+let isLocked = false;
+
+// 習熟度科目：unitKey（組）という概念を使わない
+if (subject?.isSkillLevel === true) {
+  isLocked = completion?.isCompleted === true;
+
+// 単一提出科目（__SINGLE__）
+} else if (completedUnits.includes("__SINGLE__")) {
+  isLocked = true;
+
+// 通常・共通科目（組／コース単位）
+} else {
+  isLocked = completedUnits.includes(unitKey);
+}
 
 if (isLocked) {
   tr.classList.add("locked-row");
@@ -947,10 +970,18 @@ function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope }) {
     const studentData = scoresDocData.students?.[studentId];
     if (!studentData || typeof studentData !== "object") return;
 // student 情報は DOM 行（stu）ではなく students マスタから引く
+// student マスタ（全学生）から取得
+const master = studentState.allStudents.find(
+  s => String(s.studentId) === String(studentId)
+);
+if (!master) return;
+
 const student = {
-  courseClass: tr.querySelector("td:nth-child(3)")?.textContent || "",
-  classGroup: tr.querySelector("td:nth-child(3)")?.textContent || "",
+  studentId,
+  courseClass: master.courseClass || "",
+  classGroup: master.classGroup || "",
 };
+
 
 const unitKey = getUnitKeyForStudent(student, subject);
 
@@ -1105,12 +1136,6 @@ await updateDoc(ref, {
   completion,      // ★これを追加
   updatedAt: now,
 });
-// ================================
-// ★ UI state 側の completion も即更新する（重要）
-// ================================
-if (window.studentState) {
-  window.studentState.completion = completion;
-}
 
 // ================================
 // STEP3-B: completion を teacherSubjects に複写（確実版）
