@@ -193,11 +193,12 @@
 
   <div id="electiveModal" class="ktc-modal" style="display:none;">
     <div class="ktc-modal-content">
-      <h2>受講者登録（選択科目）</h2>
-            <div class="ktc-modal-actions">
-              <button id="electiveRegisterBtn" type="button" class="primary">登録</button>
-        <button id="electiveCancelBtn">キャンセル</button>    
-      </div>
+   <h2 id="electiveModalTitle">受講者（選択科目）</h2>
+
+<div class="ktc-modal-actions">
+  <button id="electiveRegisterBtn" type="button" class="primary"></button>
+  <button id="electiveCancelBtn">キャンセル</button>
+</div>
       <div class="elective-group-filter">
   <button data-group="all" class="eg-btn active">全員</button>
   <button data-group="1" class="eg-btn">1</button>
@@ -206,7 +207,7 @@
   <button data-group="4" class="eg-btn">4</button>
   <button data-group="5" class="eg-btn">5</button>
 </div>
-      <p>受講する学生にチェックを入れてください。</p>
+      <p id="electiveModalDescription"></p>
 
       <table class="elective-table">
         <thead>

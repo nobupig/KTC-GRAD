@@ -2790,6 +2790,15 @@ if (currentSubjectMeta.specialType === 2) {
 
 function openElectiveModal() {
   const isAddMode = (electiveMode === "add" || electiveMode === "initial");
+    // ===== モーダル文言（登録/解除）をモードで切替 =====
+  const titleEl = document.getElementById("electiveModalTitle");
+  const descEl  = document.getElementById("electiveModalDescription");
+  const btnEl   = document.getElementById("electiveRegisterBtn");
+
+  if (titleEl) titleEl.textContent = isAddMode ? "受講者登録（選択科目）" : "受講者登録解除（選択科目）";
+  if (descEl)  descEl.textContent  = isAddMode ? "受講する学生にチェックを入れてください。" : "登録を解除する学生にチェックを入れてください。";
+  if (btnEl)   btnEl.textContent   = isAddMode ? "登録" : "解除";
+
 
   // ① 超過学生登録と同じ名簿取得
   const baseStudents = getStudentsForSubject();
