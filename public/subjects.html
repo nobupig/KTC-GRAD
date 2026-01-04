@@ -735,18 +735,31 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
         const q = query(collection(db, "subjects"), ...constraints);
         const snap = await getDocs(q);
 
-        // ===== 提出済科目マップを作成 =====
+// ===== 提出済科目マップ（自分が提出した unit のみ） =====
 const submittedMap = {};
 const year = window.CURRENT_YEAR;
+const myEmail = currentUser?.email || null;
 
 for (const docSnap of snap.docs) {
   const subjectId = docSnap.id;
+
   try {
     const scoreRef = doc(db, `scores_${year}`, subjectId);
     const scoreSnap = await getDoc(scoreRef);
-    if (scoreSnap.exists() && scoreSnap.data()?.submittedSnapshot) {
+
+    if (!scoreSnap.exists() || !myEmail) continue;
+
+    const submittedByUnit = scoreSnap.data()?.submittedByUnit || {};
+
+    // ★ 自分が提出した unit が1つでもあれば「提出済」
+    const hasMySubmission = Object.values(submittedByUnit).some(
+      u => u?.submittedBy === myEmail
+    );
+
+    if (hasMySubmission) {
       submittedMap[subjectId] = true;
     }
+
   } catch (e) {
     console.warn("[WARN] 提出済判定失敗:", subjectId, e);
   }
