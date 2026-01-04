@@ -414,8 +414,8 @@ if (firstNotCompletedId) {
     s => s.subjectId === firstNotCompletedId
   );
   renderUnitStatus(
-    document.getElementById("unitStatusArea"),
-     unitCs,
+       document.getElementById("unitStatusArea"),
+    target.completionSummary,
     currentUser?.email || ""
   );
 }
