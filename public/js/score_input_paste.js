@@ -1,6 +1,7 @@
 // js/score_input_paste.js
 // ★あなた専用・完全版：Excel貼付け最適化版★
 
+import { refreshSaveButtonState } from "./score_input_loader.js";
 import { updateFinalScoreForRow } from "./score_input_modes.js";
 import { isSingle100PercentCriteria } from "./score_input_criteria.js";
 import { recalcFinalScoresAfterRestore } from "./score_input_loader.js";
@@ -202,6 +203,9 @@ if (!isTrivial) {
   }
  // ★ 貼り付け完了後：平均点・調整点・赤点を一括再計算
   recalcFinalScoresAfterRestore(tbody);
+// ★ 追加：保存状態を更新
+refreshSaveButtonState();
+
   return true;
 }
 
@@ -252,4 +256,6 @@ function applyPastedScoresWithModes(
   });
   // ★ 貼り付け完了後：平均点・調整点・赤点を一括再計算
 recalcFinalScoresAfterRestore(tbody);
+// ★ 追加：保存状態を更新
+refreshSaveButtonState();
 }

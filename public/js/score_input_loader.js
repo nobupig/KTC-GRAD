@@ -2465,7 +2465,7 @@ if (Array.isArray(criteriaState.items)) {
         studentState,
         window.__latestScoresDocData?.completion
       );
-
+refreshSaveButtonState();
 // ===== 特別科目は初期値が有効なので、初回から保存可能にする =====
 if (
   currentSubjectMeta &&
@@ -3182,6 +3182,26 @@ if (!submitted) return false;
     return false;
   }
 }
+
+// ================================
+// 保存ボタン状態をDOMから再評価
+// ================================
+export function refreshSaveButtonState() {
+  const saveBtn = document.getElementById("saveBtn");
+  const tbody = document.getElementById("scoreTableBody");
+  if (!saveBtn || !tbody) return;
+
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+
+  // 1行でも「入力がある」行があれば保存可能
+  const hasAnyInput = rows.some(tr => {
+    const inputs = tr.querySelectorAll("input[type='number']");
+    return Array.from(inputs).some(inp => inp.value !== "");
+  });
+
+  saveBtn.disabled = !hasAnyInput;
+}
+
 
 // ===============================
 // 成績入力UIをロックする
