@@ -482,7 +482,8 @@ export function renderStudentRows(
   students,
   criteriaItems,
   onScoreInputChange,
-  studentState
+  studentState,
+  completion
 )
  {
   // ===== 表の総列数を動的に計算（specialType/習熟度/評価基準の違いで崩れないようにする） =====
@@ -745,28 +746,27 @@ if (subject?.specialType === 1 || subject?.specialType === 2) {
 
 tr.appendChild(finalTd);
 // ================================
-// 提出済ユニットの編集ロックUI
+// 提出済ユニットの編集ロックUI（completion基準）
 // ================================
-const lockedInfo = studentState?.lockedUnitInfo;
-if (lockedInfo) {
- const unitKey = getUnitKeyForStudent(stu, subject);
+const unitKey = getUnitKeyForStudent(stu, subject);
 
+// ★ completion を唯一の真実とする
+const completedUnits =
+  Array.isArray(completion?.completedUnits)
+    ? completion.completedUnits
+    : [];
 
-  const isLocked = lockedInfo.lockedUnits?.has(unitKey);
-  const isEditable = lockedInfo.editableUnits?.has(unitKey);
+const isLocked = completedUnits.includes(unitKey);
 
-  // 他人提出済みユニット → 完全ロック
-  if (isLocked && !isEditable) {
-    tr.classList.add("locked-row");
+if (isLocked) {
+  tr.classList.add("locked-row");
 
-    // 行内の input / select を全て無効化
-    tr.querySelectorAll("input, select").forEach(el => {
-      el.disabled = true;
-    });
+  // 行内の input / select を全て無効化
+  tr.querySelectorAll("input, select").forEach(el => {
+    el.disabled = true;
+  });
 
-    // 視覚的ヒント（任意）
-    tr.title = "このユニットは既に提出済みのため編集できません";
-  }
+  tr.title = "このユニットは既に提出済みのため編集できません";
 }
 
     tbody.appendChild(tr);
@@ -1098,6 +1098,12 @@ await updateDoc(ref, {
   completion,      // ★これを追加
   updatedAt: now,
 });
+// ================================
+// ★ UI state 側の completion も即更新する（重要）
+// ================================
+if (window.studentState) {
+  window.studentState.completion = completion;
+}
 
 // ================================
 // STEP3-B: completion を teacherSubjects に複写（確実版）

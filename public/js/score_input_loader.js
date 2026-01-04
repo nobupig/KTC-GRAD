@@ -430,16 +430,17 @@ function applySkillLevelFilter(subject, key) {
   stashCurrentInputScores(tbody);
   isRenderingTable = true;
   try {
-    renderStudentRows(
-      tbody,
-      subject,
-      filtered,
-      criteriaState.items,
-      (tr) => {
-        updateFinalScoreForRow(tr, criteriaState, modeState);
-      },
-      studentState
-    );
+renderStudentRows(
+  tbody,
+  subject,
+  filtered,
+  criteriaState.items,
+  (tr) => {
+    updateFinalScoreForRow(tr, criteriaState, modeState);
+  },
+  studentState,
+  window.__latestScoresDocData?.completion
+);
   } finally {
     isRenderingTable = false;
   }
@@ -1814,7 +1815,8 @@ studentState.lockedUnitInfo = {
       displayStudents,
       criteriaState.items,
       handleScoreInputChange,
-      studentState
+      studentState,
+      window.__latestScoresDocData?.completion
     );
 
 
@@ -2390,7 +2392,8 @@ function applyGroupOrCourseFilter(subject, filterKey) {
         filtered,   
         criteriaState.items,                 
         (tr) => updateFinalScoreForRow(tr, criteriaState, modeState),                        
-        studentState
+        studentState,
+        window.__latestScoresDocData?.completion
       );
 
 // ===== 特別科目は初期値が有効なので、初回から保存可能にする =====
