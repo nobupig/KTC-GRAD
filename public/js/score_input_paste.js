@@ -3,6 +3,7 @@
 
 import { updateFinalScoreForRow } from "./score_input_modes.js";
 import { isSingle100PercentCriteria } from "./score_input_criteria.js";
+import { recalcFinalScoresAfterRestore } from "./score_input_loader.js";
 
 /**
  * Excel などの貼り付けテキストを 2次元配列に変換
@@ -199,7 +200,8 @@ if (!isTrivial) {
     pasteRowIndex++;
     webRowIndex++;
   }
-
+ // ★ 貼り付け完了後：平均点・調整点・赤点を一括再計算
+  recalcFinalScoresAfterRestore(tbody);
   return true;
 }
 
@@ -248,4 +250,6 @@ function applyPastedScoresWithModes(
 
     webRowIndex++;
   });
+  // ★ 貼り付け完了後：平均点・調整点・赤点を一括再計算
+recalcFinalScoresAfterRestore(tbody);
 }
