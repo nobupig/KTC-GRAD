@@ -21,6 +21,9 @@ let currentSubjectMeta = {
 };
 
 window.currentSubjectMeta = currentSubjectMeta;
+// ===== ユニット毎に criteria の mode(raw/scaled) を保持 =====
+const criteriaModesByUnit = new Map(); // key: unitKey, value: ["raw"|"scaled", ...]
+let activeUnitKeyForCriteria = null;
 
 // 選択科目モーダル用ソートモード
 // "group" | "course" | null
@@ -2376,6 +2379,50 @@ function renderGroupOrCourseFilter(subject) {
 function applyGroupOrCourseFilter(subject, filterKey) {
   // ★ 最後に選択された unitKey を保持（方法A）
  window.__lastAppliedUnitKey = filterKey;
+  // ===== 修正②-1：切替前ユニットの mode を保存 =====
+  const prevUnitKey =
+    activeUnitKeyForCriteria ??
+    window.__lastAppliedUnitKey ??
+    null;
+
+  if (
+    prevUnitKey &&
+    prevUnitKey !== "all" &&
+    Array.isArray(criteriaState.items)
+  ) {
+    criteriaModesByUnit.set(
+      String(prevUnitKey),
+      criteriaState.items.map(item => item?.mode || "scaled")
+    );
+  }
+
+  // 現在のユニットを更新
+  activeUnitKeyForCriteria = filterKey;
+
+    // ===== 修正③-1：切替後ユニットの mode を復元 =====
+  const nextUnitKey =
+    filterKey == null ? "all" : String(filterKey);
+
+const savedModes = criteriaModesByUnit.get(nextUnitKey);
+
+if (Array.isArray(criteriaState.items)) {
+  if (Array.isArray(savedModes)) {
+    // 保存済みユニット：保存された mode を復元
+    for (let i = 0; i < criteriaState.items.length; i++) {
+      criteriaState.items[i].mode = savedModes[i] || "scaled";
+    }
+  } else {
+    // 初回表示ユニット：既定値で初期化
+    for (let i = 0; i < criteriaState.items.length; i++) {
+      criteriaState.items[i].mode = "scaled";
+    }
+  }
+
+  // mode ボタン表示を反映
+  renderTableHeader(headerRow, criteriaState);
+}
+
+
   // baseList = 科目ごとの初期並び済リスト（共通科目なら全学生）
   const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
 
