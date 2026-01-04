@@ -1788,3 +1788,31 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
 .locked-row td {
   pointer-events: none;
 }
+
+/* Excel貼り付け：列ごと選択モーダル */
+.paste-mode-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.paste-mode-table th,
+.paste-mode-table td {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.paste-mode-table th {
+  background: #f5f5f5;
+}
+
+.paste-mode-table select {
+  width: 100%;
+}
+
+.modal-desc {
+  font-size: 0.9em;
+  color: #333;
+  margin-bottom: 8px;
+}

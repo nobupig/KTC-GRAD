@@ -2,6 +2,7 @@
 // ★あなた専用・完全版：Excel貼付け最適化版★
 
 import { updateFinalScoreForRow } from "./score_input_modes.js";
+import { isSingle100PercentCriteria } from "./score_input_criteria.js";
 
 /**
  * Excel などの貼り付けテキストを 2次元配列に変換
@@ -34,6 +35,68 @@ function getStartCol(activeElement) {
  * @param {{ items:any[], normalizedWeights:number[] }} criteriaState
  * @param {{ currentMode:string }} modeState
  */
+
+function openPasteModeModal(targetItems, onApply, onCancel) {
+  const modal = document.getElementById("pasteModeModal");
+  const tbody = document.getElementById("pasteModeTableBody");
+  tbody.innerHTML = "";
+
+  const selections = [];
+
+  targetItems.forEach((item, idx) => {
+    const tr = document.createElement("tr");
+
+    const tdName = document.createElement("td");
+    tdName.textContent = item.name || "(無名)";
+    tr.appendChild(tdName);
+
+    const tdPercent = document.createElement("td");
+    tdPercent.textContent = `${item.percent}%`;
+    tr.appendChild(tdPercent);
+
+    const tdSelect = document.createElement("td");
+
+    // 単一100%項目は選択不要（disabled）
+    const isTrivial =
+      targetItems.length === 1 && Number(item.percent) === 100;
+
+    if (isTrivial) {
+      tdSelect.textContent = "選択不要";
+      selections[idx] = "scaled";
+    } else {
+      const select = document.createElement("select");
+      const optScaled = new Option("自動換算（0〜100）", "scaled");
+      const optRaw = new Option("素点（換算後）", "raw");
+
+      select.appendChild(optScaled);
+      select.appendChild(optRaw);
+      select.value = item.mode || "scaled";
+
+      select.addEventListener("change", () => {
+        selections[idx] = select.value;
+      });
+
+      selections[idx] = select.value;
+      tdSelect.appendChild(select);
+    }
+
+    tr.appendChild(tdSelect);
+    tbody.appendChild(tr);
+  });
+
+  modal.classList.remove("hidden");
+
+  document.getElementById("pasteModeCancelBtn").onclick = () => {
+    modal.classList.add("hidden");
+    onCancel();
+  };
+
+  document.getElementById("pasteModeApplyBtn").onclick = () => {
+    modal.classList.add("hidden");
+    onApply(selections);
+  };
+}
+
 export function applyPastedScores(pastedText, tbody, criteriaState, modeState) {
   const rows = parsePasted(pastedText);
   if (!rows.length) {
@@ -69,23 +132,34 @@ export function applyPastedScores(pastedText, tbody, criteriaState, modeState) {
     return false;
   }
 
-    // ===== 事故防止：Excelは「素点(0〜100)」前提 =====
-  // 貼り付け対象列に raw モードが混ざっていたら貼付をブロックする
-  const items = criteriaState.items || [];
-  const targetItems = items.slice(startCol, startCol + pasteColCount);
+// ===== 貼り付け時の入力意味確認 =====
+const isTrivial = isSingle100PercentCriteria(criteriaState);
 
-  const hasRaw = targetItems.some(it => (it?.mode || "scaled") === "raw");
-  if (hasRaw) {
-    alert(
-      "【貼り付けできません】\n\n" +
-        "Excelは「素点入力(0〜100)」専用です。\n" +
-        "いま選択している貼り付け先の列に「素点モード（raw）」の評価項目が含まれています。\n\n" +
-        "対策：Web側で該当項目のモードを『自動換算（0〜100入力）』に揃えてから貼り付けしてください。"
-    );
-    return false;
-  }
+if (!isTrivial) {
+  const targetItems = criteriaState.items.slice(
+    startCol,
+    startCol + pasteColCount
+  );
 
-  // 貼り付け開始行：学生の最初の行 or 現在の学生行（Excel 行とずらす運用はしない設計）
+  openPasteModeModal(
+    targetItems,
+    (selectedModes) => {
+      // 再帰的に再実行（選択結果付き）
+      applyPastedScoresWithModes(
+        rows,
+        tbody,
+        criteriaState,
+        modeState,
+        startCol,
+        selectedModes
+      );
+    },
+    () => {}
+  );
+  return false;
+}
+
+// 貼り付け開始行：学生の最初の行 or 現在の学生行（Excel 行とずらす運用はしない設計）
   let webRowIndex = studentRows.findIndex(tr => tr.contains(active));
   if (webRowIndex === -1) webRowIndex = 0;
 
@@ -127,4 +201,51 @@ export function applyPastedScores(pastedText, tbody, criteriaState, modeState) {
   }
 
   return true;
+}
+
+function applyPastedScoresWithModes(
+  rows,
+  tbody,
+  criteriaState,
+  modeState,
+  startCol,
+  selectedModes
+) {
+  const studentRows = Array.from(tbody.querySelectorAll("tr"));
+  let webRowIndex = 0;
+
+  rows.forEach((vals) => {
+    if (webRowIndex >= studentRows.length) return;
+    if (vals.every(v => v === "")) {
+      webRowIndex++;
+      return;
+    }
+
+    const tr = studentRows[webRowIndex];
+    const inputs = tr.querySelectorAll("input[type='number']");
+
+    vals.forEach((cellValue, c) => {
+      if (cellValue === "") return;
+
+      const col = startCol + c;
+      const input = inputs[col];
+      if (!input) return;
+
+      const num = Number(cellValue);
+      if (!Number.isFinite(num)) return;
+
+      input.value = String(num);
+
+      // 一時的に mode を差し替えて計算
+      const originalMode = criteriaState.items[col].mode;
+      criteriaState.items[col].mode = selectedModes[c] || originalMode;
+
+      updateFinalScoreForRow(tr, criteriaState, modeState);
+
+      // 戻す
+      criteriaState.items[col].mode = originalMode;
+    });
+
+    webRowIndex++;
+  });
 }

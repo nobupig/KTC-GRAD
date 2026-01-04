@@ -214,3 +214,23 @@ import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
 });
   });
 }
+/**
+ * 評価基準が「単一・100%」かどうかを判定
+ * - 評価項目が1つ
+ * - 割合が100%
+ *
+ * この場合：
+ *   自動換算（0〜100）と
+ *   素点（割合後）
+ * は数学的に同義なので、貼り付け確認モーダルは不要。
+ *
+ * @param {{ items:any[] }} criteriaState
+ * @returns {boolean}
+ */
+export function isSingle100PercentCriteria(criteriaState) {
+  if (!criteriaState || !Array.isArray(criteriaState.items)) return false;
+  if (criteriaState.items.length !== 1) return false;
+
+  const percent = Number(criteriaState.items[0]?.percent || 0);
+  return percent === 100;
+}

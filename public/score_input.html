@@ -284,6 +284,37 @@
       </div>
     </div>
   </div>
+<!-- ▼ Excel貼り付け：列ごと入力意味選択モーダル ▼ -->
+<div id="pasteModeModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>貼り付けた点数の扱いを選択してください</h3>
+
+    <p class="modal-desc">
+      今回貼り付けた評価項目（列）ごとに、点数の意味を選択してください。<br>
+      <strong>自動換算</strong>：100点満点の点数を入力した場合<br>
+      <strong>素点</strong>：すでに換算済みの点数（割合後）を入力した場合
+    </p>
+
+    <table class="paste-mode-table">
+      <thead>
+        <tr>
+          <th>評価項目</th>
+          <th>割合</th>
+          <th>入力の意味</th>
+        </tr>
+      </thead>
+      <tbody id="pasteModeTableBody">
+        <!-- JSで動的生成 -->
+      </tbody>
+    </table>
+
+    <div class="modal-actions">
+      <button id="pasteModeCancelBtn">キャンセル</button>
+      <button id="pasteModeApplyBtn" class="primary">この内容で貼り付け</button>
+    </div>
+  </div>
+</div>
+<!-- ▲ Excel貼り付け：列ごと入力意味選択モーダル ▲ -->
 
 </body>
 
