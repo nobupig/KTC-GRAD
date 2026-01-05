@@ -21,9 +21,7 @@ let currentSubjectMeta = {
 };
 
 window.currentSubjectMeta = currentSubjectMeta;
-// ===== ユニット毎に criteria の mode(raw/scaled) を保持 =====
-const criteriaModesByUnit = new Map(); // key: unitKey, value: ["raw"|"scaled", ...]
-let activeUnitKeyForCriteria = null;
+
 
 // 選択科目モーダル用ソートモード
 // "group" | "course" | null
@@ -293,13 +291,7 @@ import {
   renderTableHeader,
 } from "./score_input_criteria.js";
 
-import {
-  createModeState,
-  initModeTabs,
-  updateFinalScoreForRow,
-  updateAllFinalScores,
-  computeRiskFlags,
-} from "./score_input_modes.js";
+
 import { fetchIsSkillLevelFromSubjects } from "./fetch_isSkillLevel.js";
 
 import { applyPastedScores } from "./score_input_paste.js";
@@ -435,11 +427,13 @@ renderStudentRows(
   filtered,
   criteriaState.items,
   (tr) => {
-    updateFinalScoreForRow(tr, criteriaState, modeState);
+    recalcFinalScoresAfterRestore(tbody)
   },
   studentState,
   window.__latestScoresDocData?.completion
 );
+window.__currentFilterKey = "all";
+applyAllReadOnlyPolicy("all");
   } finally {
     isRenderingTable = false;
   }
@@ -535,7 +529,6 @@ const criteriaState = createCriteriaState();
 const studentState = createStudentState();
 window.studentState = studentState;
 studentState.lastElectiveGrade = null;
-const modeState = createModeState();
 const scoreVersionBaseMap = new Map(); 
 let pasteInitialized = false;
 
@@ -674,7 +667,7 @@ function applyRiskClassesToAllRows() {
   try {
     if (tbody) {
       try {
-        updateAllFinalScores(tbody, criteriaState, modeState);
+        recalcFinalScoresAfterRestore(tbody);
       } catch (e) { /* noop */ }
       try {
         syncFinalScoresFromTbody(tbody);
@@ -695,7 +688,7 @@ export function recalcFinalScoresAfterRestore(tbodyEl) {
 
   try {
     // ① DOM上の最終成績・( ) を再計算
-    updateAllFinalScores(tbodyEl, criteriaState, modeState);
+    
   } catch (e) {
     console.warn("[WARN] updateAllFinalScores failed", e);
   }
@@ -723,22 +716,8 @@ export function consumeDidApplySavedScores() {
   return v;
 }
 
-// modeState の参照を返す（評価基準確定後の再計算用）
-export function getModeState() {
-  return modeState;
-}
 
 
-function setModeTabsVisible(visible) {
-  // initModeTabs が生成している要素を広めに拾う（HTML改修なしで吸収）
-  const el =
-    document.getElementById("modeTabs") ||
-    document.querySelector(".mode-tabs") ||
-    document.querySelector(".score-mode-tabs") ||
-    document.querySelector("[data-mode-tabs]");
-  if (!el) return;
-  el.style.display = visible ? "" : "none";
-}
 
 function renderSpecialTableHeader(headerRow, meta) {
   if (!headerRow) return;
@@ -1607,8 +1586,7 @@ if (isSpecial) {
   // ★ここが一番重要（これが無かった）
   renderSpecialTableHeader(headerRow, currentSubjectMeta);
 
-  // モードUIを非表示
-  setModeTabsVisible(false);
+  
   // ★ 追加①：評価基準UIを完全に隠す
   document
     .querySelectorAll(".evaluation-related")
@@ -1630,7 +1608,7 @@ document
   }
 
   updateAdjustPointDisplay();
-  renderTableHeader(headerRow, criteriaState);
+  
 
   if (currentSubjectMeta.isSkillLevel) {
     const th = document.createElement("th");
@@ -1638,46 +1616,7 @@ document
     headerRow.insertBefore(th, headerRow.firstChild);
   }
 
-  setModeTabsVisible(true);
-  // ================================
-// ★ モード切替時に平均点・調整点を必ず再計算
-//   （initModeTabs が DOM を再生成するため毎回フックが必要）
-// ================================
-requestAnimationFrame(() => {
-  const tabsEl =
-    document.getElementById("modeTabs") ||
-    document.querySelector(".mode-tabs") ||
-    document.querySelector(".score-mode-tabs") ||
-    document.querySelector("[data-mode-tabs]");
-
-  if (!tabsEl) return;
-
-  // 二重登録防止
-  if (tabsEl.__avgRecalcHooked) return;
-  tabsEl.__avgRecalcHooked = true;
-
-   // モード切替は click だけでなく change（radio等）でも起きる。
-  // また、initModeTabs 側の modeState 更新「後」に再計算したいので、
-  // capture は使わず、次のターンに回してから実行する。
-  const scheduleModeRecalc = () => {
-    if (tabsEl.__avgRecalcPending) return;
-    tabsEl.__avgRecalcPending = true;
-
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        tabsEl.__avgRecalcPending = false;
-        recalcFinalScoresAfterRestore(tbody);
-        applyRiskClassesToAllRows();
-        updateAveragePointDisplay();
-      });
-    }, 0);
-  };
-
-  tabsEl.addEventListener("click", scheduleModeRecalc, false);
-  tabsEl.addEventListener("change", scheduleModeRecalc, false);
-
-});
-
+ 
 }
 
 
@@ -1817,7 +1756,7 @@ studentState.lockedUnitInfo = {
   isRenderingTable = true;
   const handleScoreInputChange = (tr) => {
     if (!tr) return;
-    updateFinalScoreForRow(tr, criteriaState, modeState);
+    recalcFinalScoresAfterRestore(tbody);
     syncFinalScoreForRow(tr);
       const finalCell = tr.querySelector(".final-score");
       if (finalCell) {
@@ -1890,7 +1829,7 @@ if (savedScores) {
   if (!isSkillLevel) {
     const rows = tbody.querySelectorAll("tr");
     rows.forEach((tr, index) => {
-      updateFinalScoreForRow(tr, criteriaState, modeState, null, index);
+     recalcFinalScoresAfterRestore(tbody);
     });
   }
   updateAveragePointDisplay();
@@ -2086,7 +2025,7 @@ if (!unsavedListenerInitialized && tbody) {
           text,
           tbody,
           criteriaState,
-          modeState,
+          
           (msg) => window.alert(msg)
         )
       ) {
@@ -2118,7 +2057,8 @@ else if (!criteriaState.items.length) {
   infoMessageEl?.classList.add("warning-message");
 } else {
   infoMessageEl?.classList.remove("warning-message");
-  setInfoMessage("成績を入力してください。（モード：自動換算モードがデフォルトです）");
+  setInfoMessage("成績を入力してください。（0〜100点で入力）");
+
 }
 
 
@@ -2169,7 +2109,7 @@ if (window.__latestScoresDocData?.completion?.isCompleted === true) {
   showSubmittedLockNotice();
   lockScoreInputUI();
     // ★ 追加：提出後はモード切替を完全停止
-  disableModeTabs();
+
 }
 }
 
@@ -2398,51 +2338,15 @@ function renderGroupOrCourseFilter(subject) {
 // STEP C：フィルタ処理本体
 // ================================
 function applyGroupOrCourseFilter(subject, filterKey) {
+  window.__currentFilterKey = String(filterKey ?? "all");
   // ★ 最後に選択された unitKey を保持（方法A）
  window.__lastAppliedUnitKey = filterKey;
-  // ===== 修正②-1：切替前ユニットの mode を保存 =====
-  const prevUnitKey =
-    activeUnitKeyForCriteria ??
-    window.__lastAppliedUnitKey ??
-    null;
-
-  if (
-    prevUnitKey &&
-    prevUnitKey !== "all" &&
-    Array.isArray(criteriaState.items)
-  ) {
-    criteriaModesByUnit.set(
-      String(prevUnitKey),
-      criteriaState.items.map(item => item?.mode || "scaled")
-    );
-  }
+ 
 
   // 現在のユニットを更新
   activeUnitKeyForCriteria = filterKey;
 
-    // ===== 修正③-1：切替後ユニットの mode を復元 =====
-  const nextUnitKey =
-    filterKey == null ? "all" : String(filterKey);
-
-const savedModes = criteriaModesByUnit.get(nextUnitKey);
-
-if (Array.isArray(criteriaState.items)) {
-  if (Array.isArray(savedModes)) {
-    // 保存済みユニット：保存された mode を復元
-    for (let i = 0; i < criteriaState.items.length; i++) {
-      criteriaState.items[i].mode = savedModes[i] || "scaled";
-    }
-  } else {
-    // 初回表示ユニット：既定値で初期化
-    for (let i = 0; i < criteriaState.items.length; i++) {
-      criteriaState.items[i].mode = "scaled";
-    }
-  }
-
-  // mode ボタン表示を反映
-  renderTableHeader(headerRow, criteriaState);
-}
-
+    
 
   // baseList = 科目ごとの初期並び済リスト（共通科目なら全学生）
   const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
@@ -2459,7 +2363,7 @@ if (Array.isArray(criteriaState.items)) {
         subject,    
         filtered,   
         criteriaState.items,                 
-        (tr) => updateFinalScoreForRow(tr, criteriaState, modeState),                        
+        (tr) => recalcFinalScoresAfterRestore(tbody),                        
         studentState,
         window.__latestScoresDocData?.completion
       );
@@ -2482,6 +2386,7 @@ if (
 
     // 再計算 + 行ハイライト適用
     applyRiskClassesToAllRows();
+    applyAllReadOnlyPolicy(filterKey);
   });
   // ★ 提出済みユニット判定（正本ベース）
 // ★ 提出済みユニット判定（正本ベース）
@@ -2523,8 +2428,7 @@ if (effectiveKey && effectiveKey !== "all" && hasSubmittedUnit(unitsMap, String(
 // ================================
 export function initScoreInput() {
   // モードタブを生成（infoMessage の直下）
-  initModeTabs({ infoMessageEl }, modeState);
- 
+   
   
   if (electiveAddBtn) {
     electiveAddBtn.addEventListener("click", () => {
@@ -2788,7 +2692,7 @@ if (currentSubjectMeta.specialType === 2) {
     getCurrentSubjectMeta: () => currentSubjectMeta,
     criteriaState,
     studentState,
-    modeState,
+    
   });
 }
 
@@ -3280,8 +3184,72 @@ const unitKey =
 
 }
 
+// ================================
+// 共通科目の「全員(all)」は原則：閲覧専用
+// ただし習熟度科目だけ「習熟度欄」は全員でも編集可
+// ================================
+function applyAllReadOnlyPolicy(filterKey) {
+  const meta = window.currentSubjectMeta || {};
+  const isCommon = !!meta.isCommon;
+  const isSkill = !!meta.isSkillLevel;
+  const isSpecial = meta.specialType === 1 || meta.specialType === 2;
+
+  const isAll = (filterKey == null) || (String(filterKey) === "all");
 
 
+
+  // 共通科目以外は何もしない
+  if (!isCommon) {
+    hideAllReadOnlyNotice();
+    return;
+  }
+
+  // ---- 共通科目 + 全員(all) ----
+  if (isAll) {
+    // 🔴 追加：モードタブを完全に殺す（二重保険）
+   
+        document
+      .querySelectorAll("#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea")
+      .forEach((el) => {
+        el.disabled = true;
+      });
+
+
+if (isAll) {
+  if (isSkill) {
+    // 習熟度科目 × 全員
+    document
+      .querySelectorAll("#scoreTableBody input.skill-level-input")
+      .forEach((el) => {
+        el.disabled = false;
+      });
+
+    showAllReadOnlyNotice(
+      "✏️ この画面から【習熟度】を入力してください（S / A1 / A2 / A3）。Excel等からのコピー＆ペーストも可能です。"
+    );
+  } else {
+    // 共通科目 × 全員
+    showAllReadOnlyNotice(
+      "📘 この画面は【全体閲覧用】です。成績の入力・編集はできません。入力する場合は、組／コースを選択してください。"
+    );
+  }
+} else {
+  // 全員でない（組／コース表示）
+  hideAllReadOnlyNotice();
+}
+
+    // ④ 全員(all)では提出ボタンも常に無効化
+    const submitBtn = document.getElementById("submitScoresBtn");
+    if (submitBtn) submitBtn.disabled = true;
+
+    return;
+  }
+
+  // ---- 共通科目 + 組/コース表示 ----
+  hideAllReadOnlyNotice();
+
+  // この後の提出済み判定（existingロジック）が lock/unlock を決めるので、ここでは触らない
+}
 
 // ================================
 // 提出済み注意文言の表示（共通）
@@ -3331,6 +3299,48 @@ function hideSubmittedLockNotice() {
     .forEach((el) => el.remove());
 }
 
+// ================================
+// 全員(all)閲覧専用の注意文
+// ================================
+function showAllReadOnlyNotice(message) {
+  const text =
+    message ||
+    "この画面は全体閲覧用です。成績の入力・編集はできません。入力する場合は組／コースを選択してください。";
+
+  let notice = document.querySelector(".all-readonly-notice");
+
+  // 既に存在する場合：内容が同じなら何もしない／違えば更新
+  if (notice) {
+    if (notice.textContent !== text) {
+      notice.textContent = text;
+    }
+    return;
+  }
+
+  // 初回生成
+  notice = document.createElement("div");
+  notice.className = "all-readonly-notice";
+  notice.textContent = text;
+
+  // 科目プルダウン領域（top-controls）の直下に出す
+  const topControls = document.querySelector(".top-controls");
+  if (topControls && topControls.parentNode) {
+    topControls.insertAdjacentElement("afterend", notice);
+    return;
+  }
+
+  // フォールバック（infoMessage の直前）
+  const info = document.getElementById("infoMessage");
+  if (info && info.parentNode) {
+    info.parentNode.insertBefore(notice, info);
+  }
+}
+
+function hideAllReadOnlyNotice() {
+  const el = document.querySelector(".all-readonly-notice");
+  if (el) el.remove();
+}
+
 /**
  * 科目が「全 unit 提出済」かどうかを判定する
  * ※ 文言表示・UI制御専用（ロック処理には使わない）
@@ -3367,16 +3377,6 @@ if (Array.isArray(required) && required[0] === "__SINGLE__") {
   return required.every(unit => completed.includes(unit));
 }
 
-function disableModeTabs() {
-  // 評価基準ヘッダにある「自動換算／素点」ボタンを全て無効化
-  const buttons = document.querySelectorAll(".crit-mode-btn");
 
-  buttons.forEach(btn => {
-    btn.disabled = true;
-    btn.style.pointerEvents = "none";
-    btn.style.opacity = "0.4";
-    btn.title = "提出済みのため変更できません";
-  });
-}
 
 

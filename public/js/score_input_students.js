@@ -590,11 +590,13 @@ export function renderStudentRows(
       const td = document.createElement("td");
       const input = document.createElement("input");
       input.type = "text";
+      const isAllView = String(window.__currentFilterKey || "all") === "all";
+      input.disabled = isAllView ? (subject?.isSkillLevel !== true) : false;
       input.className = "skill-level-input skill-input";
       input.maxLength = 2;
       input.dataset.studentId = studentId;
       input.readOnly = false;
-      input.disabled = false;
+     
       input.addEventListener("input", () => {
         let v = input.value
           .toUpperCase()
@@ -709,6 +711,10 @@ selectEl2.addEventListener("input", setFilled2);
     input.min = "0";
     input.max = "100";
     input.step = "0.1";
+ 
+ const isAllView = String(window.__currentFilterKey || "all") === "all";
+if (isAllView) input.disabled = true;
+
     input.dataset.index = String(index);
     input.dataset.criteriaName = item.name;
     input.dataset.studentId = String(stu.studentId);

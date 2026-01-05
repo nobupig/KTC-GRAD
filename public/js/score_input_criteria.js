@@ -77,7 +77,7 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
   const mapped = items.map((it) => ({
     name: it.name || "",
     percent: Number(it.percent || 0),
-    mode: it.mode || "scaled",
+    // mode: it.mode || "scaled", // 旧モードは廃止（互換用に保持しない）
   }));
 
   const { normalized, rawTotal } = normalizeWeights(
@@ -90,7 +90,7 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
 }
 
 /**
- * 成績表ヘッダ描画＋項目ごとミニモードボタン
+ * 成績表ヘッダ描画（項目ごとラベル表示）
  */
 export function renderTableHeader(headerRow, criteriaState) {
   const table = headerRow?.closest("table");
@@ -147,27 +147,6 @@ export function renderTableHeader(headerRow, criteriaState) {
       label.textContent = `${critItem.name} (${critItem.percent}%)`;
       th.appendChild(label);
 
-      const wrap = document.createElement("div");
-      wrap.style.display = "flex";
-      wrap.style.gap = "4px";
-      wrap.style.marginTop = "4px";
-
-      const btnScaled = document.createElement("button");
-      btnScaled.textContent = "自動換算";
-      btnScaled.dataset.index = String(idx);
-      btnScaled.className = "crit-mode-btn";
-      if (critItem.mode === "scaled") btnScaled.classList.add("active");
-
-      const btnRaw = document.createElement("button");
-      btnRaw.textContent = "素点";
-      btnRaw.dataset.index = String(idx);
-      btnRaw.className = "crit-mode-btn";
-      if (critItem.mode === "raw") btnRaw.classList.add("active");
-
-      wrap.appendChild(btnScaled);
-      wrap.appendChild(btnRaw);
-
-      th.appendChild(wrap);
       ths.push(th);
     });
   }
@@ -175,37 +154,32 @@ export function renderTableHeader(headerRow, criteriaState) {
   addTh("最終成績");
   ths.forEach((th) => headerRow.appendChild(th));
 
-  // ▼ ミニタブイベント
-headerRow.addEventListener("click", (e) => {
-  const btn = e.target;
-  if (!(btn instanceof HTMLButtonElement)) return;
-  if (!btn.classList.contains("crit-mode-btn")) return;
-
-// ★ 表示中の行がロックされている場合はモード切替不可
-const tbody = document.getElementById("scoreTableBody");
-if (tbody && tbody.querySelector("tr.locked-row")) {
-  console.warn("[crit-mode] blocked: locked rows visible");
-  return;
-}
-
-
-
-  // ===== ここから先は未提出時のみ =====
-  const idx = Number(btn.dataset.index);
-  const item = criteriaState.items[idx];
-  if (!item) return;
-
-  item.mode = btn.textContent === "素点" ? "raw" : "scaled";
-
-  btn.parentElement.querySelectorAll("button").forEach((b) =>
-    b.classList.toggle("active", b === btn)
-  );
-
-  
-  import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
-    recalcFinalScoresAfterRestore(tbody);
-  });
-});
+  // ▼ ミニタブイベント（raw/scaled 廃止に伴い無効化）
+// headerRow.addEventListener("click", (e) => {
+//   const btn = e.target;
+//   if (!(btn instanceof HTMLButtonElement)) return;
+//   if (!btn.classList.contains("crit-mode-btn")) return;
+//
+//   const tbody = document.getElementById("scoreTableBody");
+//   if (tbody && tbody.querySelector("tr.locked-row")) {
+//     console.warn("[crit-mode] blocked: locked rows visible");
+//     return;
+//   }
+//
+//   const idx = Number(btn.dataset.index);
+//   const item = criteriaState.items[idx];
+//   if (!item) return;
+//
+//   item.mode = btn.textContent === "素点" ? "raw" : "scaled";
+//
+//   btn.parentElement.querySelectorAll("button").forEach((b) =>
+//     b.classList.toggle("active", b === btn)
+//   );
+//
+//   import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
+//     recalcFinalScoresAfterRestore(tbody);
+//   });
+// });
 
 }
 /**
@@ -214,9 +188,7 @@ if (tbody && tbody.querySelector("tr.locked-row")) {
  * - 割合が100%
  *
  * この場合：
- *   自動換算（0〜100）と
- *   素点（割合後）
- * は数学的に同義なので、貼り付け確認モーダルは不要。
+ *   自動換算（0〜100）でも結果が同じため、貼り付け確認モーダルは不要。
  *
  * @param {{ items:any[] }} criteriaState
  * @returns {boolean}

@@ -1,5 +1,5 @@
 // js/score_input_modes.js
-// STEP B：入力モード（raw/scaled）＋バリデーション＋換算後表示＋最終成績計算
+// STEP B：入力（自動換算のみ）＋バリデーション＋換算後表示＋最終成績計算
 //
 // 仕様（2025-12 改訂版：A仕様）
 // ----------------------------------------
@@ -10,52 +10,19 @@
 // - 将来の「成績送信時」に使えるよう、エラー情報を返す
 
 /**
- * モード状態オブジェクト
- * - currentMode: "scaled" | "raw"
+ * 1セル分の「最終成績への寄与点」を計算（自動換算のみ）
  *
- * ※いまは「列ごとのモード」がメインなので、
- *   currentMode はあくまでフォールバック用です。
- */
-export function createModeState() {
-  return {
-    currentMode: "scaled", // デフォルトは自動換算モード
-  };
-}
-
-/**
- * 旧仕様の「全体タブUI」は現在は使っていないので何もしない
- */
-export function initModeTabs(_options, _modeState) {
-  return;
-}
-
-/**
- * 1セル分の「最終成績への寄与点」を計算
+ * - 換算式は 入力値 × (percent / 100)
  *
- * - mode === "scaled"（自動換算モード）
- *    → 入力値は 0〜100 の素点
- *    → 寄与点 = 入力値 × (percent / 100)
- *
- * - mode === "raw"（素点モード）
- *    → 入力値は 0〜percent の“既に換算済みの点”
- *    → 寄与点 = 入力値 そのもの
- *
- * @param {number} rawValue 入力値
+ * @param {number} value 入力値
  * @param {number} percent  評価割合（例: 50, 30, 20）
- * @param {"raw"|"scaled"} mode
  * @returns {number} 最終成績に足し込む「寄与点」
  */
-function calcContribution(rawValue, percent, mode) {
-  if (!Number.isFinite(rawValue) || !Number.isFinite(percent)) return NaN;
-
-  if (mode === "scaled") {
-    // 例：percent = 30, rawValue = 80 → 80 * 0.3 = 24
-    return (rawValue * percent) / 100;
-  } else {
-    // raw モード：既に「0〜percent 点」に換算済みなのでそのまま使う
-    return rawValue;
-  }
+function calcContribution(value, percent) {
+  if (!Number.isFinite(value) || !Number.isFinite(percent)) return NaN;
+  return (value * percent) / 100;
 }
+
 
 /**
  * tr 要素から学生情報（学籍番号・氏名）を取得
@@ -98,9 +65,9 @@ function getAdjustPointFromDom() {
 }
 
 // 現在の科目タイプを推定（special/elective/normal/skill）
-function deriveSubjectType(modeState) {
-  if (modeState && typeof modeState.subjectType === "string") {
-    return modeState.subjectType;
+function deriveSubjectType(context) {
+  if (context && typeof context.subjectType === "string") {
+    return context.subjectType;
   }
 
   try {
@@ -121,16 +88,16 @@ function deriveSubjectType(modeState) {
 }
 
 // 既存の riskContext 提供者を優先しつつ、DOMから補完
-function buildLocalRiskContext(modeState) {
-  if (modeState && typeof modeState.riskContextBuilder === "function") {
-    try { return modeState.riskContextBuilder() || {}; } catch (e) { /* noop */ }
+function buildLocalRiskContext(context) {
+  if (context && typeof context.riskContextBuilder === "function") {
+    try { return context.riskContextBuilder() || {}; } catch (e) { /* noop */ }
   }
-  if (modeState && modeState.riskContext) {
-    return modeState.riskContext;
+  if (context && context.riskContext) {
+    return context.riskContext;
   }
 
   const adjustPoint = getAdjustPointFromDom();
-  const subjectType = deriveSubjectType(modeState);
+  const subjectType = deriveSubjectType(context);
   return { adjustPoint, subjectType };
 }
 
@@ -141,7 +108,7 @@ function buildLocalRiskContext(modeState) {
  *  - 入力文字列から数字以外を除去（1--- → 1 など）し、数値に変換
  *  - 空欄：アラート無し・括弧表示無し・エラーも無し
  *  - 不正値（数値でない／マイナス）はアラートしてクリア
- *  - 上限超過（raw: 0〜percent, scaled: 0〜100 を超えた場合）は
+ *  - 上限超過（0〜100 を超えた場合）は
  *      → 数値はそのまま残す
  *      → セルに .ktc-input-error を付与（赤枠表示用）
  *      → 寄与点としては計算に含めない
@@ -162,16 +129,15 @@ function buildLocalRiskContext(modeState) {
  *       studentName: "山田 太郎",
  *       itemIndex: 0,
  *       itemName: "小テスト",
- *       value: 50,
- *       max: 30,
- *       mode: "raw",
+ *       value: 120,
+ *       max: 100,
  *     },
  *   ]
  * }
  *
  * @param {HTMLTableRowElement} tr
  * @param {{ items:any[], normalizedWeights:number[] }} criteriaState
- * @param {{ currentMode: string }} modeState
+ * @param {any} context  // リスク判定などの外部文脈を受け取る
  * @param {(msg:string)=>void} [showAlert]
  * @param {number} [rowIndex]  // updateAllFinalScores から渡せるようにしておく
  * @returns {{hasError:boolean, errors:any[]}}
@@ -179,7 +145,7 @@ function buildLocalRiskContext(modeState) {
 export function updateFinalScoreForRow(
   tr,
   criteriaState,
-  modeState,
+  context,
   showAlert,
   rowIndex
 ) {
@@ -207,12 +173,6 @@ export function updateFinalScoreForRow(
     const idx = Number(input.dataset.index || "0");
     const item = items[idx];
     const percent = item ? Number(item.percent || 0) : 0;
-
-    // 列ごとのモード
-    const mode =
-      (item && item.mode) ||
-      (modeState && modeState.currentMode) ||
-      "scaled";
 
     // 変換結果表示用 <span>
     const span = input.nextElementSibling;
@@ -267,31 +227,8 @@ export function updateFinalScoreForRow(
       return;
     }
 
-    // ---------- ③ モードごとの最大値を決定 ----------
-    let maxAllowed;
-    if (mode === "raw") {
-      maxAllowed = Number(percent || 0);
-      if (!Number.isFinite(maxAllowed) || maxAllowed <= 0) {
-        // 満点が定義されていない場合はアラート
-        alertFn("評価基準の割合（満点）が設定されていません。");
-        // とりあえずこのセルは計算に含めない＆エラー表示
-        input.classList.add("ktc-input-error");
-        errors.push({
-          type: "noMax",
-          rowIndex: typeof rowIndex === "number" ? rowIndex : null,
-          studentId,
-          studentName,
-          itemIndex: idx,
-          itemName: item ? item.name || "" : "",
-          value,
-          max: null,
-          mode,
-        });
-        return;
-      }
-    } else {
-      maxAllowed = 100;
-    }
+    // ---------- ③ 最大値を決定（常に 0-100） ----------
+    const maxAllowed = 100; // 入力値は常に 0-100
 
     // ---------- ④ 上限超過チェック（A仕様の肝） ----------
     if (Number.isFinite(maxAllowed) && maxAllowed > 0 && value > maxAllowed) {
@@ -312,7 +249,6 @@ export function updateFinalScoreForRow(
         itemName: item ? item.name || "" : "",
         value,
         max: maxAllowed,
-        mode,
       });
 
       // 寄与点には含めない
@@ -320,7 +256,7 @@ export function updateFinalScoreForRow(
     }
 
     // ---------- ⑤ 正常値として寄与点を計算 ----------
-    const contribution = calcContribution(value, percent, mode);
+    const contribution = calcContribution(value, percent);
     if (hasConvertedSpan) {
       span.textContent = `(${contribution.toFixed(1)})`;
     }
@@ -349,7 +285,7 @@ export function updateFinalScoreForRow(
     // --- 赤点ハイライト（発火点をここに集約） ---
     try {
       const finalText = finalCell.textContent || "";
-      const riskContext = buildLocalRiskContext(modeState);
+      const riskContext = buildLocalRiskContext(context);
       const flags = computeRiskFlags(finalText, riskContext);
       tr.classList.toggle("red-failure-row", !!(flags && flags.isFail));
     } catch (e) {
@@ -411,19 +347,19 @@ export function computeRiskFlags(finalScore, ctx) {
  * 全行分のエラー情報を配列で返す。
  *
  * 例：
- * const errorList = updateAllFinalScores(tbody, criteriaState, modeState);
+ * const errorList = updateAllFinalScores(tbody, criteriaState, context);
  * if (errorList.length > 0) { ...モーダル表示... }
  *
  * @param {HTMLTableSectionElement} tbody
  * @param {{ items:any[], normalizedWeights:number[] }} criteriaState
- * @param {{ currentMode: string }} modeState
+ * @param {any} context  // リスク判定などの外部文脈を受け取る
  * @param {(msg:string)=>void} [showAlert]
  * @returns {any[]} errors
  */
 export function updateAllFinalScores(
   tbody,
   criteriaState,
-  modeState,
+  context,
   showAlert
 ) {
   const rows = tbody.querySelectorAll("tr");
@@ -433,7 +369,7 @@ export function updateAllFinalScores(
     const result = updateFinalScoreForRow(
       tr,
       criteriaState,
-      modeState,
+      context,
       showAlert,
       rowIndex
     );
@@ -455,13 +391,13 @@ export function updateAllFinalScores(
  *
  * @param {HTMLTableSectionElement} tbody
  * @param {{ items:any[], normalizedWeights:number[] }} criteriaState
- * @param {{ currentMode: string }} modeState
+ * @param {any} context  // リスク判定などの外部文脈を受け取る
  * @param {(msg:string)=>void} [showAlert]
  */
 export function attachInputHandlers(
   tbody,
   criteriaState,
-  modeState,
+  context,
   showAlert
 ) {
   tbody.addEventListener("input", (ev) => {
@@ -472,6 +408,6 @@ export function attachInputHandlers(
     const tr = target.closest("tr");
     if (!tr) return;
 
-    updateFinalScoreForRow(tr, criteriaState, modeState, showAlert);
+    updateFinalScoreForRow(tr, criteriaState, context, showAlert);
   });
 }
