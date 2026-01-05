@@ -770,10 +770,11 @@ let isLocked = false;
 
 // 習熟度科目：unitKey（組）という概念を使わない
 if (subject?.isSkillLevel === true) {
-  isLocked = completion?.isCompleted === true;
+  const currentUnit = String(window.currentSkillFilter || "").toUpperCase();
+  isLocked = completion?.completedUnits?.includes(currentUnit);
+}
 
-// 単一提出科目（__SINGLE__）
-} else if (completedUnits.includes("__SINGLE__")) {
+ else if (completedUnits.includes("__SINGLE__")) {
   isLocked = true;
 
 // 通常・共通科目（組／コース単位）
@@ -952,6 +953,42 @@ export function canSubmitScoresByVisibleRows() {
 
 
 function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope }) {
+
+// ★ 習熟度科目：S / A1 / A2 / A3 を unitKey として扱う
+if (subject?.isSkillLevel === true) {
+  const rows = document.querySelectorAll("#scoreTableBody tr");
+  const units = {};
+
+  // ★ 現在のフィルタ（S / A1 / A2 / A3）
+  const unitKey = String(window.currentSkillFilter || "").toUpperCase();
+
+if (!["S", "A1", "A2", "A3"].includes(unitKey)) {
+  console.warn("[skill submit] invalid unitKey:", unitKey);
+  return {
+    units: {},
+    scope: "skill"
+  };
+}
+
+  rows.forEach(tr => {
+    if (tr.offsetParent === null) return;
+
+    const studentId = String(tr.dataset.studentId);
+    if (!studentId) return;
+
+    const studentData = scoresDocData.students?.[studentId];
+    if (!studentData) return;
+
+    if (!units[unitKey]) {
+      units[unitKey] = { students: {} };
+    }
+
+    units[unitKey].students[studentId] = { ...studentData };
+  });
+
+  return { units, scope };
+}
+
     // ★ 現在選択中ユニット（UI単位）を保持
   if (scope && scope.unitKey) {
     window.currentUnitKey = scope.unitKey;
@@ -1078,6 +1115,11 @@ if (!window.currentUser || !window.currentUser.email) {
     const now = serverTimestamp();
     const userEmail = window.currentUser?.email || "";
 
+    if (!snapshotByUnit || !snapshotByUnit.units) {
+  alert("送信対象の成績データがありません。");
+  return;
+}
+
     Object.entries(snapshotByUnit.units).forEach(([unitKey, unitData]) => {
       updatePayload[`submittedSnapshot.units.${unitKey}`] = {
         students: unitData.students,
@@ -1092,44 +1134,79 @@ if (!window.currentUser || !window.currentUser.email) {
       return;
     }
 
-   // ================================
+ // ================================
 // completion 再計算（提出成功前に確定値を作って一緒に保存）
-// 目的：共通科目で「全unit揃ったか」をFirestore側で正本化する
 // ================================
 
-// requiredUnits（科目メタから機械的に決める：UI/フィルタは見ない）
-const requiredUnits = resolveRequiredUnits({
-  grade: String(subject?.grade ?? ""),
-  subjectMeta: window.currentSubjectMeta
-});
+let completion;
 
-// completedUnits（既存 + 今回提出分を合成して確定）
-const existingUnits = Object.keys(window.__latestScoresDocData?.submittedSnapshot?.units || {});
-const newUnits = Object.keys(snapshotByUnit?.units || {});
-const submittedAny = Array.from(new Set([...existingUnits, ...newUnits]));
+if (subject?.isSkillLevel === true) {
+  const requiredUnits = ["S", "A1", "A2", "A3"];
 
-// ★ 単一科目は「1回でも提出があれば完了」
-let completedUnits;
-let isCompleted;
+  const existingUnits = Object.keys(
+    window.__latestScoresDocData?.submittedSnapshot?.units || {}
+  );
+  const newUnits =
+  snapshotByUnit && snapshotByUnit.units
+    ? Object.keys(snapshotByUnit.units)
+    : [];
 
-if (requiredUnits?.[0] === "__SINGLE__") {
-  isCompleted = submittedAny.length > 0;
-  // ★提出済みの実キーを保持（例: ["C"] や ["5"]）
-  completedUnits = submittedAny;
-} else {
-  completedUnits = submittedAny;
-  isCompleted =
-    requiredUnits.length > 0 &&
-    requiredUnits.every(u => completedUnits.includes(u));
+  const completedUnits = Array.from(
+    new Set([...existingUnits, ...newUnits])
+  );
+
+  const isCompleted = requiredUnits.every(u =>
+    completedUnits.includes(u)
+  );
+
+  completion = {
+    requiredUnits,
+    completedUnits,
+    isCompleted,
+    completedAt: isCompleted ? now : null,
+    completedBy: isCompleted ? userEmail : null,
+  };
 }
 
-const completion = {
-  requiredUnits,
-  completedUnits,
-  isCompleted,
-  completedAt: isCompleted ? now : null,
-  completedBy: isCompleted ? userEmail : null,
-};
+ else {
+  // ================================
+  // 既存：unitKey ベース completion
+  // ================================
+  const requiredUnits = resolveRequiredUnits({
+    grade: String(subject?.grade ?? ""),
+    subjectMeta: window.currentSubjectMeta
+  });
+
+  const existingUnits = Object.keys(
+    window.__latestScoresDocData?.submittedSnapshot?.units || {}
+  );
+  const newUnits =
+  snapshotByUnit && snapshotByUnit.units
+    ? Object.keys(snapshotByUnit.units)
+    : [];
+  const submittedAny = Array.from(new Set([...existingUnits, ...newUnits]));
+
+  let completedUnits;
+  let isCompleted;
+
+  if (requiredUnits?.[0] === "__SINGLE__") {
+    isCompleted = submittedAny.length > 0;
+    completedUnits = submittedAny;
+  } else {
+    completedUnits = submittedAny;
+    isCompleted =
+      requiredUnits.length > 0 &&
+      requiredUnits.every(u => completedUnits.includes(u));
+  }
+
+  completion = {
+    requiredUnits,
+    completedUnits,
+    isCompleted,
+    completedAt: isCompleted ? now : null,
+    completedBy: isCompleted ? userEmail : null,
+  };
+}
 
 await updateDoc(ref, {
   ...updatePayload,
@@ -1160,12 +1237,11 @@ try {
 console.log("[completion copy] subjectId=", subjectId, "hitIndex=", hitIndex);
 
 const completionSummary = {
-  isCompleted,
-  completedUnits,
-  requiredUnits,
-   completedAt: isCompleted ? true : null,
+  isCompleted: completion.isCompleted,
+  completedUnits: completion.completedUnits,
+  requiredUnits: completion.requiredUnits,
+  completedAt: completion.isCompleted ? true : null,
 };
-
 // ★ ここが唯一の修正点
 const updatedSubjects =
   hitIndex >= 0

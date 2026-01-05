@@ -294,21 +294,6 @@ import {
 } from "./score_input_criteria.js";
 
 import {
-  createStudentState,
-  loadAllStudents,
-  loadStudentsByIds,
-  loadStudentsForGrade,
-  loadSubjectRoster,
-  filterAndSortStudentsForSubject,
-  renderStudentRows,
-  sortStudents,
-  sortStudentsBySkillLevel,
-  sortStudentsSameAsExcess,
-  updateElectiveRegistrationButtons,
-  canSubmitScoresByVisibleRows
-} from "./score_input_students.js";
-
-import {
   createModeState,
   initModeTabs,
   updateFinalScoreForRow,
@@ -340,7 +325,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { activateQuotaErrorState } from "./quota_banner.js";
-
+// ★ ここを必ず入れる
+import {
+  createStudentState,
+  loadStudentsForGrade,
+  canSubmitScoresByVisibleRows,
+  loadSubjectRoster,
+  filterAndSortStudentsForSubject,
+  renderStudentRows,
+  updateElectiveRegistrationButtons,
+  sortStudentsBySkillLevel,
+} from "./score_input_students.js";
 
 // ================================
 // ★ 科目マスタ（subjects）を正本として取得
@@ -418,7 +413,8 @@ filterDefs.forEach(def => {
 // 新規追加: 習熟度フィルタ適用
 // ================================
 function applySkillLevelFilter(subject, key) {
-  window.__lastAppliedUnitKey = key;
+    window.currentSkillFilter = key;   // "S" / "A1" / "A2" / "A3" / "all" / "unset"
+   // ❌ unitKey は変更しない（習熟度は提出単位ではない）
   const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
   const levelsMap = studentState.skillLevelsMap || {};
   let filtered = baseList;
@@ -2864,6 +2860,13 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
 
 function resolveCurrentUnitKey({ grade, subjectMeta, visibleStudents }) {
   if (!visibleStudents || visibleStudents.length === 0) return null;
+  if (subjectMeta?.isSkillLevel === true) {
+    // 習熟度は「現在のフィルタボタン」が unitKey
+    const activeBtn =
+      document.querySelector("#groupFilterArea .filter-btn.active");
+    const key = activeBtn?.dataset?.filterKey;
+    return key && key !== "all" ? key : null;
+  }
 
   const first = visibleStudents[0] || {};
 
