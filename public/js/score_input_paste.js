@@ -218,6 +218,16 @@ function applyPastedScoresWithModes(
   selectedModes
 ) {
   const studentRows = Array.from(tbody.querySelectorAll("tr"));
+
+  // === ① 対象列の mode を一時固定 ===
+  const originalModes = {};
+  selectedModes.forEach((m, i) => {
+    const col = startCol + i;
+    originalModes[col] = criteriaState.items[col].mode;
+    criteriaState.items[col].mode = m;
+  });
+
+  // === ② 値をセットするだけ（再計算しない） ===
   let webRowIndex = 0;
 
   rows.forEach((vals) => {
@@ -241,21 +251,41 @@ function applyPastedScoresWithModes(
       if (!Number.isFinite(num)) return;
 
       input.value = String(num);
-
-      // 一時的に mode を差し替えて計算
-      const originalMode = criteriaState.items[col].mode;
-      criteriaState.items[col].mode = selectedModes[c] || originalMode;
-
-      updateFinalScoreForRow(tr, criteriaState, modeState);
-
-      // 戻す
-      criteriaState.items[col].mode = originalMode;
     });
 
     webRowIndex++;
   });
-  // ★ 貼り付け完了後：平均点・調整点・赤点を一括再計算
-recalcFinalScoresAfterRestore(tbody);
-// ★ 追加：保存状態を更新
-refreshSaveButtonState();
+
+  // === ③ まとめて再計算 ===
+  recalcFinalScoresAfterRestore(tbody);
+
+  // === ④ mode を元に戻す ===
+  Object.entries(originalModes).forEach(([col, mode]) => {
+    criteriaState.items[col].mode = mode;
+  });
+
+  refreshSaveButtonState();
+  // === ⑤ ヘッダのモード表示を一時同期（表示のみ） ===
+try {
+  selectedModes.forEach((mode, i) => {
+    const colIndex = startCol + i;
+    const th = document.querySelector(
+      `th button.crit-mode-btn[data-index="${colIndex}"]`
+    )?.parentElement;
+
+    if (!th) return;
+
+    th.querySelectorAll("button").forEach(btn => {
+      const isRaw = btn.textContent.includes("素点");
+      btn.classList.toggle(
+        "active",
+        (mode === "raw" && isRaw) || (mode === "scaled" && !isRaw)
+      );
+    });
+  });
+} catch (e) {
+  console.warn("paste mode header sync skipped:", e);
 }
+
+}
+

@@ -952,7 +952,7 @@ export function canSubmitScoresByVisibleRows() {
 }
 
 
-function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope }) {
+function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope}) {
 
 // ★ 習熟度科目：S / A1 / A2 / A3 を unitKey として扱う
 if (subject?.isSkillLevel === true) {
@@ -1007,14 +1007,15 @@ if (!["S", "A1", "A2", "A3"].includes(unitKey)) {
     const studentData = scoresDocData.students?.[studentId];
     if (!studentData || typeof studentData !== "object") return;
 // student 情報は DOM 行（stu）ではなく students マスタから引く
-// student マスタ（全学生）から取得
-const master = studentState.allStudents.find(
+// student マスタ（全学生）から取得（★window.studentState を参照）
+const master = window.studentState?.allStudents?.find(
   s => String(s.studentId) === String(studentId)
 );
 if (!master) return;
 
 const student = {
   studentId,
+    group: master.group || "",
   courseClass: master.courseClass || "",
   classGroup: master.classGroup || "",
 };
@@ -1096,6 +1097,26 @@ if (!window.currentUser || !window.currentUser.email) {
     alert("科目情報を取得できません。画面を再読み込みしてください。");
     return;
   }
+if (!window.studentState || !window.studentState.allStudents) {
+  console.error("studentState not ready", studentState);
+  alert("学生データがまだ読み込まれていません。少し待ってから再度送信してください。");
+  return;
+}
+  // ★ 教務送信時：現在表示中のユニットを必ず確定させる
+if (!window.currentUnitKey) {
+  const firstVisibleRow = document.querySelector(
+    "#scoreTableBody tr:not([style*='display: none'])"
+  );
+  if (firstVisibleRow) {
+    const sid = String(firstVisibleRow.dataset.studentId);
+  const master = window.studentState.allStudents.find(
+  s => String(s.studentId) === sid
+);
+    if (master) {
+      window.currentUnitKey = getUnitKeyForStudent(master, subject);
+    }
+  }
+}
 
   // 3) 表示中データを unitKey 単位で分解
   const snapshotByUnit = buildSubmittedSnapshotByUnit({
@@ -1103,7 +1124,8 @@ if (!window.currentUser || !window.currentUser.email) {
     subject,
     scope: {
       subjectId,
-      filter: "currentView"
+      filter: "currentView",
+      unitKey: window.currentUnitKey
     }
   });
 
@@ -1416,12 +1438,20 @@ function getUnitKeyForStudent(student, subject) {
   if (!student || !subject) return null;
 
   // 1・2年 → 組
-  if (["1", "2"].includes(String(subject.grade))) {
-    return String(student.classGroup || student.courseClass || "");
-  }
+if (["1", "2"].includes(String(subject.grade))) {
+  const unitKey = String(
+    student.group ||
+    student.classGroup ||
+    student.courseClass ||
+    ""
+  );
+  console.log("[DEBUG unitKey]", student.studentId, "=>", unitKey);
+  return unitKey;
+}
 
   // 3年以上 → コース
   return String(student.courseClass || "");
+  
 }
 
 

@@ -533,6 +533,7 @@ let subjectIdFromURL = urlParams.get("subjectId") || null;
 // ================================
 const criteriaState = createCriteriaState();
 const studentState = createStudentState();
+window.studentState = studentState;
 studentState.lastElectiveGrade = null;
 const modeState = createModeState();
 const scoreVersionBaseMap = new Map(); 
@@ -1557,6 +1558,7 @@ try {
     if (DEBUG) console.log("[SKILL LEVEL MODE] enabled");
   } else {
     if (DEBUG) console.log("[SKILL LEVEL MODE] disabled");
+    window.currentSkillFilter = null; // ★通常科目では習熟度フィルタを必ずリセット
   }
   // NOTE: call moved below to ensure students (sourceStudents) are determined first
   if (!subject) {
