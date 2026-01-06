@@ -80,6 +80,15 @@
       margin-bottom: 16px;
     }
 
+    .scheme-note {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #4b5563;
+      background: #f9fafb;
+      padding: 6px 10px;
+      border-radius: 6px;
+    }
+
     .scheme-tab {
       display: flex;
       align-items: center;
@@ -125,6 +134,21 @@
       display:none;
     }
 
+    .subject-status-bar {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #1f2937;
+      background: #f1f5f9;
+      border-left: 6px solid #004A99;
+    }
+
+    .subject-status-bar:empty {
+      display: none;
+    }
+
     #toastContainer {
       position: fixed;
       top: 20px;
@@ -162,6 +186,7 @@
     <div class="user-info">
       <button id="logoutBtn">ログアウト</button>
     </div>
+
   </header>
 
   <div style="max-width:1100px; margin:10px auto 0; padding:0 20px; display:flex; gap:8px;">
@@ -188,13 +213,35 @@
 
     <h2>評価基準の設定</h2>
 
+    <!-- 手順ガイド -->
+    <div style="
+      margin:12px 0 16px;
+      padding:12px 16px;
+      background:#f8fafc;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      font-size:13px;
+      line-height:1.7;
+      color:#1f2937;
+    ">
+      <strong style="color:#004A99;">この画面での操作手順</strong><br>
+      ① 担当科目を選択します<br>
+      ② 評価方式（考査のみ／考査＋課題／実験・実習）を選択します<br>
+      ③ 評価項目と割合（合計100%）を入力します<br>
+      ④ 保存後、「成績入力へ」ボタンから成績入力画面へ進みます<br>
+      <span style="display:block; margin-top:6px; color:#4b5563;">
+        ※「考査のみ（100%）」の場合、評価項目の入力は不要です。<br>
+        ※ 一度保存した評価基準を修正する場合は、修正理由の入力が必要です。
+      </span>
+    </div>
+
     <!-- 科目選択 -->
     <div class="field">
       <label for="subjectSelect" style="font-size:13px; color:#4b5563;">担当科目を選択</label>
       <select id="subjectSelect">
         <option value="">科目を選択してください</option>
       </select>
-      <div id="subjectStatus" style="margin-top:6px; font-size:12px; color:#6b7280;"></div>
+      <div id="subjectStatus" class="subject-status-bar"></div>
     </div>
 
     <!-- 評価方式 -->
@@ -220,6 +267,10 @@
           <span class="label">実験・実習</span>
         </div>
 
+      </div>
+      <div class="scheme-note">
+        ※ 評価方式を変更すると、現在入力中の評価項目は初期化されます。<br>
+        ※ 「考査のみ（100%）」を選択した場合、評価項目の入力は不要です。
       </div>
     </div>
 
