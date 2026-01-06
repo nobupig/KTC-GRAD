@@ -80,19 +80,35 @@ export function applyPastedScores(pastedText, tbody, criteriaState) {
 
       const num = Number(cellValue);
       if (!Number.isFinite(num)) continue;
-      if (num < 0 || num > 100) continue;
+      if (num < 0) continue;
 
       const col = startCol + c;
       const input = inputs[col];
       if (!input) continue;
 
+      // ★ 評価基準 max を取得
+      const item = criteriaState?.items?.[col];
+      const max = item ? Number(item.max) : null;
+
+      // ★ max 超過は「その場で拒否」
+      if (Number.isFinite(max) && num > max) {
+        input.value = "";
+        input.classList.add("input-over-max");
+        (window.showScoreInputErrorToast ? window.showScoreInputErrorToast(`この項目の上限は ${max} 点です`) : alert(`この項目の上限は ${max} 点です`));
+        continue;
+      }
+
+      // ★ 正常値のみ反映
+      input.classList.remove("input-over-max");
       input.value = String(num);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+
     }
 
     pasteRowIndex++;
     webRowIndex++;
   }
-
+  
   recalcFinalScoresAfterRestore(tbody);
   refreshSaveButtonState();
   return true;

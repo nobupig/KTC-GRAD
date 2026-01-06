@@ -1835,3 +1835,9 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
   font-weight: 600;
   color: #0d47a1;
 }
+
+/* 評価基準超過入力（赤枠） */
+.input-over-max {
+  border: 2px solid #e53935 !important;
+  background-color: #fff5f5;
+}

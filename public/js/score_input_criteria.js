@@ -15,6 +15,8 @@ export function createCriteriaState() {
     items: [],
     normalizedWeights: [],
     rawTotal: 0,
+    ready: false,
+    maxByIndex: [],
   };
 }
 
@@ -49,6 +51,8 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
   criteriaState.items = [];
   criteriaState.normalizedWeights = [];
   criteriaState.rawTotal = 0;
+  criteriaState.maxByIndex = [];
+  criteriaState.ready = false;
 
   if (!subjectId) return;
 
@@ -77,6 +81,7 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
   const mapped = items.map((it) => ({
     name: it.name || "",
     percent: Number(it.percent || 0),
+    max: Number.isFinite(Number(it.max)) ? Number(it.max) : 100,
     // mode: it.mode || "scaled", // 旧モードは廃止（互換用に保持しない）
   }));
 
@@ -87,6 +92,11 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
   criteriaState.items = mapped;
   criteriaState.normalizedWeights = normalized;
   criteriaState.rawTotal = rawTotal;
+  criteriaState.maxByIndex = mapped.map((item) => item.max);
+  criteriaState.ready = true;
+  if (typeof window !== "undefined") {
+    window.enableScoreInputs?.();
+  }
 }
 
 /**

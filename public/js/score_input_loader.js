@@ -80,6 +80,148 @@ function markDirty(reason = "score") {
   }
   if (DEBUG) console.log('[DIRTY]', reason);
 }
+
+// ================================
+// 簡易エラートースト表示（入力エラー用）
+// ================================
+// ================================
+// ★ 点数入力の最大値を取得する唯一の関数（正本）
+// ================================
+function getMaxScoreForInput(target) {
+  if (!target) return null;
+
+  // ① criteriaState（最優先）
+  const idx = Number(target.dataset.index);
+  const item = criteriaState?.items?.[idx];
+  if (item && Number.isFinite(item.max)) {
+    return item.max;
+  }
+
+  // ② input の max 属性
+  if (target.max && Number.isFinite(Number(target.max))) {
+    return Number(target.max);
+  }
+
+  // ③ ヘッダ表示から取得（例: 期末考査(100%)）
+  const th = target
+    .closest("table")
+    ?.querySelector(`th[data-index="${idx}"]`);
+
+  if (th) {
+    const m = th.textContent.match(/(\d+)\s*%|\((\d+)\)/);
+    if (m) return Number(m[1] || m[2]);
+  }
+
+  return null; // 不明な場合
+}
+
+let __scoreInputErrorToastTimer = null;
+
+function showScoreInputErrorToast(message) {
+  let toast = document.getElementById("score-input-error-toast");
+
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "score-input-error-toast";
+    toast.style.position = "fixed";
+    toast.style.top = "20px";
+    toast.style.left = "50%";
+    toast.style.transform = "translateX(-50%)";
+    toast.style.background = "#d32f2f";
+    toast.style.color = "#fff";
+    toast.style.padding = "10px 18px";
+    toast.style.borderRadius = "6px";
+    toast.style.boxShadow = "0 4px 10px rgba(0,0,0,0.2)";
+    toast.style.fontSize = "14px";
+    toast.style.zIndex = "9999";
+    toast.style.opacity = "0";
+    toast.style.transition = "opacity 0.25s ease";
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.style.opacity = "1";
+
+  if (__scoreInputErrorToastTimer) {
+    clearTimeout(__scoreInputErrorToastTimer);
+  }
+
+  __scoreInputErrorToastTimer = setTimeout(() => {
+    toast.style.opacity = "0";
+  }, 2500);
+}
+window.showScoreInputErrorToast = showScoreInputErrorToast;
+// ================================
+// ★ 評価基準 max 超過を検査して即クリア（入力/貼り付け共通）
+// ================================
+function enforceMaxForScoreInput(inputEl) {
+  if (!(inputEl instanceof HTMLInputElement)) return { ok: true };
+  if (inputEl.type !== "number") return { ok: true };
+  // 点数欄だけ対象（data-index が無い個体が混ざるので救済する）
+  if (inputEl.classList.contains("skill-level-input")) return { ok: true }; // 念のため
+
+  const idx =
+    Number.isFinite(Number(inputEl.dataset.index))
+      ? Number(inputEl.dataset.index)
+      : Number(inputEl.getAttribute("data-criteria-index"));
+
+  if (!Number.isFinite(idx)) return { ok: true };
+
+  const item = criteriaState?.items?.[idx];
+  if (!item) return { ok: true };
+
+  const maxVal = Number(item.max);
+  if (!Number.isFinite(maxVal)) return { ok: true };
+
+  const raw = (inputEl.value ?? "").toString().trim();
+  if (raw === "") {
+    inputEl.classList.remove("input-over-max");
+    return { ok: true };
+  }
+
+  const val = Number(raw);
+  if (!Number.isFinite(val)) return { ok: true };
+
+  if (val > maxVal) {
+    inputEl.value = "";
+    inputEl.classList.add("input-over-max");
+    return { ok: false, max: maxVal, idx };
+  }
+
+  inputEl.classList.remove("input-over-max");
+  return { ok: true };
+}
+
+function enforceMaxForAllScoreInputs(tbodyEl) {
+  const items = criteriaState?.items || [];
+  if (!tbodyEl || !items.length) return { ok: true, cleared: 0 };
+
+  const inputs = Array.from(
+    tbodyEl.querySelectorAll("input[type='number'][data-index]")
+  ).filter((el) => !el.classList.contains("skill-level-input"));
+
+  let cleared = 0;
+  let firstMax = null;
+
+  for (const input of inputs) {
+    const r = enforceMaxForScoreInput(input);
+    if (!r.ok) {
+      cleared++;
+      if (firstMax == null) firstMax = r.max;
+    }
+  }
+
+  if (cleared > 0) {
+    showScoreInputErrorToast(
+      `上限超過の入力が ${cleared} 件あったためクリアしました（上限例: ${firstMax} 点）`
+    );
+    return { ok: false, cleared };
+  }
+
+  return { ok: true, cleared: 0 };
+}
+
+
 // ================================
 // 調整点表示を更新
 // ================================
@@ -432,8 +574,9 @@ renderStudentRows(
   studentState,
   window.__latestScoresDocData?.completion
 );
-window.__currentFilterKey = "all";
-applyAllReadOnlyPolicy("all");
+window.__currentFilterKey = String(key ?? "all");
+window.__lastAppliedUnitKey = String(key ?? "all");
+applyAllReadOnlyPolicy(String(key ?? "all"));
   } finally {
     isRenderingTable = false;
   }
@@ -613,6 +756,38 @@ function buildRiskContext() {
   const subjectType = getSubjectType(currentSubjectMeta);
   return { useAdjustment, adjustPoint, subjectType };
 }
+// ================================
+// 赤点・超過判定（最終成績ベース）
+// ================================
+function computeRiskFlags(finalText, context) {
+  const result = {
+    isFail: false,
+    isExcess: false,
+  };
+
+  // finalText が数値でない場合は何もしない
+  const score = Number(finalText);
+  if (!Number.isFinite(score)) {
+    return result;
+  }
+
+  const { useAdjustment, adjustPoint, subjectType } = context || {};
+
+  // 赤点判定
+  // ・調整点科目：adjustPoint 未満
+  // ・通常科目：60 未満
+  if (useAdjustment && Number.isFinite(adjustPoint)) {
+    result.isFail = score < adjustPoint;
+  } else {
+    result.isFail = score < 60;
+  }
+
+  // 超過判定は別ロジック（state 依存）
+  // ※ 行単位では studentId で判定するため、ここでは false 固定
+  result.isExcess = false;
+
+  return result;
+}
 
 // 1行分のリスククラスを即時反映（Firestore readなし）
 function applyRiskClassForRow(tr) {
@@ -629,6 +804,26 @@ function applyRiskClassForRow(tr) {
 
     const finalCell = tr.querySelector('.final-score');
     const finalText = finalCell ? (finalCell.textContent || '').toString().trim() : "";
+
+// ================================
+// ★ 未入力行は「赤点のみ」判定しない
+// ★ 超過はそのまま表示する
+// ================================
+if (!finalText) {
+  tr.classList.remove(
+    "row-fail",
+    "row-fail-excess",
+    "red-failure-row"
+  );
+
+  if (excessStudentsState?.[studentId]) {
+    tr.classList.add("row-excess");
+  } else {
+    tr.classList.remove("row-excess");
+  }
+  return;
+}
+
     const flags = computeRiskFlags(finalText, buildRiskContext());
     const isFail = !!flags.isFail;
     const isExcess = !!excessStudentsState?.[studentId];
@@ -686,26 +881,99 @@ function applyRiskClassesToAllRows() {
 export function recalcFinalScoresAfterRestore(tbodyEl) {
   if (!tbodyEl) return;
 
-  try {
-    // ① DOM上の最終成績・( ) を再計算
-    
-  } catch (e) {
-    console.warn("[WARN] updateAllFinalScores failed", e);
+  // items と weights を確定（weights は 1(=100%) に正規化して扱う）
+  const items = criteriaState?.items || [];
+  const rawW = (criteriaState?.normalizedWeights || []).slice();
+  const weights = [];
+
+  if (items.length) {
+    if (rawW.length === items.length) {
+      // normalizedWeights が「合計1」or「合計100」どちらでも来ても吸収
+      const sumW = rawW.reduce((a, b) => a + (Number(b) || 0), 0);
+      const base = (sumW > 1.5) ? 100 : 1; // 100系なら100、1系なら1
+      for (let i = 0; i < items.length; i++) weights[i] = (Number(rawW[i]) || 0) / base;
+    } else {
+      // weights 不在時：max 比率で代替（事故回避）
+      const sumMax = items.reduce((a, it) => a + (Number(it?.max) || 0), 0);
+      for (let i = 0; i < items.length; i++) {
+        const m = Number(items[i]?.max) || 0;
+        weights[i] = sumMax > 0 ? (m / sumMax) : 0;
+      }
+    }
   }
 
-  try {
-    // ② ★平均点計算用MapをDOMから同期（Firestore readなし）
-    syncFinalScoresFromTbody(tbodyEl);
-  } catch (e) {
-    console.warn("[WARN] syncFinalScoresFromTbody failed", e);
-  }
+  const rows = tbodyEl.querySelectorAll("tr");
 
-  try {
-    // ③ 平均点・調整点を更新
-    updateAveragePointDisplay();
-  } catch (e) {
-    console.warn("[WARN] updateAveragePointDisplay failed", e);
-  }
+  rows.forEach((tr) => {
+    const studentId = tr.dataset.studentId;
+    if (!studentId) return;
+
+    // specialType は対象外
+    if (currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2) return;
+
+    if (!items.length) return;
+
+    let sumWeighted = 0;
+    let hasAnyInput = false;
+    let allPerfect = true; // 99%対策（満点判定）
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const max = Number(item?.max || 0);
+      const w = Number(weights[idx] || 0);
+
+      const input = tr.querySelector(`input[data-index="${idx}"][data-student-id="${studentId}"]`);
+      if (!input) continue;
+
+      const raw = (input.value ?? "").toString().trim();
+      if (raw === "") {
+        allPerfect = false;
+        continue;
+      }
+
+      const val = Number(raw);
+      if (!Number.isFinite(val)) {
+        allPerfect = false;
+        continue;
+      }
+
+      hasAnyInput = true;
+      if (!(Number.isFinite(max) && max > 0 && val >= max)) allPerfect = false;
+
+      // 比率計算： (val/max) * weight を合算 → 最終的に 0..100
+      if (Number.isFinite(max) && max > 0 && w > 0) {
+        sumWeighted += (val / max) * w;
+      }
+    }
+
+    const finalCell = tr.querySelector(".final-score");
+
+    // 未入力行
+    if (!hasAnyInput || !finalCell) {
+      if (finalCell) finalCell.textContent = "";
+      try { studentState.finalScores.delete(studentId); } catch (e) {}
+      return;
+    }
+
+    // 0..100 に換算
+    let finalScoreFloat = sumWeighted * 100;
+
+    // 99%対策：浮動小数の誤差で 99.xx → 99 に落ちる/満点が 99 になる事故を救済
+    if (allPerfect) {
+      finalScoreFloat = 100;
+    } else if (finalScoreFloat >= 99.5) {
+      finalScoreFloat = 100;
+    }
+
+    const finalScore = Math.round(finalScoreFloat);
+
+    finalCell.textContent = String(finalScore);
+    try { studentState.finalScores.set(studentId, finalScore); } catch (e) {}
+  });
+
+  // 平均点・調整点更新
+  try { syncFinalScoresFromTbody(tbodyEl); } catch (e) {}
+  try { updateAveragePointDisplay(); } catch (e) {}
 }
 
 
@@ -1056,7 +1324,7 @@ async function ensureElectiveRegistrationLoaded(subject) {
   if (snap.exists()) {
     const data = snap.data() || {};
     const students = Array.isArray(data.students) ? data.students : [];
-    studentState.electiveStudents = sortStudents(students);
+    studentState.electiveStudents = students.slice();
 
     // ★ subjectId を必ずキャッシュに保持
     electiveRegistrations = { ...data, subjectId: subject.subjectId };
@@ -1606,7 +1874,8 @@ document
     await loadCriteria(db, currentYear, subjectId, criteriaState);
     criteriaCache.set(subjectId, structuredClone(criteriaState));
   }
-
+// ★ 通常科目の評価基準ヘッダー描画（これが無いとヘッダーが出ない）
+  renderTableHeader(headerRow, criteriaState);
   updateAdjustPointDisplay();
   
 
@@ -1687,7 +1956,7 @@ document
   if (subject.required === false) {
     const list = studentState.electiveStudents || [];
     // electiveStudents を正本として使う（subjectRoster 由来の students を再フィルタしない）
-    displayStudents = sortStudents(list).slice();
+    displayStudents = list.slice();
   } else {
     displayStudents = students;
   }
@@ -1918,63 +2187,101 @@ if (!unsavedListenerInitialized && tbody) {
     }
   }, true);
 
+
+
+// ================================
+// ★ 入力される前に異常値・max超過を止める
+// ================================
+tbody.addEventListener("beforeinput", (ev) => {
+  const target = ev.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (target.type !== "number") return;
+  if (target.classList.contains("skill-level-input")) return;
+
+  const raw =
+    ev.inputType === "insertFromPaste"
+      ? (ev.clipboardData?.getData("text") ?? "")
+      : (target.value + (ev.data ?? ""));
+
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 1000) {
+    ev.preventDefault();
+    showScoreInputErrorToast("異常な数値は入力できません");
+  }
+});
+
+
+
   
   tbody.addEventListener("input", (ev) => {
     if (isRenderingTable) return;
     if (isProgrammaticInput) return;
 
     const target = ev.target;
-      // ================================
-  // ★ 数値入力の正規化（e / - / -- 防止）
-  // ================================
-  if (
-    target instanceof HTMLInputElement &&
-    target.type === "number" &&
-    target.dataset.index
-  ) {
-    let v = target.value ?? "";
 
-    // 数字と小数点以外を除去
-    v = v.replace(/[^0-9.]/g, "");
+    // ================================
+    // ★ 数値入力の正規化（e / - / -- 防止）
+    // ================================
+    if (
+      target instanceof HTMLInputElement &&
+      target.type === "number" &&
+      target.dataset.index
+    ) {
+      let v = target.value ?? "";
 
-    // 小数点は1つまで
-    const parts = v.split(".");
-    if (parts.length > 2) {
-      v = parts[0] + "." + parts.slice(1).join("");
+      // 数字と小数点以外を除去
+      v = v.replace(/[^0-9.]/g, "");
+
+      // 小数点は1つまで
+      const parts = v.split(".");
+      if (parts.length > 2) {
+        v = parts[0] + "." + parts.slice(1).join("");
+      }
+
+      if (target.value !== v) {
+        target.value = v;
+      }
     }
 
-    if (target.value !== v) {
-      target.value = v;
-    }
-  }
+    if (
+      criteriaState.ready &&
+      target instanceof HTMLInputElement &&
+      target.type === "number" &&
+      target.dataset.index &&
+      !target.classList.contains("skill-level-input")
+    ) {
+      const idx = Number(target.dataset.index);
+      const max = criteriaState.maxByIndex?.[idx];
 
-    // ① スキル入力は除外（既存どおり）
-    if (target instanceof HTMLInputElement && target.classList.contains("skill-level-input")) {
+      const v = Number(target.value);
+      if (Number.isFinite(max) && Number.isFinite(v) && v > max) {
+        target.value = "";
+        showScoreInputErrorToast(`この項目の上限は ${max} 点です`);
+        return;
+      }
+    }
+
+    if (
+      target instanceof HTMLInputElement &&
+      target.classList.contains("skill-level-input")
+    ) {
       return;
     }
 
-    // ② 通常科目：数値 input のみ対象（既存の条件を維持）
     const isNumberScoreInput =
       target instanceof HTMLInputElement &&
       target.type === "number" &&
       !!target.dataset.index;
 
-    // ③ 特別科目：select を対象にする（new）
     const isSpecialSelect =
       target instanceof HTMLSelectElement &&
-      (target.classList.contains("pass-fail-select") || target.classList.contains("cert-select"));
+      (target.classList.contains("pass-fail-select") ||
+       target.classList.contains("cert-select"));
 
     if (!isNumberScoreInput && !isSpecialSelect) return;
 
     setUnsavedChanges(true);
     isSavedAfterLastEdit = false;
-
-    const tr = target.closest("tr");
-    // 特別科目は点数計算しないので、行再計算は呼ばなくてOK
-    // （呼んでも即死はしにくいが、無駄なので分岐）
-    if (!isSpecialSelect) {
-      handleScoreInputChange(tr);
-    }
   });
 
   unsavedListenerInitialized = true;
@@ -2030,6 +2337,7 @@ if (!unsavedListenerInitialized && tbody) {
         )
       ) {
         setUnsavedChanges(true);
+        enforceMaxForAllScoreInputs(tbody);
          // ★ 貼り付け直後に必ず再評価
         recalcFinalScoresAfterRestore(tbody);
         applyRiskClassesToAllRows();
@@ -2105,12 +2413,19 @@ const isScoreLocked = document.body.classList.contains("score-locked");
 // ===============================
 // 提出済み文言の最終判定（completion 正本）
 // ===============================
-if (window.__latestScoresDocData?.completion?.isCompleted === true) {
+const completion = window.__latestScoresDocData?.completion;
+const currentUnitKey = window.__submissionContext?.unitKey;
+
+if (
+  completion?.completedUnits?.includes(currentUnitKey)
+) {
   showSubmittedLockNotice();
   lockScoreInputUI();
-    // ★ 追加：提出後はモード切替を完全停止
-
+} else {
+  hideSubmittedLockNotice();
+  unlockScoreInputUI();
 }
+
 }
 
 // =====================================================
@@ -2339,14 +2654,7 @@ function renderGroupOrCourseFilter(subject) {
 // ================================
 function applyGroupOrCourseFilter(subject, filterKey) {
   window.__currentFilterKey = String(filterKey ?? "all");
-  // ★ 最後に選択された unitKey を保持（方法A）
  window.__lastAppliedUnitKey = filterKey;
- 
-
-  // 現在のユニットを更新
-  activeUnitKeyForCriteria = filterKey;
-
-    
 
   // baseList = 科目ごとの初期並び済リスト（共通科目なら全学生）
   const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
@@ -2367,7 +2675,10 @@ function applyGroupOrCourseFilter(subject, filterKey) {
         studentState,
         window.__latestScoresDocData?.completion
       );
-refreshSaveButtonState();
+// ★ specialType（習熟度など）の場合は number input 依存の判定をスキップ
+if (!(currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2)) {
+  refreshSaveButtonState();
+}
 // ===== 特別科目は初期値が有効なので、初回から保存可能にする =====
 if (
   currentSubjectMeta &&
@@ -2725,7 +3036,7 @@ function openElectiveModal() {
     : baseStudents.filter((s) => registeredIds.includes(String(s.studentId)));
 
   // ④ ソート（超過学生登録と同一）
-  displayStudents = sortStudentsSameAsExcess(displayStudents || []);
+  displayStudents = (displayStudents || []).slice();
 
   // モーダル用ソートの元データを保持
   electiveModalSourceStudents = displayStudents.slice();
@@ -3008,7 +3319,7 @@ nextStudents = Array.from(byId.values());
 
     // transaction成功後に nextStudents を state/cache に同期（この変数が上で宣言されている前提）
   if (Array.isArray(nextStudents)) {
-    studentState.electiveStudents = sortStudents(nextStudents);
+    studentState.electiveStudents = nextStudents.slice();
     electiveRegistrations = {
       ...(electiveRegistrations || {}),
       subjectId: subjectId,
@@ -3109,6 +3420,22 @@ export function refreshSaveButtonState() {
   });
 
   saveBtn.disabled = !hasAnyInput;
+}
+
+export function disableScoreInputs() {
+  document.querySelectorAll("#scoreTableBody input[type='number']").forEach((input) => {
+    input.disabled = true;
+  });
+}
+
+export function enableScoreInputs() {
+  document.querySelectorAll("#scoreTableBody input[type='number']").forEach((input) => {
+    input.disabled = false;
+  });
+}
+
+if (typeof window !== "undefined") {
+  window.enableScoreInputs = enableScoreInputs;
 }
 
 
@@ -3376,6 +3703,7 @@ if (Array.isArray(required) && required[0] === "__SINGLE__") {
   // 全 requiredUnits が completedUnits に含まれているか
   return required.every(unit => completed.includes(unit));
 }
+
 
 
 
