@@ -21,8 +21,8 @@
       align-items: center;
       justify-content: space-between;
     }
-    header h1 { font-size: 18px; margin: 0; }
-    .user-info { font-size: 12px; }
+    header h1 { font-size: 24px; margin: 0; }
+    .user-info { font-size: 14px; }
 
     header button {
       border: none;
@@ -58,7 +58,7 @@
     .btn-secondary { background: #e5e7eb; color: #111; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     thead { background: #f9fafb; }
     th, td {
       border-bottom: 1px solid #e5e7eb;
@@ -70,19 +70,19 @@
     select, input {
       width: 100%; padding: 6px 8px;
       border-radius: 8px; border: 1px solid #d1d5db;
-      font-size: 14px;
+      font-size: 20px;
       box-sizing: border-box;
     }
 
     .scheme-tabs {
       display: flex;
       border-bottom: 2px solid #d1d5db;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
 
     .scheme-note {
       margin-top: 6px;
-      font-size: 12px;
+      font-size: 18px;
       color: #4b5563;
       background: #f9fafb;
       padding: 6px 10px;
@@ -97,7 +97,7 @@
       border: 2px solid transparent;
       border-bottom: none;
       cursor: pointer;
-      font-size: 13px;
+      
       color: #374151;
       white-space: nowrap;
     }
@@ -122,7 +122,52 @@
       font-size: 16px;
     }
 
-    .total-note { font-size: 12px; color: #dc2626; margin-left: 8px; }
+    .action-bar {
+      margin-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .action-primary {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .action-hint {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .action-next {
+      display: flex;
+      align-items: center;
+    }
+
+ #editBtn {
+  display: block;
+  margin: 12px auto 0 auto; /* ← 中央寄せ確定 */
+}
+
+    /* 保存済み状態の保存ボタン */
+    #saveBtn:disabled {
+      background: #e5e7eb;
+      color: #6b7280;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    /* 保存済み時のラベルを強調しすぎない */
+    #saveBtn:disabled::after {
+      content: "（保存済み）";
+      margin-left: 6px;
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .total-note { font-size: 18px; color: #dc2626; margin-left: 8px; }
 
     #multiTeacherWarning {
       background:#fff3cd;
@@ -190,17 +235,17 @@
   </header>
 
   <div style="max-width:1100px; margin:10px auto 0; padding:0 20px; display:flex; gap:8px;">
-    <button class="btn btn-secondary" style="font-size:12px;" onclick="location.href='start.html'">
+    <button class="btn btn-secondary" style="font-size:18px;" onclick="location.href='start.html'">
       🏠 ホームへ戻る
     </button>
-    <button id="backToSubjectsBtn" class="btn btn-secondary" style="font-size:12px;">
+    <button id="backToSubjectsBtn" class="btn btn-secondary" style="font-size:18px;">
       ◀ 科目登録に戻る
     </button>
   </div>
 
   <!-- ログイン中表示 -->
   <div id="userInfoArea" style="max-width:1100px; margin:4px auto 0; padding:0 20px;">
-    <div id="userInfoDisplay" style="font-size:13px; font-weight:600; text-align:right;"></div>
+    <div id="userInfoDisplay" style="font-size:16px; font-weight:600; text-align:right;"></div>
   </div>
 
   <div id="toastContainer"></div>
@@ -220,9 +265,9 @@
       background:#f8fafc;
       border:1px solid #e5e7eb;
       border-radius:12px;
-      font-size:13px;
+      font-size:18px;    
       line-height:1.7;
-      color:#1f2937;
+      color:#211e1e;
     ">
       <strong style="color:#004A99;">この画面での操作手順</strong><br>
       ① 担当科目を選択します<br>
@@ -237,7 +282,7 @@
 
     <!-- 科目選択 -->
     <div class="field">
-      <label for="subjectSelect" style="font-size:13px; color:#4b5563;">担当科目を選択</label>
+      <label for="subjectSelect" style="font-size:18px; color:#4b5563;">担当科目を選択</label>
       <select id="subjectSelect">
         <option value="">科目を選択してください</option>
       </select>
@@ -246,7 +291,7 @@
 
     <!-- 評価方式 -->
     <div id="schemeBlock" style="margin-bottom:16px;">
-      <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">評価方式を選択</div>
+      <div style="font-size:18px; color:#4b5563; margin-bottom:4px;">評価方式を選択</div>
       <div class="scheme-tabs">
 
         <div class="scheme-tab" data-value="exam_only">
@@ -290,17 +335,31 @@
       <button id="addRowBtn" class="btn btn-secondary">+ 行追加</button>
     </div>
 
-    <div id="totalArea" style="margin-top:12px; font-size:13px;">合計：0%</div>
+    <div id="totalArea" style="margin-top:12px; font-size:16px;">合計：0%</div>
     <span class="total-note">
       ※ 評価基準の合計は必ず100%としてください（許容誤差 ±1%）
     </span>
 
-    <div style="margin-top:20px; display:flex; gap:8px;">
-      <button id="saveBtn" class="btn btn-primary">保存する</button>
-      <button id="goScoreBtn" class="btn btn-secondary" style="display:none;">
-           成績入力へ
-      </button>
-        <!-- ロック/登録済み通知ダイアログ -->
+    <div class="action-bar">
+      <div class="action-primary">
+        <button id="saveBtn" class="btn btn-primary">保存する</button>
+        <div class="action-hint">
+          ※ 保存後は修正理由を入力することで再編集できます
+        </div>
+        <button id="editBtn"
+                class="btn btn-secondary"
+                style="display:none; font-size:14px;">
+          修正する
+        </button>
+      </div>
+
+      <div class="action-next">
+        <button id="goScoreBtn" class="btn btn-secondary" style="display:none;">
+             成績入力へ
+        </button>
+      </div>
+    </div>
+    <!-- ロック/登録済み通知ダイアログ -->
 <dialog id="criteriaInfoDialog">
   <h3 id="criteriaInfoTitle" style="margin:0 0 8px 0;"></h3>
   <p id="criteriaInfoMessage" style="white-space:pre-wrap; font-size:13px; margin:0 0 12px 0;"></p>
@@ -399,6 +458,7 @@
     const editReasonInput = document.getElementById("editReasonInput");
     const editReasonCancelBtn = document.getElementById("editReasonCancelBtn");
     const editReasonOkBtn = document.getElementById("editReasonOkBtn");
+    const editBtn = document.getElementById("editBtn");
 
     // ================================
     // グローバル状態
@@ -847,46 +907,13 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       saveBtn.textContent = "保存済み";
       saveBtn.dataset.mode = "locked";
 
-      let editBtn = document.getElementById("editBtn");
+      if (!editBtn) return;
       if (!allowEditButton) {
-        if (editBtn) editBtn.remove();
+        editBtn.style.display = "none";
         return;
       }
 
-      if (!editBtn) {
-        editBtn = document.createElement("button");
-        editBtn.id = "editBtn";
-        editBtn.className = "btn btn-secondary";
-        editBtn.style.marginLeft = "8px";
-        editBtn.textContent = "修正する";
-
-        const parent = saveBtn.parentNode;
-        const scoreBtn = document.getElementById("goScoreBtn");
-        if (scoreBtn) {
-          // 保存 → 修正する → 成績入力へ の順になるように、成績入力ボタンの手前に差し込む
-          parent.insertBefore(editBtn, scoreBtn);
-        } else {
-          parent.appendChild(editBtn);
-        }
-      }
-      editBtn.style.display = "inline-block";
-
-      editBtn.onclick = () => {
-        if (!currentSubjectId) {
-          alert("科目が選択されていません。");
-          return;
-        }
-
-          // ★ 修正前スナップショットは「修正開始時」に1回だけ取る
-  historyBeforeCriteriaSnapshot =
-    captureCurrentCriteriaSnapshot(currentSubjectId);
-
-        isEditingExistingCriteria = true;
-        currentEditReason = null;
-        
-        if (editReasonInput) editReasonInput.value = "";
-        if (editReasonModal) editReasonModal.style.display = "flex";
-      };
+      editBtn.style.display = "inline-flex";
     }
 
     function unlockUIForEdit() {
@@ -905,7 +932,6 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       saveBtn.textContent = "保存する（修正反映）";
       saveBtn.dataset.mode = "edit";
 
-      const editBtn = document.getElementById("editBtn");
       if (editBtn) editBtn.style.display = "none";
     }
 
@@ -923,8 +949,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       currentEditReason = null;
       historyBeforeCriteriaSnapshot = null;
 
-      const editBtn = document.getElementById("editBtn");
-      if (editBtn) editBtn.remove();
+      if (editBtn) editBtn.style.display = "none";
 
       totalArea.textContent = "合計：0%";
       totalArea.style.color = "#111827";
@@ -1104,6 +1129,17 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       });
     }
 
+    if (editBtn) {
+      editBtn.addEventListener("click", () => {
+        if (!currentSubjectId) {
+          alert("科目が選択されていません。");
+          return;
+        }
+        if (editReasonInput) editReasonInput.value = "";
+        if (editReasonModal) editReasonModal.style.display = "flex";
+      });
+    }
+
     if (editReasonOkBtn) {
       editReasonOkBtn.addEventListener("click", () => {
         const reason = (editReasonInput?.value || "").trim();
@@ -1117,7 +1153,10 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         }
 
         currentEditReason = reason;
-               if (editReasonModal) editReasonModal.style.display = "none";
+        historyBeforeCriteriaSnapshot =
+          captureCurrentCriteriaSnapshot(currentSubjectId);
+        isEditingExistingCriteria = true;
+        if (editReasonModal) editReasonModal.style.display = "none";
 
         // ここで初めて編集可能にする
         unlockUIForEdit();
