@@ -47,13 +47,15 @@
       margin-top: 0;
     }
 
-    .btn {
-      padding: 8px 14px;
-      border-radius: 999px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-    }
+  .btn {
+  padding: 10px 18px;   /* ← 高さ・横幅を安定させる */
+  min-height: 44px;     /* ← 全ボタン共通の高さ */
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;      /* ← 全体フォントに合わせる */
+}
+
     .btn-primary { background: #004A99; color: white; }
     .btn-secondary { background: #e5e7eb; color: #111; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -130,28 +132,44 @@
       gap: 16px;
     }
 
-    .action-primary {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+.action-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;          /* ← 行追加と修正の間隔 */
+}
 
-    .action-hint {
-      font-size: 14px;
-      color: #6b7280;
-    }
+
+    .action-primary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;   /* ★ 追加：中央揃えの本体 */
+  gap: 6px;
+}
+
+   .action-hint {
+  font-size: 14px;
+  color: #6b7280;
+  text-align: center;   /* ★ 追加 */
+}
+
+.action-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
 
     .action-next {
       display: flex;
       align-items: center;
     }
 
- #editBtn {
-  display: block;
-  margin: 12px auto 0 auto; /* ← 中央寄せ確定 */
+    .action-primary .btn {
+  min-width: 220px;   /* 好みで 200〜240 */
+  text-align: center;
 }
 
-    /* 保存済み状態の保存ボタン */
+     /* 保存済み状態の保存ボタン */
     #saveBtn:disabled {
       background: #e5e7eb;
       color: #6b7280;
@@ -331,34 +349,46 @@
       <tbody id="criteriaTbody"></tbody>
     </table>
 
-    <div>
-      <button id="addRowBtn" class="btn btn-secondary">+ 行追加</button>
-    </div>
+   
 
     <div id="totalArea" style="margin-top:12px; font-size:16px;">合計：0%</div>
     <span class="total-note">
       ※ 評価基準の合計は必ず100%としてください（許容誤差 ±1%）
     </span>
 
-    <div class="action-bar">
-      <div class="action-primary">
-        <button id="saveBtn" class="btn btn-primary">保存する</button>
-        <div class="action-hint">
-          ※ 保存後は修正理由を入力することで再編集できます
-        </div>
-        <button id="editBtn"
-                class="btn btn-secondary"
-                style="display:none; font-size:14px;">
-          修正する
-        </button>
-      </div>
+<div class="action-bar">
 
-      <div class="action-next">
-        <button id="goScoreBtn" class="btn btn-secondary" style="display:none;">
-             成績入力へ
-        </button>
-      </div>
-    </div>
+  <!-- 左：行追加 -->
+<div class="action-left">
+  <button id="addRowBtn" class="btn btn-secondary">
+    ＋ 行追加
+  </button>
+
+  <button id="editBtn"
+          class="btn btn-secondary"
+          style="display:none;">
+    修正する
+  </button>
+</div>
+
+
+  <!-- 中央：保存・修正 -->
+<div class="action-primary">
+  <button id="saveBtn" class="btn btn-primary">
+    保存する
+  </button>
+</div>
+ <!-- 右：次へ -->
+  <div class="action-next">
+    <button id="goScoreBtn"
+            class="btn btn-secondary"
+            style="display:none;">
+      成績入力へ
+    </button>
+  </div>
+
+</div>
+
     <!-- ロック/登録済み通知ダイアログ -->
 <dialog id="criteriaInfoDialog">
   <h3 id="criteriaInfoTitle" style="margin:0 0 8px 0;"></h3>

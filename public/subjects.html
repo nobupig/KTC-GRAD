@@ -21,7 +21,7 @@
       align-items: center;
       justify-content: space-between;
     }
-    header h1 { font-size: 18px; margin: 0; }
+    header h1 { font-size: 24px; margin: 0; }
     header .user-info { font-size: 12px; text-align: right; }
     header button {
       border: none; padding: 6px 12px;
@@ -55,7 +55,7 @@
     select, input, textarea {
       width: 100%; padding: 6px 8px;
       border-radius: 8px; border: 1px solid #d1d5db;
-      font-size: 14px;
+      font-size: 18px;
       box-sizing: border-box;
     }
 
@@ -109,7 +109,7 @@
     .modal-actions {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
     }
 
     .modal-btn {
@@ -146,26 +146,40 @@
       cursor: pointer;
     }
 
-    .status { font-size: 13px; color: #6b7280; margin: 4px 0 10px; }
-    .error { color: #b91c1c; font-size: 13px; margin-top: 4px; }
+    .status { font-size: 16px; color: #6b7280; margin: 4px 0 10px; }
+    .error { color: #b91c1c; font-size: 16px; margin-top: 4px; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 16px; }
     thead { background: #f9fafb; }
-    th, td {
-      border-bottom: 1px solid #e5e7eb;
-      padding: 6px 8px; white-space: nowrap;
-    }
-    th:first-child, td:first-child {
-      text-align: center;
-      width: 40px;
-    }
+th, td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 12px 16px;        /* ← 左右を広げる */
+  white-space: nowrap;
+  vertical-align: middle;
+  font-size: 18px;
+}
+
+th:first-child,
+td:first-child {
+  text-align: center;
+  width: 56px;
+  padding: 12px 0;   /* 上下は他列と合わせる */
+}
+
+
+thead th {
+  font-weight: 600;
+  color: #111827;
+}
+
+
     tbody tr:hover { background: #f3f4f6; }
 
     .badge {
       display: inline-block;
       padding: 2px 6px;
       border-radius: 999px;
-      font-size: 11px;
+      font-size: 16px;
       background: #eff6ff;
       color: #1d4ed8;
     }
@@ -177,7 +191,7 @@
       justify-content: space-between;
       gap: 8px;
       flex-wrap: wrap;
-      font-size: 13px;
+      font-size: 18px;
     }
 
     dialog {
@@ -188,11 +202,13 @@
     dialog::backdrop { background: rgba(0,0,0,0.25); }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
       #registeredSubjectsArea {
-        background:#f8fafc;
-        padding:16px;
-        border-radius:12px;
-        border:1px solid #e2e8f0;
-      }
+      background:#f8fafc;
+      padding:16px;
+      border-radius:12px;
+      border:1px solid #e2e8f0;
+      margin-bottom: 16px;
+    }
+
   
    #userInfoArea {
   max-width: 1100px;
@@ -205,7 +221,26 @@
    color: #1e3a8a;
    text-align: right;
  }
+
+ /* 登録済み科目一覧 */
+.registered-subject-row {
+  font-size: 16px;
+  line-height: 1.6;
+}
  
+#tableContainer {
+  margin-top: 0;
+}
+
+th:not(:first-child),
+td:not(:first-child) {
+  text-align: left;
+}
+
+td input[type="checkbox"] {
+  vertical-align: middle;
+}
+
   </style>
 </head>
 <body>
@@ -220,7 +255,7 @@
 </header>
 
 <div style="max-width:1100px; margin:10px auto; padding:0 20px;">
-  <button class="btn btn-secondary" style="font-size:12px;" onclick="location.href='start.html'">
+  <button class="btn btn-secondary" style="font-size:16px;" onclick="location.href='start.html'">
     🏠 ホームへ戻る
   </button>
 </div>
@@ -313,7 +348,7 @@
     <div id="loadError" class="error"></div>
       <!-- ▼登録済み科目一覧（後で動的に描画） -->
       <div id="registeredSubjectsArea" style="display:none; margin-top:20px;">
-        <h3 style="font-size:16px; margin-bottom:10px;">📘 登録済み科目一覧</h3>
+        <h3 style="font-size:20px; margin-bottom:10px;">📘 登録済み科目一覧</h3>
         <div id="registeredSubjectsList"></div>
       </div>
       <!-- ▲登録済み科目一覧 -->
@@ -349,11 +384,11 @@
 
     <!-- 自分が担当するはずの科目が一覧に無いとき用の連絡ボタン -->
     <div id="contactOfficeAnytimeArea"
-         style="margin:12px 0 0; font-size:13px; color:#374151;">
+         style="margin:12px 0 0; font-size:14px; color:#374151;">
       担当しているはずの科目が一覧にない場合は、教務へ連絡してください。
       <button id="contactOfficeAnytimeBtn"
               class="btn btn-secondary"
-              style="margin-left:8px; padding:5px 12px; font-size:12px;">
+              style="margin-left:8px; padding:5px 14px; font-size:12px;">
         教務へ連絡する
       </button>
     </div>
@@ -896,7 +931,7 @@ function getSelectedSubjects() {
         row.style.justifyContent = "space-between";
         row.style.alignItems = "center";
         row.style.padding = "4px 0";
-        row.style.fontSize = "13px";
+        row.classList.add("registered-subject-row");
         row.style.borderBottom = "1px solid #e5e7eb";
 
         const label = document.createElement("div");
