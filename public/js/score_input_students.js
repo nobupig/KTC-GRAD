@@ -707,10 +707,9 @@ selectEl2.addEventListener("input", setFilled2);
     const input = document.createElement("input");
     input.dataset.weightPercent = String(item.percent ?? 0);
 
-    input.type = "number";
-    input.min = "0";
-    input.max = "100";
-    input.step = "0.1";
+input.type = "number";
+input.min = "0";
+input.step = "0.1";
  
  const isAllView = String(window.__currentFilterKey || "all") === "all";
 if (isAllView) input.disabled = true;
@@ -1451,7 +1450,7 @@ if (["1", "2"].includes(String(subject.grade))) {
     student.courseClass ||
     ""
   );
-  console.log("[DEBUG unitKey]", student.studentId, "=>", unitKey);
+ 
   return unitKey;
 }
 

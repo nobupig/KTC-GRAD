@@ -18,10 +18,20 @@
  * @param {number} percent  評価割合（例: 50, 30, 20）
  * @returns {number} 最終成績に足し込む「寄与点」
  */
-function calcContribution(value, percent) {
-  if (!Number.isFinite(value) || !Number.isFinite(percent)) return NaN;
-  return (value * percent) / 100;
+function calcContribution(value, percent, maxAllowed) {
+  const v = Number(value);
+  const p = Number(percent);
+  const m = Number(maxAllowed);
+
+  if (!Number.isFinite(v) || !Number.isFinite(p)) return 0;
+
+  // max が不正なら「100点満点」として扱う（保険）
+  if (!Number.isFinite(m) || m <= 0) return (v * p) / 100;
+
+  // (value / max) * percent
+  return (v / m) * p;
 }
+
 
 
 /**
@@ -172,7 +182,8 @@ export function updateFinalScoreForRow(
   inputs.forEach((input) => {
     const idx = Number(input.dataset.index || "0");
     const item = items[idx];
-    const percent = item ? Number(item.percent || 0) : 0;
+    const percent = Number((criteriaState.normalizedWeights || [])[idx] ?? (item?.percent || 0));
+
 
     // 変換結果表示用 <span>
     const span = input.nextElementSibling;
@@ -227,12 +238,19 @@ export function updateFinalScoreForRow(
       return;
     }
 
- // ---------- ③ 最大値を評価基準から取得 ----------
-const maxAllowed =
-  Number.isFinite(item?.max) && item.max > 0
-    ? Number(item.max)
-    : null; // max 未設定時は上限制御しない
+// ---------- ③ 最大値を評価基準から取得（最終確定仕様） ----------
+    const maxAllowed = Number(item.max);
 
+    if (!Number.isFinite(maxAllowed) || maxAllowed <= 0) {
+      console.error("[FATAL] invalid item.max (should never happen)", item);
+      return;
+    }
+// ---------- ★ STEP4：input の max 属性を評価基準と同期 ----------
+if (Number.isFinite(maxAllowed) && maxAllowed > 0) {
+  input.max = String(maxAllowed);
+} else {
+  input.removeAttribute("max");
+}
 
     // ---------- ④ 上限超過チェック（A仕様の肝） ----------
     if (Number.isFinite(maxAllowed) && maxAllowed > 0 && value > maxAllowed) {
@@ -260,7 +278,25 @@ const maxAllowed =
     }
 
     // ---------- ⑤ 正常値として寄与点を計算 ----------
-    const contribution = calcContribution(value, percent);
+let contribution = 0;
+
+if (
+  Number.isFinite(value) &&
+  Number.isFinite(maxAllowed) &&
+  maxAllowed > 0 &&
+  Number.isFinite(percent)
+) {
+  contribution = (value / maxAllowed) * percent;
+}
+console.log({
+  idx,
+  itemName: item?.name,
+  percent,
+  maxAllowed,
+  value,
+  contribution,
+});
+
     if (hasConvertedSpan) {
       span.textContent = `(${contribution.toFixed(1)})`;
     }
@@ -383,6 +419,31 @@ export function updateAllFinalScores(
   });
 
   return allErrors;
+}
+// ================================
+// STEP2: 手入力時の即時再計算
+// ================================
+export function setupAutoRecalcOnInput(
+  tbody,
+  criteriaState,
+  context
+) {
+  if (!tbody) return;
+
+  // ★ tbody 全体で input を拾う（イベント委譲）
+  tbody.addEventListener("input", (ev) => {
+    const target = ev.target;
+
+    if (!(target instanceof HTMLInputElement)) return;
+    if (target.type !== "number") return;
+
+    // ★ 入力のたびに最終成績を再計算
+    updateAllFinalScores(
+      tbody,
+      criteriaState,
+      context
+    );
+  });
 }
 
 /**

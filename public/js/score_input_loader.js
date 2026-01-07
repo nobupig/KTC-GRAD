@@ -1783,17 +1783,7 @@ try {
   subject.specialType = specialType;
   subject.isSkillLevel = isSkillLevel;
 
-  if (DEBUG) console.log("[DEBUG subjectMaster]", subjectMaster);
-  if (DEBUG) console.log("[DEBUG isSkillLevel]", currentSubjectMeta.isSkillLevel);
-  if (DEBUG) console.log(
-    "[DEBUG subject]",
-    {
-      subjectId: subject?.subjectId,
-      name: subject?.name,
-      isSkillLevel: currentSubjectMeta.isSkillLevel,
-      required: subject?.required
-    }
-  );
+
   if (subject?.required === false) {
     await ensureElectiveRegistrationLoaded(subject);
   }
@@ -2199,9 +2189,26 @@ tbody.addEventListener("beforeinput", (ev) => {
   if (target.classList.contains("skill-level-input")) return;
 
   const raw =
-    ev.inputType === "insertFromPaste"
-      ? (ev.clipboardData?.getData("text") ?? "")
-      : (target.value + (ev.data ?? ""));
+  ev.inputType === "insertFromPaste"
+    ? (ev.clipboardData?.getData("text") ?? "")
+    : (target.value + (ev.data ?? ""));
+
+// ================================
+// ★ STEP3-②：満点（maxScore）による事前入力ブロック
+// ================================
+if (target.dataset.index) {
+  const idx = Number(target.dataset.index);
+  const max = criteriaState.maxByIndex?.[idx];
+
+  if (Number.isFinite(max)) {
+    const v = Number(raw);
+    if (Number.isFinite(v) && v > max) {
+      ev.preventDefault();
+      showScoreInputErrorToast(`この項目の上限は ${max} 点です`);
+      return;
+    }
+  }
+}
 
   const n = Number(raw);
   if (Number.isFinite(n) && n > 1000) {
@@ -2282,6 +2289,9 @@ tbody.addEventListener("beforeinput", (ev) => {
 
     setUnsavedChanges(true);
     isSavedAfterLastEdit = false;
+
+recalcFinalScoresAfterRestore(tbody);
+
   });
 
   unsavedListenerInitialized = true;

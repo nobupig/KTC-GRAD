@@ -78,16 +78,43 @@ export async function loadCriteria(db, year, subjectId, criteriaState) {
   criteriaState.adjustPoint = (typeof data.adjustPoint === 'number' || data.adjustPoint === null) ? data.adjustPoint : null;
   criteriaState.useAdjustPoint = (typeof data.useAdjustPoint === 'boolean') ? data.useAdjustPoint : false;
 
-  const mapped = items.map((it) => ({
-    name: it.name || "",
-    percent: Number(it.percent || 0),
-    max: Number.isFinite(Number(it.max)) ? Number(it.max) : 100,
-    // mode: it.mode || "scaled", // 旧モードは廃止（互換用に保持しない）
-  }));
+const mapped = items.map((it) => {
+  const percent = Number(it.percent ?? 0);
 
-  const { normalized, rawTotal } = normalizeWeights(
-    mapped.map((i) => i.percent)
-  );
+  // Firestore（evaluation.html）が保存しているのは maxScore
+  const maxScore = Number(it.maxScore);
+
+  let max;
+
+  // ① Firestore に maxScore が数値で入っている（＝「割合と同じ」など）
+  if (Number.isFinite(maxScore) && maxScore > 0) {
+    max = maxScore;
+
+  // ② 旧互換：it.max が数値で入っている（過去データ救済）
+  } else if (Number.isFinite(Number(it.max)) && Number(it.max) > 0) {
+    max = Number(it.max);
+
+  // ③ 旧互換：it.max が "percent"/"same"（過去データ救済）
+  } else if (it.max === "same" || it.max === "percent") {
+    max = percent;
+
+  // ④ それ以外（maxScore 無し＝100点満点扱い）
+  } else {
+    max = 100;
+  }
+
+  return {
+    name: it.name || "",
+    percent,
+    max,
+  };
+});
+
+
+
+const { normalized, rawTotal } = normalizeWeights(
+  mapped.map((i) => i.percent)
+);
 
   criteriaState.items = mapped;
   criteriaState.normalizedWeights = normalized;
