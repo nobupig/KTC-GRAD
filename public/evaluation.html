@@ -237,6 +237,14 @@
       border-radius: 16px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
+    .maxscore-help-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #f0f6ff;
+      border-left: 4px solid #2563eb;
+      font-size: 18px;
+      color: #1f2937;
+    }
   </style>
 
 </head>
@@ -292,10 +300,7 @@
       ② 評価方式（考査のみ／考査＋課題／実験・実習）を選択します<br>
       ③ 評価項目と割合（合計100%）を入力します<br>
       ④ 保存後、「成績入力へ」ボタンから成績入力画面へ進みます<br>
-      <span style="display:block; margin-top:6px; color:#4b5563;">
-        ※「考査のみ（100%）」の場合、評価項目の入力は不要です。<br>
-        ※ 一度保存した評価基準を修正する場合は、修正理由の入力が必要です。
-      </span>
+  
     </div>
 
     <!-- 科目選択 -->
@@ -335,6 +340,11 @@
         ※ 評価方式を変更すると、現在入力中の評価項目は初期化されます。<br>
         ※ 「考査のみ（100%）」を選択した場合、評価項目の入力は不要です。
       </div>
+      <div class="maxscore-help-box">
+  <strong>【満点（点）の考え方】</strong><br>
+  ・100点満点：各評価項目を 0～100 点で入力します。<br>
+  ・割合と同じ：割合がそのまま満点になります。（例：30% → 30点満点）
+</div>
     </div>
 
     <!-- 表 -->
