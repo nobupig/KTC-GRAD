@@ -227,8 +227,12 @@ export function updateFinalScoreForRow(
       return;
     }
 
-    // ---------- ③ 最大値を決定（常に 0-100） ----------
-    const maxAllowed = 100; // 入力値は常に 0-100
+ // ---------- ③ 最大値を評価基準から取得 ----------
+const maxAllowed =
+  Number.isFinite(item?.max) && item.max > 0
+    ? Number(item.max)
+    : null; // max 未設定時は上限制御しない
+
 
     // ---------- ④ 上限超過チェック（A仕様の肝） ----------
     if (Number.isFinite(maxAllowed) && maxAllowed > 0 && value > maxAllowed) {
