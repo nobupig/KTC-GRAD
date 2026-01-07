@@ -343,6 +343,7 @@
         <tr>
           <th>評価項目</th>
           <th>割合 (%)</th>
+          <th>満点（点）</th>
           <th>削除</th>
         </tr>
       </thead>
@@ -743,6 +744,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         fixedName = false,
         fixedPercent = false,
         allowDelete = true,
+        maxScore = 100,
       } = options;
 
       const tr = document.createElement("tr");
@@ -766,6 +768,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       percentInput.max = "100";
       percentInput.value = percent;
       percentInput.dataset.fixed = fixedPercent ? "true" : "false";
+      percentInput.classList.add("percent-input");
       if (fixedPercent) {
         percentInput.readOnly = true;
         percentInput.style.backgroundColor = "#f3f4f6";
@@ -773,6 +776,24 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         percentInput.addEventListener("input", updateTotal);
       }
       tdPercent.appendChild(percentInput);
+
+      const tdMax = document.createElement("td");
+      const maxScoreSelect = document.createElement("select");
+      maxScoreSelect.className = "max-score-select";
+
+      const optionHundred = document.createElement("option");
+      optionHundred.value = "100";
+      optionHundred.textContent = "100点満点";
+
+      const optionPercent = document.createElement("option");
+      optionPercent.value = "percent";
+      optionPercent.textContent = "割合と同じ";
+
+      maxScoreSelect.appendChild(optionHundred);
+      maxScoreSelect.appendChild(optionPercent);
+      maxScoreSelect.value = maxScore === 100 ? "100" : "percent";
+
+      tdMax.appendChild(maxScoreSelect);
 
       const tdDel = document.createElement("td");
       if (allowDelete) {
@@ -791,6 +812,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
 
       tr.appendChild(tdName);
       tr.appendChild(tdPercent);
+      tr.appendChild(tdMax);
       tr.appendChild(tdDel);
       criteriaTbody.appendChild(tr);
     }
@@ -848,7 +870,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
 
     // 合計計算
     function updateTotal() {
-      const inputs = criteriaTbody.querySelectorAll("input[type='number']");
+      const inputs = criteriaTbody.querySelectorAll("input.percent-input");
       let total = 0;
       inputs.forEach((el) => {
         const v = parseFloat(el.value);
@@ -1319,6 +1341,7 @@ subjectSelect.addEventListener("change", async () => {
       for (const tr of rows) {
         const nameInput = tr.querySelector("td:nth-child(1) input");
         const percentInput = tr.querySelector("td:nth-child(2) input");
+        const maxScoreSelect = tr.querySelector("select.max-score-select");
 
         const name = nameInput.value.trim();
         const percentStr = percentInput.value.trim();
@@ -1345,7 +1368,11 @@ subjectSelect.addEventListener("change", async () => {
           return;
         }
 
-        items.push({ name, percent });
+        const item = { name, percent };
+        if (maxScoreSelect?.value === "percent") {
+          item.maxScore = percent;
+        }
+        items.push(item);
       }
 
       const r = document.querySelector('input[name="schemeType"]:checked');
