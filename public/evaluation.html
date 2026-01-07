@@ -502,6 +502,7 @@
     let currentTeacherName = "";
     let currentSubjectId = null;
     let currentScheme = "exam_only";
+    let isSchemeSwitchDisabled = false;
 
     // ロック情報
     let currentLockSubjectId = null;
@@ -949,6 +950,9 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         inp.disabled = true;
         inp.style.backgroundColor = "#f3f4f6";
       });
+      criteriaTbody.querySelectorAll("select.max-score-select").forEach((sel) => {
+        sel.disabled = true;
+      });
       criteriaTbody.querySelectorAll("button").forEach((btn) => {
         btn.style.display = "none";
       });
@@ -958,6 +962,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       saveBtn.disabled = true;
       saveBtn.textContent = "保存済み";
       saveBtn.dataset.mode = "locked";
+      isSchemeSwitchDisabled = true;
 
       if (!editBtn) return;
       if (!allowEditButton) {
@@ -974,6 +979,9 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         inp.disabled = false;
         inp.style.backgroundColor = "";
       });
+      criteriaTbody.querySelectorAll("select.max-score-select").forEach((sel) => {
+        sel.disabled = false;
+      });
       criteriaTbody.querySelectorAll("button").forEach((btn) => {
         btn.style.display = "inline-block";
       });
@@ -983,6 +991,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       saveBtn.disabled = false;
       saveBtn.textContent = "保存する（修正反映）";
       saveBtn.dataset.mode = "edit";
+      isSchemeSwitchDisabled = false;
 
       if (editBtn) editBtn.style.display = "none";
     }
@@ -1089,10 +1098,15 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       if (hasCriteria) {
         criteriaTbody.innerHTML = "";
         (data.items || []).forEach((item) => {
+          const normalizedMaxScore =
+            typeof item.maxScore === "number" && Number.isFinite(item.maxScore)
+              ? item.maxScore
+              : 100;
           addCriteriaRow(item.name, item.percent, {
             fixedName: false,
             fixedPercent: false,
             allowDelete: true,
+            maxScore: normalizedMaxScore,
           });
         });
       }
@@ -1165,7 +1179,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
     // ================================
     schemeRadios.forEach((radio) => {
       radio.addEventListener("change", (e) => {
-        if (!e.target.checked) return;
+        if (isSchemeSwitchDisabled || !e.target.checked) return;
 
         const value = e.target.value;
         if (value === "exam_only") {
@@ -1180,6 +1194,7 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
 
     document.querySelectorAll(".scheme-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
+        if (isSchemeSwitchDisabled) return;
         const value = tab.dataset.value;
 
         const radio = tab.querySelector("input[type='radio']");
