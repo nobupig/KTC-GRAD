@@ -1843,3 +1843,9 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
   background-color: #fff5f5;
 }
 
+/* 成績入力欄の見た目を number input 時代に戻す */
+#scoreTableBody input[type="text"] {
+  width: 80px;
+  text-align: right;
+  box-sizing: border-box;
+}

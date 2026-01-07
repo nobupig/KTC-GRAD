@@ -165,7 +165,7 @@ export function updateFinalScoreForRow(
     return { hasError: false, errors: [] };
   }
 
-  const inputs = tr.querySelectorAll("input[type='number']");
+  const inputs = tr.querySelectorAll("input[data-index]:not(.skill-level-input)");
   const { studentId, studentName } = getStudentInfoFromRow(tr);
 
   const alertFn =
@@ -197,22 +197,15 @@ export function updateFinalScoreForRow(
     }
 
     // ---------- ① 入力文字列をクリーンアップ ----------
-    let rawStr = (input.value || "").toString();
+const rawStr = (input.value || "").trim();
 
-    // 数字と小数点以外を除去
-    rawStr = rawStr.replace(/[^\d.]/g, "");
+if (rawStr === "") {
+  hasEmpty = true;
+  if (hasConvertedSpan) span.textContent = "";
+  return;
+}
 
-    // 小数点が複数ある場合は最初の1つだけ残す
-    const firstDot = rawStr.indexOf(".");
-    if (firstDot !== -1) {
-      const head = rawStr.slice(0, firstDot + 1);
-      const tail = rawStr.slice(firstDot + 1).replace(/\./g, "");
-      rawStr = head + tail;
-    }
-
-    if (rawStr !== input.value) {
-      input.value = rawStr;
-    }
+const value = Number(rawStr);
 
     // ---------- 空欄は無視（アラート無し・括弧表示無し） ----------
     if (rawStr === "") {
@@ -226,8 +219,7 @@ export function updateFinalScoreForRow(
       hasAnyInput = true;
     }
 
-    const value = Number(rawStr);
-
+  
     // ---------- ② 数値として妥当かどうか ----------
     if (!basicNumericCheck(value, alertFn)) {
       // 不正な値はクリアして終了（エラーセルとしては扱わない）
@@ -245,12 +237,7 @@ export function updateFinalScoreForRow(
       console.error("[FATAL] invalid item.max (should never happen)", item);
       return;
     }
-// ---------- ★ STEP4：input の max 属性を評価基準と同期 ----------
-if (Number.isFinite(maxAllowed) && maxAllowed > 0) {
-  input.max = String(maxAllowed);
-} else {
-  input.removeAttribute("max");
-}
+
 
     // ---------- ④ 上限超過チェック（A仕様の肝） ----------
     if (Number.isFinite(maxAllowed) && maxAllowed > 0 && value > maxAllowed) {
@@ -423,21 +410,14 @@ export function updateAllFinalScores(
 // ================================
 // STEP2: 手入力時の即時再計算
 // ================================
-export function setupAutoRecalcOnInput(
-  tbody,
-  criteriaState,
-  context
-) {
-  if (!tbody) return;
-
-  // ★ tbody 全体で input を拾う（イベント委譲）
+function setupAutoRecalcOnInput(tbody, criteriaState, context) {
   tbody.addEventListener("input", (ev) => {
     const target = ev.target;
 
     if (!(target instanceof HTMLInputElement)) return;
-    if (target.type !== "number") return;
+    if (!target.dataset.index) return;                 // ← 点数欄
+    if (target.classList.contains("skill-level-input")) return;
 
-    // ★ 入力のたびに最終成績を再計算
     updateAllFinalScores(
       tbody,
       criteriaState,
@@ -468,7 +448,7 @@ export function attachInputHandlers(
   tbody.addEventListener("input", (ev) => {
     const target = ev.target;
     if (!(target instanceof HTMLInputElement)) return;
-    if (target.type !== "number") return;
+    if (target.classList.contains("skill-level-input")) return;
 
     const tr = target.closest("tr");
     if (!tr) return;

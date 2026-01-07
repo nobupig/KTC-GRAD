@@ -156,7 +156,7 @@ window.showScoreInputErrorToast = showScoreInputErrorToast;
 // ================================
 function enforceMaxForScoreInput(inputEl) {
   if (!(inputEl instanceof HTMLInputElement)) return { ok: true };
-  if (inputEl.type !== "number") return { ok: true };
+ 
   // 点数欄だけ対象（data-index が無い個体が混ざるので救済する）
   if (inputEl.classList.contains("skill-level-input")) return { ok: true }; // 念のため
 
@@ -197,7 +197,8 @@ function enforceMaxForAllScoreInputs(tbodyEl) {
   if (!tbodyEl || !items.length) return { ok: true, cleared: 0 };
 
   const inputs = Array.from(
-    tbodyEl.querySelectorAll("input[type='number'][data-index]")
+    tbodyEl.querySelectorAll("input[data-index]:not(.skill-level-input)")
+
   ).filter((el) => !el.classList.contains("skill-level-input"));
 
   let cleared = 0;
@@ -593,7 +594,7 @@ applyAllReadOnlyPolicy(String(key ?? "all"));
   updateStudentCountDisplay(filtered.length);
   // ===== FIX: 習熟度フィルタ後の表示再構築（DOMのみ / Firestore readなし）=====
     const hasNumberInputs =
-    tbody && tbody.querySelector("input[type='number'][data-criteria-name]");
+    tbody && tbody.querySelectorAll('input[data-index]:not(.skill-level-input)');
 
     if (hasNumberInputs) {
       recalcFinalScoresAfterRestore(tbody);
@@ -719,7 +720,9 @@ function syncFinalScoreForRow(tr) {
   if (!tr) return;
   const sid = String(tr.dataset.studentId || "");
   if (!sid) return;
-  const scoreInputs = Array.from(tr.querySelectorAll("input[type='number']"));
+   const scoreInputs = Array.from(
+    tr.querySelectorAll('input[data-index]:not(.skill-level-input)')
+  );
   const hasInputValue = scoreInputs.some((input) => {
     return (input.value || "").toString().trim() !== "";
   });
@@ -944,6 +947,15 @@ export function recalcFinalScoresAfterRestore(tbodyEl) {
       if (Number.isFinite(max) && max > 0 && w > 0) {
         sumWeighted += (val / max) * w;
       }
+      // ★ 上限超過は「赤枠」＋「計算に含めない」（A仕様）
+if (Number.isFinite(max) && max > 0 && val > max) {
+  input.classList.add("ktc-input-error");
+  allPerfect = false;
+  continue; // ← ここが重要：寄与点に入れない
+} else {
+  input.classList.remove("ktc-input-error");
+}
+
     }
 
     const finalCell = tr.querySelector(".final-score");
@@ -2134,7 +2146,7 @@ if (!unsavedListenerInitialized && tbody) {
   tbody.addEventListener("beforeinput", (ev) => {
     const t = ev.target;
     if (!(t instanceof HTMLInputElement)) return;
-    if (t.type !== "number") return;
+    
     if (!t.dataset.index) return; // 点数欄だけ対象
 
     // IME系や削除系は通す
@@ -2180,47 +2192,42 @@ if (!unsavedListenerInitialized && tbody) {
 
 
 // ================================
-// ★ 入力される前に異常値・max超過を止める
+// ★ STEP3-③：確定時（フォーカスアウト）の最終ガード
 // ================================
-tbody.addEventListener("beforeinput", (ev) => {
-  const target = ev.target;
-  if (!(target instanceof HTMLInputElement)) return;
-  if (target.type !== "number") return;
-  if (target.classList.contains("skill-level-input")) return;
+tbody.addEventListener(
+  "focusout",
+  (ev) => {
+    const t = ev.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (t.classList.contains("skill-level-input")) return;
+    if (!t.dataset.index) return; // 点数セルだけ対象
 
-  const raw =
-  ev.inputType === "insertFromPaste"
-    ? (ev.clipboardData?.getData("text") ?? "")
-    : (target.value + (ev.data ?? ""));
+    const raw = t.value;
+    if (raw === "") return;
 
-// ================================
-// ★ STEP3-②：満点（maxScore）による事前入力ブロック
-// ================================
-if (target.dataset.index) {
-  const idx = Number(target.dataset.index);
-  const max = criteriaState.maxByIndex?.[idx];
-
-  if (Number.isFinite(max)) {
     const v = Number(raw);
-    if (Number.isFinite(v) && v > max) {
-      ev.preventDefault();
-      showScoreInputErrorToast(`この項目の上限は ${max} 点です`);
+    if (!Number.isFinite(v)) {
+      t.value = "";
       return;
     }
-  }
-}
 
-  const n = Number(raw);
-  if (Number.isFinite(n) && n > 1000) {
-    ev.preventDefault();
-    showScoreInputErrorToast("異常な数値は入力できません");
-  }
-});
+    const idx = Number(t.dataset.index);
+    const max = criteriaState.maxByIndex?.[idx];
 
+    // ★ max 超過は「確定時」に強制修正
+    if (Number.isFinite(max) && v > max) {
+      t.value = String(max);
+      t.classList.add("ktc-input-error");
+      showScoreInputErrorToast(`この項目の上限は ${max} 点です`);
 
+      // 即時再計算を保証
+      t.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  },
+  true // ← capture で確実に拾う
+);
 
-  
-  tbody.addEventListener("input", (ev) => {
+tbody.addEventListener("input", (ev) => {
     if (isRenderingTable) return;
     if (isProgrammaticInput) return;
 
@@ -2231,7 +2238,7 @@ if (target.dataset.index) {
     // ================================
     if (
       target instanceof HTMLInputElement &&
-      target.type === "number" &&
+     
       target.dataset.index
     ) {
       let v = target.value ?? "";
@@ -2253,7 +2260,7 @@ if (target.dataset.index) {
     if (
       criteriaState.ready &&
       target instanceof HTMLInputElement &&
-      target.type === "number" &&
+      
       target.dataset.index &&
       !target.classList.contains("skill-level-input")
     ) {
@@ -2277,7 +2284,7 @@ if (target.dataset.index) {
 
     const isNumberScoreInput =
       target instanceof HTMLInputElement &&
-      target.type === "number" &&
+      
       !!target.dataset.index;
 
     const isSpecialSelect =
@@ -2291,8 +2298,14 @@ if (target.dataset.index) {
     isSavedAfterLastEdit = false;
 
 recalcFinalScoresAfterRestore(tbody);
+  // ★★★ ここに追加 ★★★
+  const tr = target.closest("tr");
+  if (tr) {
+    handleScoreInputChange(tr);
+  }
 
   });
+// ★ 入力した行だけ即時再計算（ソートしなくても反映される）
 
   unsavedListenerInitialized = true;
 }
@@ -3425,7 +3438,7 @@ export function refreshSaveButtonState() {
 
   // 1行でも「入力がある」行があれば保存可能
   const hasAnyInput = rows.some(tr => {
-    const inputs = tr.querySelectorAll("input[type='number']");
+    const inputs = tr.querySelectorAll('input[data-index]:not(.skill-level-input)');
     return Array.from(inputs).some(inp => inp.value !== "");
   });
 
@@ -3433,13 +3446,13 @@ export function refreshSaveButtonState() {
 }
 
 export function disableScoreInputs() {
-  document.querySelectorAll("#scoreTableBody input[type='number']").forEach((input) => {
+  document.querySelectorAll("#scoreTableBody input[data-index]:not(.skill-level-input)").forEach((input) => {
     input.disabled = true;
   });
 }
 
 export function enableScoreInputs() {
-  document.querySelectorAll("#scoreTableBody input[type='number']").forEach((input) => {
+  document.querySelectorAll("#scoreTableBody input[data-index]:not(.skill-level-input)").forEach((input) => {
     input.disabled = false;
   });
 }
@@ -3454,7 +3467,7 @@ if (typeof window !== "undefined") {
 // ===============================
 function lockScoreInputUI() {
   // 入力ロック
-  document.querySelectorAll("input[type='number']").forEach(el => {
+  document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(el => {
     el.disabled = true;
   });
 
@@ -3500,9 +3513,7 @@ const unitKey =
   // ================================
   // ↓↓↓ 以下は「未提出ユニットのみ」実行される
   // ================================
-  document.querySelectorAll("input[type='number']").forEach(el => {
-    el.disabled = false;
-  });
+document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(el => { el.disabled = false; });
 
   document.querySelectorAll(
     "input.skill-level-input, select.pass-fail-select, select.cert-select"

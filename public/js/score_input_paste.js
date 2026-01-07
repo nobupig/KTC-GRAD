@@ -72,7 +72,7 @@ export function applyPastedScores(pastedText, tbody, criteriaState) {
   while (pasteRowIndex < rows.length && webRowIndex < studentCount) {
     const vals = rows[pasteRowIndex];
     const tr = studentRows[webRowIndex];
-    const inputs = tr.querySelectorAll("input[type='number']");
+    const inputs = tr.querySelectorAll("input[data-index]:not(.skill-level-input)");
 
     for (let c = 0; c < pasteColCount; c++) {
       const cellValue = vals[c];

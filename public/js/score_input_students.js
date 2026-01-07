@@ -707,10 +707,40 @@ selectEl2.addEventListener("input", setFilled2);
     const input = document.createElement("input");
     input.dataset.weightPercent = String(item.percent ?? 0);
 
-input.type = "number";
-input.min = "0";
-input.step = "0.1";
- 
+input.type = "text";
+input.inputMode = "decimal"; // ← モバイル用
+input.addEventListener("input", () => {
+  // 数字と . 以外を即座に除去（valueは破壊しない）
+  input.value = input.value.replace(/[^\d.]/g, "");
+});
+input.addEventListener("blur", () => {
+  if (input.value === "") return;
+
+  const v = Number(input.value);
+  if (!Number.isFinite(v)) {
+    input.value = "";
+    return;
+  }
+
+  const max = Number(item.max);
+  if (Number.isFinite(max) && v > max) {
+    // 値は残す（A仕様）
+    input.classList.add("ktc-input-error");
+  } else {
+    input.classList.remove("ktc-input-error");
+  }
+    // ★ これを追加：最終成績を即時再計算
+  updateAllFinalScores(
+    input.closest("tbody"),
+    window.criteriaState,
+    window.currentContext
+  );
+});
+
+input.pattern = "^\\d*(\\.\\d*)?$"; // 数値＋小数のみ
+input.placeholder = `0～${item.max}`;
+
+
  const isAllView = String(window.__currentFilterKey || "all") === "all";
 if (isAllView) input.disabled = true;
 
