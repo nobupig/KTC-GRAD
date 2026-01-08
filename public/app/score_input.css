@@ -1884,3 +1884,76 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
   text-align: right;
   box-sizing: border-box;
 }
+
+/* ================================
+   評価項目ヘッダー：視認性改善
+================================ */
+.score-table thead th .criteria-title {
+  font-weight: 700;              /* 太く */
+  font-size: 13px;               /* 少し大きく */
+  color: #0f172a;                /* より濃い文字色 */
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.score-table thead th .criteria-maxline {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #475569;                /* 薄すぎないグレー */
+  line-height: 1.2;
+}
+
+/* ================================
+   習熟度入力欄のサイズ調整
+================================ */
+.skill-level-cell input,
+input.skill-level-input {
+  height: 28px;              /* 数値入力より低く */
+  min-height: 28px;
+  padding: 2px 6px;          /* 上下を詰める */
+  font-size: 13px;           /* 数値入力と揃える */
+  line-height: 1.2;
+  text-align: center;        /* S / A1 を中央に */
+}
+
+.skill-level-cell input,
+input.skill-level-input {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  background-color: #f8fafc;
+}
+
+/* ================================
+   習熟度入力欄：最終上書き（specificity対策）
+================================ */
+#scoreTableBody input.skill-level-input {
+  width: 48px;              /* S / A1 / A2 に最適 */
+  min-width: 48px;
+  height: 28px;
+  padding: 2px 4px;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;       /* 右寄せを強制解除 */
+}
+
+/* ================================
+   ヘッダー文字サイズを大きくする（最終指定）
+================================ */
+
+/* ヘッダー全体の基準サイズを引き上げる */
+.score-table thead th {
+  font-size: 16px;   /* ← ここが本命 */
+  font-weight: 700;
+}
+
+/* 評価項目名（上段） */
+.score-table thead th .criteria-title {
+  font-size: 15px;   /* th と同じにする */
+  font-weight: 700;
+}
+
+/* （100点満点）など補助情報 */
+.score-table thead th .criteria-maxline {
+  font-size: 14px;   /* 一段小さく */
+  font-weight: 500;
+}

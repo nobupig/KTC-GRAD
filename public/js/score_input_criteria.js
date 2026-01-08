@@ -177,15 +177,44 @@ export function renderTableHeader(headerRow, criteriaState) {
     addTh("評価項目");
   } else {
     items.forEach((critItem, idx) => {
-      const th = document.createElement("th");
+  const th = document.createElement("th");
+  th.classList.add("criteria-th");
 
-      // ラベル
-      const label = document.createElement("div");
-      label.textContent = `${critItem.name} (${critItem.percent}%)`;
-      th.appendChild(label);
+  // 表示用フォーマット（整数は整数、端数は小数1桁）
+  const fmt = (n) => {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return "";
+    const rounded = Math.round(x * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  };
 
-      ths.push(th);
-    });
+  // 1) タイトル（上段）
+  const title = document.createElement("div");
+  title.className = "criteria-title";
+  title.textContent = String(critItem.name ?? "");
+  th.appendChild(title);
+
+  // 2) パーセント（中段）
+  const percent = Number(critItem?.percent);
+  const percentLine = document.createElement("div");
+  percentLine.className = "criteria-percentline";
+  percentLine.textContent = Number.isFinite(percent) ? `(${fmt(percent)}%)` : "";
+  th.appendChild(percentLine);
+
+  // 3) 満点（下段）: critItem.max が無い/不正なら percent を満点として扱う（今までの運用に合わせる）
+  let max = Number(critItem?.max);
+  if (!Number.isFinite(max) || max <= 0) {
+    if (Number.isFinite(percent) && percent > 0) max = percent;
+    else max = NaN;
+  }
+  const maxLine = document.createElement("div");
+  maxLine.className = "criteria-maxline";
+  maxLine.textContent = Number.isFinite(max) ? `(${fmt(max)}点満点)` : "";
+  th.appendChild(maxLine);
+
+  ths.push(th);
+});
+
   }
 
   addTh("最終成績");
