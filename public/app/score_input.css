@@ -271,7 +271,7 @@ tr.excess-student-row.row-fail.row-excess > td {
 .score-table td:nth-child(4) { width: 60px; }  /* 番号 */
 
 .score-table th:nth-child(5),
-.score-table td:nth-child(5) { width: 160px; } /* 氏名 */
+.score-table td:nth-child(5) { width: 120px; } /* 氏名 */
 
 .score-table th:nth-child(6),
 .score-table td:nth-child(6) { width: 140px; } /* 評価入力 */
@@ -1956,4 +1956,187 @@ input.skill-level-input {
 .score-table thead th .criteria-maxline {
   font-size: 14px;   /* 一段小さく */
   font-weight: 500;
+}
+
+/* ================================
+   評価基準ヘッダー：折り返しを強制的に有効化
+================================ */
+
+/* 評価基準の th のみ対象 */
+.score-table thead th.criteria-th {
+  white-space: normal !important;   /* ← これが最重要 */
+  word-break: break-all;            /* 日本語を強制折り返し */
+  overflow-wrap: anywhere;          /* モダンブラウザ対応 */
+  text-align: center;
+}
+
+.score-table thead th.criteria-th .criteria-title {
+  white-space: normal !important;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* ================================
+   ヘッダーと入力欄の縦位置を揃える
+   ================================ */
+
+/* th / td の基準を統一 */
+.score-table th,
+.score-table td {
+  vertical-align: middle;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* 評価基準ヘッダー内の縦ズレ防止 */
+.score-table thead th.criteria-th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* ヘッダー内の各行は margin でズラさない */
+.score-table thead th.criteria-th > div {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* 成績入力 input を td の中央に固定 */
+.score-table tbody td input[type="number"],
+.score-table tbody td input[type="text"] {
+  margin: 0 auto;          /* 横中央 */
+  display: block;
+  height: 32px;
+  line-height: 32px;
+}
+
+
+
+
+
+/* ================================
+   ヘッダー(th)と本文(td)の縦ライン（左右位置）を一致させる
+   ================================ */
+
+/* まず th/td の左右パディングを統一（既に同じならOKだが保険） */
+.score-table thead th,
+.score-table tbody td {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* 列ごとに th と td を “同じ text-align” に統一 */
+.score-table thead th:nth-child(1),
+.score-table tbody td:nth-child(1) { text-align: left; }   /* 学籍番号 */
+
+.score-table thead th:nth-child(2),
+.score-table tbody td:nth-child(2) { text-align: center; } /* 学年 */
+
+.score-table thead th:nth-child(3),
+.score-table tbody td:nth-child(3) { text-align: center; } /* 組・コース */
+
+.score-table thead th:nth-child(4),
+.score-table tbody td:nth-child(4) { text-align: center; } /* 番号 */
+
+.score-table thead th:nth-child(5),
+.score-table tbody td:nth-child(5) { text-align: left; }   /* 氏名 */
+
+/* ヘッダーだけ変な align が当たっている場合の打ち消し */
+.score-table thead th {
+  text-align: inherit;
+}
+/* =====================================================
+   成績入力テーブル：列ズレ・余白・視認性 最終調整
+   ※ score_input.css の末尾にそのまま貼り付け
+   ===================================================== */
+
+/* ---------- 共通：th / td の基準統一 ---------- */
+.score-table thead th,
+.score-table tbody td {
+  padding-left: 12px;
+  padding-right: 12px;
+  vertical-align: middle;
+}
+
+/* ---------- 列ごとの幅・align を完全固定 ---------- */
+
+/* 1: 学籍番号 */
+.score-table th:nth-child(1),
+.score-table td:nth-child(1) {
+  width: 120px;
+  text-align: left;
+}
+
+/* 2: 学年 */
+.score-table th:nth-child(2),
+.score-table td:nth-child(2) {
+  width: 60px;
+  text-align: center;
+}
+
+/* 3: 組・コース */
+.score-table th:nth-child(3),
+.score-table td:nth-child(3) {
+  width: 80px;
+  text-align: center;
+}
+
+/* 4: 番号 */
+.score-table th:nth-child(4),
+.score-table td:nth-child(4) {
+  width: 60px;
+  text-align: center;
+}
+
+/* 5: 氏名（余白の原因だった列） */
+.score-table th:nth-child(5),
+.score-table td:nth-child(5) {
+  width: 140px;          /* ← 氏名列を明示的に絞る */
+  text-align: left;
+  padding-right: 8px;    /* 右側の無駄な空白を削減 */
+  white-space: nowrap;
+}
+
+/* ---------- 評価項目列（6列目以降） ---------- */
+.score-table th:nth-child(n+6),
+.score-table td:nth-child(n+6) {
+  text-align: left;      /* ヘッダーと入力欄の開始位置を揃える */
+  padding-left: 8px;
+}
+
+/* 単一評価項目（例：期末考査100%）でも間延びしない */
+.score-table th:nth-child(6),
+.score-table td:nth-child(6) {
+  width: 160px;
+}
+
+/* ---------- 評価基準ヘッダーの縦並び・視認性 ---------- */
+.score-table thead th .criteria-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.score-table thead th .criteria-percent {
+  display: block;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.score-table thead th .criteria-maxline {
+  display: block;
+  font-size: 12px;
+  color: #555;
+  margin-top: 1px;
+}
+
+/* ---------- ヘッダーと本文の左右ズレ最終防止 ---------- */
+.score-table thead th {
+  text-align: inherit; /* 変な center 指定を打ち消す */
+}
+
+/* ---------- 点数入力ボックスの位置安定 ---------- */
+.score-table input[type="number"],
+.score-table input[type="text"] {
+  margin-left: 0;
 }
