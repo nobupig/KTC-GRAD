@@ -784,15 +784,50 @@ th {
   font-size: 14px;
 }
 
-td input[type="number"] {
+/* ================================
+   成績入力欄（点数入力）UI改善
+   ※ 実体は input[type="text"]
+================================ */
+#scoreTableBody input[type="text"] {
   width: 80px;
   min-width: 64px;
   box-sizing: border-box;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
+
+  padding: 5px 8px;
+  border-radius: 8px;
+
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
   font-size: 14px;
+  text-align: right;
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
+
+/* フォーカス時 */
+#scoreTableBody input[type="text"]:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96,165,250,0.25);
+}
+
+/* hover */
+#scoreTableBody input[type="text"]:hover:not(:focus) {
+  border-color: #c7d2fe;
+}
+
+/* readonly / disabled */
+#scoreTableBody input[type="text"]:disabled,
+#scoreTableBody input[type="text"][readonly] {
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
 
 /* 最終成績セル */
 .final-score {

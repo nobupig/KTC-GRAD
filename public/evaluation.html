@@ -887,7 +887,9 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         const v = parseFloat(el.value);
         if (!isNaN(v)) total += v;
       });
-      totalArea.textContent = `合計：${total}%`;
+
+      const displayTotal = Math.round(total * 10) / 10;
+      totalArea.textContent = `合計：${displayTotal}%`;
 
       if (currentScheme === "exam_only") {
         totalArea.style.color = "#111827";
@@ -1016,6 +1018,9 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
       schemeRadios.forEach((r) => { r.disabled = false; });
       multiTeacherWarning.style.display = "none";
 
+      // ★ 保存済みロック状態を完全解除
+      isSchemeSwitchDisabled = false;
+
       isEditingExistingCriteria = false;
       currentEditReason = null;
       historyBeforeCriteriaSnapshot = null;
@@ -1142,8 +1147,10 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
         totalPercent = currentScheme === "exam_only" ? 100 : 0;
       }
 
-      totalArea.textContent = `合計：${totalPercent}%`;
-      updateTotal();
+       const displayTotal = Math.round(totalPercent * 10) / 10;
+       totalArea.textContent = `合計：${displayTotal}%`;
+      
+       updateTotal();
       // ★ 行追加ボタンを科目切替ごとに再バインド
       setupAddRowButton();
 
