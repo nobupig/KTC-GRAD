@@ -2140,3 +2140,55 @@ input.skill-level-input {
 .score-table input[type="text"] {
   margin-left: 0;
 }
+
+/* ================================
+   氏名の視覚中央揃え
+================================ */
+
+.score-table th:nth-child(5) {
+  text-align: center;
+}
+
+.score-table td:nth-child(5) {
+  text-align: left;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* ================================
+   固定列の間延び防止（最重要）
+================================ */
+
+/* 学籍番号 */
+.score-table th:nth-child(1),
+.score-table td:nth-child(1) {
+  width: 7.5rem;
+  white-space: nowrap;
+}
+
+/* 学年 */
+.score-table th:nth-child(2),
+.score-table td:nth-child(2) {
+  width: 3.5rem;
+  text-align: center;
+}
+
+/* 組・コース */
+.score-table th:nth-child(3),
+.score-table td:nth-child(3) {
+  width: 5rem;
+  text-align: center;
+}
+
+/* 番号 */
+.score-table th:nth-child(4),
+.score-table td:nth-child(4) {
+  width: 3.5rem;
+  text-align: center;
+}
+
+/* 氏名 */
+.score-table th:nth-child(5),
+.score-table td:nth-child(5) {
+  width: 10rem;        /* ← ここが肝 */
+}
