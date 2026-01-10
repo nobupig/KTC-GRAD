@@ -1690,7 +1690,11 @@ if (ok) {
 // ================================
 async function handleSubjectChange(subjectId) {
     // ★ 科目切替時：提出済み文言は必ず最初に消す（唯一の消去ポイント）
-  hideSubmittedLockNotice();
+   hideSubmittedLockNotice();
+
+  // ★ 追加：習熟度の注意文言は科目切替の最初に必ず消す（残留防止の唯一の消去ポイント）
+  hideAllReadOnlyNotice();
+
   setUnsavedChanges(false);
     // ★重要：前科目の scoresDoc（completion 等）が残留すると、別科目が提出済みロックになる
   // 例：国語で completedUnits=["4","5"] が残ったまま数学を開くと 4組・5組が誤ロックされる
@@ -3537,6 +3541,7 @@ document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(e
 // ただし習熟度科目だけ「習熟度欄」は全員でも編集可
 // ================================
 function applyAllReadOnlyPolicy(filterKey) {
+  clearAllReadOnlyNotice();
   const meta = window.currentSubjectMeta || {};
   const isCommon = !!meta.isCommon;
   const isSkill = !!meta.isSkillLevel;
@@ -3687,6 +3692,10 @@ function showAllReadOnlyNotice(message) {
 function hideAllReadOnlyNotice() {
   const el = document.querySelector(".all-readonly-notice");
   if (el) el.remove();
+}
+
+function clearAllReadOnlyNotice() {
+  hideAllReadOnlyNotice();
 }
 
 /**
