@@ -1877,7 +1877,7 @@ document
     criteriaCache.set(subjectId, structuredClone(criteriaState));
   }
 // ★ 通常科目の評価基準ヘッダー描画（これが無いとヘッダーが出ない）
-  renderTableHeader(headerRow, criteriaState);
+  renderTableHeader(headerRow, criteriaState, subject);
   updateAdjustPointDisplay();
   
 

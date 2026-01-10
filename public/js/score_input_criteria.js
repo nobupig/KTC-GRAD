@@ -7,6 +7,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import { activateQuotaErrorState } from "./quota_banner.js";
 
+import { getBaseColumns } from "./score_input_columns.js";
+
 /**
  * 評価基準状態
  */
@@ -130,124 +132,66 @@ const { normalized, rawTotal } = normalizeWeights(
  * 成績表ヘッダ描画（項目ごとラベル表示）
  */
 export function renderTableHeader(headerRow, criteriaState) {
-  const table = headerRow?.closest("table");
-  if (table) {
-    const oldColgroup = table.querySelector("colgroup");
-    if (oldColgroup) oldColgroup.remove();
-
-    const colgroup = document.createElement("colgroup");
-    const fixedWidths = [120, 60, 90, 60, 140];
-    fixedWidths.forEach((w) => {
-      const col = document.createElement("col");
-      col.style.width = `${w}px`;
-      colgroup.appendChild(col);
-    });
-
-    (criteriaState.items || []).forEach(() => {
-      const col = document.createElement("col");
-      col.style.width = "90px";
-      colgroup.appendChild(col);
-    });
-
-    const finalCol = document.createElement("col");
-    finalCol.style.width = "80px";
-    colgroup.appendChild(finalCol);
-
-    table.prepend(colgroup);
-  }
-
   headerRow.innerHTML = "";
 
-  const ths = [];
-  const addTh = (label) => {
+  // ===== ベース列（学籍番号〜氏名）=====
+  const baseCols = getBaseColumns();
+
+  baseCols.forEach(col => {
     const th = document.createElement("th");
-    th.textContent = label;
-    ths.push(th);
-  };
+    th.textContent = col.label;
+    th.style.textAlign = col.align;
 
-  addTh("学籍番号");
-  addTh("学年");
-  addTh("組・コース");
-  addTh("番号");
-  addTh("氏名");
+    if (col.width) th.style.width = col.width + "px";
+    if (col.minWidth) th.style.minWidth = col.minWidth + "px";
 
+    if (col.key === "name") {
+      th.classList.add("student-name");
+    }
+
+    headerRow.appendChild(th);
+  });
+
+  // ===== 評価基準列 =====
   const items = criteriaState.items || [];
 
   if (!items.length) {
-    addTh("評価項目");
+    const th = document.createElement("th");
+    th.textContent = "評価項目";
+    headerRow.appendChild(th);
   } else {
-    items.forEach((critItem, idx) => {
-  const th = document.createElement("th");
-  th.classList.add("criteria-th");
+    items.forEach(critItem => {
+      const th = document.createElement("th");
+      th.classList.add("criteria-th");
 
-  // 表示用フォーマット（整数は整数、端数は小数1桁）
-  const fmt = (n) => {
-    const x = Number(n);
-    if (!Number.isFinite(x)) return "";
-    const rounded = Math.round(x * 10) / 10;
-    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-  };
+      const title = document.createElement("div");
+      title.className = "criteria-title";
+      title.textContent = String(critItem.name ?? "");
+      th.appendChild(title);
 
-  // 1) タイトル（上段）
-  const title = document.createElement("div");
-  title.className = "criteria-title";
-  title.textContent = String(critItem.name ?? "");
-  th.appendChild(title);
+      const percent = Number(critItem?.percent);
+      const percentLine = document.createElement("div");
+      percentLine.className = "criteria-percentline";
+      percentLine.textContent = Number.isFinite(percent) ? `(${percent}%)` : "";
+      th.appendChild(percentLine);
 
-  // 2) パーセント（中段）
-  const percent = Number(critItem?.percent);
-  const percentLine = document.createElement("div");
-  percentLine.className = "criteria-percentline";
-  percentLine.textContent = Number.isFinite(percent) ? `(${fmt(percent)}%)` : "";
-  th.appendChild(percentLine);
+      const max = Number(critItem?.max);
+      const maxLine = document.createElement("div");
+      maxLine.className = "criteria-maxline";
+      maxLine.textContent = Number.isFinite(max) ? `(${max}点満点)` : "";
+      th.appendChild(maxLine);
 
-  // 3) 満点（下段）: critItem.max が無い/不正なら percent を満点として扱う（今までの運用に合わせる）
-  let max = Number(critItem?.max);
-  if (!Number.isFinite(max) || max <= 0) {
-    if (Number.isFinite(percent) && percent > 0) max = percent;
-    else max = NaN;
-  }
-  const maxLine = document.createElement("div");
-  maxLine.className = "criteria-maxline";
-  maxLine.textContent = Number.isFinite(max) ? `(${fmt(max)}点満点)` : "";
-  th.appendChild(maxLine);
-
-  ths.push(th);
-});
-
+      headerRow.appendChild(th);
+    });
   }
 
-  addTh("最終成績");
-  ths.forEach((th) => headerRow.appendChild(th));
-
-  // ▼ ミニタブイベント（raw/scaled 廃止に伴い無効化）
-// headerRow.addEventListener("click", (e) => {
-//   const btn = e.target;
-//   if (!(btn instanceof HTMLButtonElement)) return;
-//   if (!btn.classList.contains("crit-mode-btn")) return;
-//
-//   const tbody = document.getElementById("scoreTableBody");
-//   if (tbody && tbody.querySelector("tr.locked-row")) {
-//     console.warn("[crit-mode] blocked: locked rows visible");
-//     return;
-//   }
-//
-//   const idx = Number(btn.dataset.index);
-//   const item = criteriaState.items[idx];
-//   if (!item) return;
-//
-//   item.mode = btn.textContent === "素点" ? "raw" : "scaled";
-//
-//   btn.parentElement.querySelectorAll("button").forEach((b) =>
-//     b.classList.toggle("active", b === btn)
-//   );
-//
-//   import("./score_input_loader.js").then(({ recalcFinalScoresAfterRestore }) => {
-//     recalcFinalScoresAfterRestore(tbody);
-//   });
-// });
-
+  // ===== 最終成績 =====
+  const finalTh = document.createElement("th");
+  finalTh.textContent = "最終成績";
+  finalTh.classList.add("final-score");
+  headerRow.appendChild(finalTh);
 }
+
 /**
  * 評価基準が「単一・100%」かどうかを判定
  * - 評価項目が1つ

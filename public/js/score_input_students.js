@@ -92,6 +92,8 @@ import {
 import { activateQuotaErrorState } from "./quota_banner.js";
 import { CURRENT_YEAR } from "./config.js";
 import { db } from "./score_input_loader.js";
+import { getBaseColumns } from "./score_input_columns.js";
+
 
 
 /**
@@ -507,45 +509,7 @@ export function renderStudentRows(
     return count;
   };
 
-  const bodyTable = tbody?.closest("table");
-  // 列幅を固定する colgroup をテーブル先頭に挿入（thead/tbody より前）
-  if (bodyTable) {
-    const existing = bodyTable.querySelector("colgroup");
-    if (existing) existing.remove();
-
-    const colgroup = document.createElement("colgroup");
-    const addCol = (px) => {
-      const col = document.createElement("col");
-      col.style.width = px;
-      colgroup.appendChild(col);
-    };
-
-    const enableSkillLevel = subject && subject.isSkillLevel === true;
-    if (enableSkillLevel) addCol("72px");
-
-    addCol("110px"); // 学籍番号
-    addCol("56px");  // 学年
-    addCol("84px");  // 組・コース
-    addCol("56px");  // 番号
-    addCol("160px"); // 氏名
-
-    const spForCols = Number(subject?.specialType ?? 0);
-
-    // 評価入力列（通常: criteriaItems数 / 無し:"-" / 特別: 合否 or 認定）
-    if (spForCols === 1 || spForCols === 2) {
-      addCol("140px");
-    } else if (Array.isArray(criteriaItems) && criteriaItems.length > 0) {
-      criteriaItems.forEach(() => addCol("140px"));
-    } else {
-      addCol("140px");
-    }
-
-    addCol("90px"); // 最終成績
-
-    bodyTable.insertBefore(colgroup, bodyTable.firstElementChild || null);
-  }
-
-  tbody.innerHTML = "";
+   tbody.innerHTML = "";
 
   // 科目未選択
   if (!subject) {
@@ -588,8 +552,13 @@ export function renderStudentRows(
       const subjectId = subject.subjectId || "";
       const studentId = String(stu.studentId ?? "");
       const td = document.createElement("td");
-      const input = document.createElement("input");
-      input.type = "text";
+        td.style.textAlign = "center"; // ★ 追加（セル中央寄せ）
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.style.width = "48px";     // ★ 追加（入力欄を中央に見せる）
+        input.style.textAlign = "center"; // ★ 追加
+
       const isAllView = String(window.__currentFilterKey || "all") === "all";
       input.disabled = isAllView ? (subject?.isSkillLevel !== true) : false;
       input.className = "skill-level-input skill-input";

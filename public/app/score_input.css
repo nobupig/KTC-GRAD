@@ -5,19 +5,8 @@
   --both-bg: #f3e5f5;
 }
 
-/* ================================
-   成績入力テーブル：スクロール制御
-================================= */
-.score-table-wrapper {
-  max-height: 70vh;
-  overflow-y: auto;
-  overflow-x: auto;
-}
 
-.score-table th,
-.score-table td {
-  white-space: nowrap;
-}
+
 .score-table thead th {
   background: #fff;
   position: sticky;
@@ -34,10 +23,7 @@
 /* ================================
    成績入力テーブル：body側テーブル横スクロール対応（上書き）
 ================================= */
-.score-table-body-scroll table {
-  width: max-content !important;
-  min-width: 100%;
-}
+
 /* ================================
    成績入力テーブル：横スクロール対応（上書き）
 ================================= */
@@ -247,39 +233,12 @@ tr.excess-student-row.row-fail.row-excess > td {
 }
 */
 
-/* ================================
-   列ズレ完全防止（最終解）
-================================ */
-/* テーブルは固定レイアウトにする */
-.score-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-  min-width: 100% !important;
+/* 氏名列：ヘッダーもセルも中央に */
+.score-table th.student-name,
+.score-table td.student-name{
+  text-align: center;
 }
 
-/* 各列の幅を明示的に固定 */
-.score-table th:nth-child(1),
-.score-table td:nth-child(1) { width: 110px; } /* 学籍番号 */
-
-.score-table th:nth-child(2),
-.score-table td:nth-child(2) { width: 60px; }  /* 学年 */
-
-.score-table th:nth-child(3),
-.score-table td:nth-child(3) { width: 80px; }  /* 組・コース */
-
-.score-table th:nth-child(4),
-.score-table td:nth-child(4) { width: 60px; }  /* 番号 */
-
-.score-table th:nth-child(5),
-.score-table td:nth-child(5) { width: 120px; } /* 氏名 */
-
-.score-table th:nth-child(6),
-.score-table td:nth-child(6) { width: 140px; } /* 評価入力 */
-
-.score-table th.final-score,
-.score-table td.final-score {
-  width: 80px !important;
-}
 /*
 #scoreTableBody tr.row-fail > td:first-child {
   box-shadow: inset 6px 0 0 #c62828;
@@ -290,11 +249,6 @@ tr.excess-student-row.row-fail.row-excess > td {
 #excessStudentListArea {
   max-width: 740px;
   margin: 0 auto;
-}
-
-/* thead側にスクロールバー分の余白を確保 */
-.score-table thead tr {
-  padding-right: 16px; /* scrollbar 対策 */
 }
 
 /* ================================
@@ -530,7 +484,9 @@ header {
   max-height: 70vh;
   overflow-y: auto;
   overflow-x: auto;
+  scrollbar-gutter: stable both-edges; /* 縦スクロールバーの有無でヘッダーがズレるのを防ぐ */
 }
+
 .score-table thead th {
   background: #fff;
   position: sticky;
@@ -1214,13 +1170,7 @@ th {
 /* ================================
    列幅ズレ完全防止：最終成績列を固定
 ================================ */
-.score-table th.final-score,
-.score-table td.final-score {
-  width: 72px !important;
-  min-width: 72px !important;
-  max-width: 72px !important;
-  box-sizing: border-box;
-}
+
 
 /* ================================
    ⚠ アイコンによる列幅変動防止
@@ -1259,24 +1209,6 @@ th {
 }
 */
 
-/* ================================
-   強制上書き：レイアウト固定と横スクロール許容
-================================ */
-.score-table,
-.score-table-body-scroll table {
-  table-layout: fixed !important;
-  width: max-content !important;
-  min-width: 0 !important;
-  border-collapse: collapse;
-}
-
-.score-table th,
-.score-table td {
-  min-width: 0 !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* ================================
    FIX: 超過学生モーダルを純粋な table レイアウトに戻す
@@ -1306,15 +1238,8 @@ th {
   text-overflow: ellipsis;
 }
 
-/* ================================
-   FIX: score-table の幅定義を一本化（右余白・二重定義の解消）
-================================ */
-.score-table {
-  table-layout: fixed !important;
-  width: 100% !important;
-  min-width: 100% !important;
-  border-collapse: collapse;
-}
+/* 成績表：列数可変でも自然に詰める（A案の核心） */
+
 
 /* ================================
    Consolidated: excess-* rules
@@ -1324,15 +1249,7 @@ th {
 ================================= */
 
 /* Modal wrapper and list area */
-#excessStudentListArea,
-.excess-modal-table {
-  margin: 0 auto;
-  max-width: 740px;
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 14px;
-}
+
 
 /* Basic cell styling shared by modal and excess table */
 .excess-modal-table th,
@@ -1349,34 +1266,8 @@ th {
 }
 
 /* Column sizing (conservative, covers existing variants) */
-.excess-modal-table th:nth-child(1),
-.excess-modal-table td:nth-child(1) { /* checkbox */
-  width: 40px; min-width: 40px; max-width: 40px; flex-shrink: 0;
-}
-.excess-modal-table th:nth-child(2),
-.excess-modal-table td:nth-child(2) { /* 学籍番号 */
-  width: 90px; min-width: 70px; max-width: 110px; flex-shrink: 0;
-}
-.excess-modal-table th:nth-child(3),
-.excess-modal-table td:nth-child(3) { /* 学年 */
-  width: 48px; min-width: 40px; max-width: 60px; text-align: center;
-}
-.excess-modal-table th:nth-child(4),
-.excess-modal-table td:nth-child(4) { /* 組・コース */
-  width: 80px; min-width: 60px; max-width: 100px; text-align: center;
-}
-.excess-modal-table th:nth-child(5),
-.excess-modal-table td:nth-child(5) { /* 氏名 */
-  width: auto; min-width: 80px; max-width: 260px; overflow: hidden; text-overflow: ellipsis;
-}
-.excess-modal-table th:nth-child(6),
-.excess-modal-table td:nth-child(6) { /* 氏名（余白調整） */
-  padding-right: 4px;
-}
-.excess-modal-table th:nth-child(7),
-.excess-modal-table td:nth-child(7) { /* 超過時間数 */
-  width: 80px; min-width: 60px; max-width: 96px; flex-shrink: 0;
-}
+
+
 
 .excess-modal-table .excess-hours-input,
 .excess-table .excess-hours-input {
@@ -1415,8 +1306,7 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
 .excess-modal-table tr { height: auto !important; }
 
 /* Small utility: ensure consistent final column spacing when icons appear */
-.excess-table td:nth-child(6), .excess-table th:nth-child(6) { padding-right: 4px; }
-.excess-table td:nth-child(7), .excess-table th:nth-child(7) { padding-left: 4px; }
+
 
 /* End consolidated excess block */
 
@@ -1425,19 +1315,7 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
    氏名列と超過時間数列の余白最終調整
 ===================================================== */
 
-/* 氏名列（5列目）に上限を強制 */
-.excess-modal-table th:nth-child(5),
-.excess-modal-table td:nth-child(5) {
-  width: 180px !important;
-  max-width: 180px !important;
-}
 
-/* 超過時間数列（7列目）は固定 */
-.excess-modal-table th:nth-child(7),
-.excess-modal-table td:nth-child(7) {
-  width: 96px !important;
-  min-width: 96px !important;
-}
 
 #electivePostRegisterModal {
   position: fixed;
@@ -2059,55 +1937,7 @@ input.skill-level-input {
 
 /* ---------- 列ごとの幅・align を完全固定 ---------- */
 
-/* 1: 学籍番号 */
-.score-table th:nth-child(1),
-.score-table td:nth-child(1) {
-  width: 120px;
-  text-align: left;
-}
 
-/* 2: 学年 */
-.score-table th:nth-child(2),
-.score-table td:nth-child(2) {
-  width: 60px;
-  text-align: center;
-}
-
-/* 3: 組・コース */
-.score-table th:nth-child(3),
-.score-table td:nth-child(3) {
-  width: 80px;
-  text-align: center;
-}
-
-/* 4: 番号 */
-.score-table th:nth-child(4),
-.score-table td:nth-child(4) {
-  width: 60px;
-  text-align: center;
-}
-
-/* 5: 氏名（余白の原因だった列） */
-.score-table th:nth-child(5),
-.score-table td:nth-child(5) {
-  width: 140px;          /* ← 氏名列を明示的に絞る */
-  text-align: left;
-  padding-right: 8px;    /* 右側の無駄な空白を削減 */
-  white-space: nowrap;
-}
-
-/* ---------- 評価項目列（6列目以降） ---------- */
-.score-table th:nth-child(n+6),
-.score-table td:nth-child(n+6) {
-  text-align: left;      /* ヘッダーと入力欄の開始位置を揃える */
-  padding-left: 8px;
-}
-
-/* 単一評価項目（例：期末考査100%）でも間延びしない */
-.score-table th:nth-child(6),
-.score-table td:nth-child(6) {
-  width: 160px;
-}
 
 /* ---------- 評価基準ヘッダーの縦並び・視認性 ---------- */
 .score-table thead th .criteria-title {
@@ -2145,50 +1975,109 @@ input.skill-level-input {
    氏名の視覚中央揃え
 ================================ */
 
-.score-table th:nth-child(5) {
-  text-align: center;
-}
-
-.score-table td:nth-child(5) {
-  text-align: left;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-}
 
 /* ================================
    固定列の間延び防止（最重要）
 ================================ */
 
-/* 学籍番号 */
-.score-table th:nth-child(1),
-.score-table td:nth-child(1) {
-  width: 7.5rem;
+
+/* 成績表：列数が少なくても途中列を引き延ばさない */
+
+
+/* ================================
+   氏名ヘッダーを名前中央に寄せる
+================================ */
+.name-header {
+  text-align: left; /* 列基準は左 */
+}
+
+/* 氏名列：ヘッダー・セルとも中央 */
+.score-table th.student-name,
+.score-table td.student-name {
+  text-align: center;
+}
+
+/* 習熟度セル（S / A1 / A2 / A3）を視覚中央に */
+.skill-level-input,
+.skill-input {
+  display: block;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* 番号列（4列目）を中央揃え */
+.score-table th:nth-child(4),
+.score-table td:nth-child(4) {
+  text-align: center;
+}
+
+/* 表全体は左寄せ、余白は wrapper が持つ */
+.score-table-wrapper {
+  overflow-x: auto;
+  padding-right: 16px; /* 右の“逃げ” */
+}
+
+/* 不要な横方向 padding を抑制（情報密度UP） */
+.score-table th,
+.score-table td {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/* 習熟度ヘッダーを本当に中央にする */
+.score-table th .skill-header {
+  width: 100%;
+  text-align: center;
+}
+
+/* 空ヘッダー・空列を潰す（列間延びの正体） */
+
+
+/* 氏名ヘッダー：中身構造差を吸収して完全中央化 */
+.score-table th.student-name {
+  text-align: center;
+}
+
+
+/* ===== 評価基準ヘッダーの崩れ防止 ===== */
+.score-table th.criteria-th {
+  min-width: 140px;          /* ← これが一番重要 */
+  text-align: center;
+  white-space: normal;       /* ← 中の div を自然改行 */
+  vertical-align: middle;
+}
+
+/* 上・中・下段の文字を横書きに保つ */
+.score-table th.criteria-th > div {
+  white-space: nowrap;
+}
+/* ===============================
+   氏名列：ヘッダーと本文を完全一致させる
+   =============================== */
+
+/* ===============================
+   氏名列：ヘッダー・本文を完全一致
+   =============================== */
+.score-table th.student-name,
+.score-table td.student-name {
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
   white-space: nowrap;
 }
 
-/* 学年 */
-.score-table th:nth-child(2),
-.score-table td:nth-child(2) {
-  width: 3.5rem;
-  text-align: center;
+/* ===============================
+   氏名列：padding 完全統一（最終）
+   =============================== */
+.score-table th.student-name,
+.score-table td.student-name {
+  text-align: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
-/* 組・コース */
-.score-table th:nth-child(3),
-.score-table td:nth-child(3) {
-  width: 5rem;
-  text-align: center;
-}
-
-/* 番号 */
-.score-table th:nth-child(4),
-.score-table td:nth-child(4) {
-  width: 3.5rem;
-  text-align: center;
-}
-
-/* 氏名 */
-.score-table th:nth-child(5),
-.score-table td:nth-child(5) {
-  width: 10rem;        /* ← ここが肝 */
+/* 通常科目：本文セルの余白を殺す */
+.score-table tbody td {
+  padding-left: 0;
+  padding-right: 0;
 }
