@@ -409,9 +409,29 @@ function collectScoresFromDOM(criteriaState) {
 function buildInputSheetAoA({ subject, criteriaState, students, scoreMap, showSkillLevelColumn,studentState}) {
   const items = Array.isArray(criteriaState?.items) ? criteriaState.items : [];
   const baseHeaders = ["学籍番号", "学年", "組・コース", "番号", "氏名"];
-const headers = showSkillLevelColumn
-  ? ["習熟度", ...baseHeaders, ...items.map(x => x?.label ?? x?.name ?? "項目"), "合計(参考)"]
-  : [...baseHeaders, ...items.map(x => x?.label ?? x?.name ?? "項目"), "合計(参考)"];
+
+  const criteriaHeaders = items.map((item) => {
+    const name = item?.name ?? "";
+    const percentValue = Number(item?.percent);
+    const percent = Number.isFinite(percentValue) ? percentValue : null;
+    const maxValue = Number(item?.max);
+    const max = Number.isFinite(maxValue) ? maxValue : null;
+
+    if (percent != null && max != null) {
+      return `${name}（${percent}%／${max}点満点）`;
+    }
+    if (percent != null) {
+      return `${name}（${percent}%）`;
+    }
+    if (max != null) {
+      return `${name}（${max}点満点）`;
+    }
+    return name;
+  });
+
+  const headers = showSkillLevelColumn
+    ? ["習熟度", ...baseHeaders, ...criteriaHeaders, "合計(参考)"]
+    : [...baseHeaders, ...criteriaHeaders, "合計(参考)"];
 
   const aoa = [];
   // 上部：モードセル（説明用。実際のプルダウン/保護は後で段階導入）
@@ -606,6 +626,12 @@ for (let i = 0; i < scoreColCount; i++) {
 cols[colIndex++] = { wch: 12 };
 
 wsInput["!cols"] = cols;
+
+const baseColCount = 5 + (showSkillLevelColumn ? 1 : 0);
+wsInput["!cols"] = wsInput["!cols"] || [];
+for (let i = 0; i < scoreColCount; i++) {
+  wsInput["!cols"][baseColCount + i] = { wch: 26 };
+}
 
 // ===============================
 // Excel A-3：ヘッダ行固定
