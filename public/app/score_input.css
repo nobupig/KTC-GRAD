@@ -787,10 +787,15 @@ th {
 
 /* 最終成績セル */
 .final-score {
+  min-width: 80px;        /* ★必須：見切れ防止 */
+  padding-left: 8px;      /* ★壁貼り付き防止 */
+  padding-right: 8px;
+  text-align: center;
   font-weight: 600;
-  text-align: right;
-  color: #111827;
+  white-space: nowrap;
+  box-sizing: border-box; /* ★fixed対策の保険 */
 }
+
 
 /* データがないときの行 */
 .no-data {

@@ -263,6 +263,114 @@ function openSimplePickModal(title, options) {
   });
 }
 
+function openExcelDownloadNoticeModal() {
+  return new Promise((resolve) => {
+    // overlay
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0,0,0,0.4)";
+    overlay.style.zIndex = "10000";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+
+    // panel
+    const panel = document.createElement("div");
+    panel.style.background = "#fff";
+    panel.style.borderRadius = "12px";
+    panel.style.padding = "24px";
+    panel.style.maxWidth = "520px";
+    panel.style.width = "90%";
+    panel.style.boxShadow = "0 10px 30px rgba(0,0,0,0.2)";
+
+panel.innerHTML = `
+  <h3 style="
+    margin-top:0;
+    color:#b91c1c;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  ">
+    ⚠ Excelダウンロードの注意
+  </h3>
+
+  <p style="line-height:1.7; margin-bottom:12px;">
+    このExcelは
+    <span style="
+      background:#fef3c7;
+      color:#92400e;
+      padding:2px 6px;
+      border-radius:4px;
+      font-weight:600;
+    ">
+      素点入力専用の補助ツール
+    </span>
+    です。
+  </p>
+
+  <ul style="line-height:1.7; padding-left:20px; margin:0;">
+    <li>
+      <span style="font-weight:600; color:#b91c1c;">
+        換算後の点数や最終成績
+      </span>
+      は入力しないでください。
+    </li>
+    <li>
+      最終成績の計算・確定は
+      <span style="font-weight:600;">
+        Web上
+      </span>
+      で行われます。
+    </li>
+    <li>
+      Excelの
+      <span style="
+        background:#e0f2fe;
+        padding:2px 6px;
+        border-radius:4px;
+        font-weight:600;
+      ">
+        合計（参考）
+      </span>
+      欄は確認用で、成績確定には使用されません。
+    </li>
+  </ul>
+`;
+
+
+    // buttons
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.justifyContent = "flex-end";
+    actions.style.gap = "12px";
+    actions.style.marginTop = "20px";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.textContent = "キャンセル";
+    cancelBtn.className = "btn btn-outline-secondary";
+
+    const okBtn = document.createElement("button");
+    okBtn.textContent = "OK";
+    okBtn.className = "btn btn-primary";
+
+    cancelBtn.onclick = () => {
+      overlay.remove();
+      resolve(false);
+    };
+    okBtn.onclick = () => {
+      overlay.remove();
+      resolve(true);
+    };
+
+    actions.append(cancelBtn, okBtn);
+    panel.appendChild(actions);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+  });
+}
+
 /**
  * DOM(表示中の表) から現在値を回収して、studentId -> scores[] にする
  * - Firestore read なし
@@ -372,14 +480,9 @@ export function initExcelDownloadFeature({ getCurrentSubject, getCurrentSubjectM
   if (!btn) return;
 
   btn.addEventListener("click", async () => {
-     const ok = window.confirm(
-    "【Excelダウンロードの注意】\n\n" +
-    "このExcelは《素点入力専用》です。\n" +
-    "換算後の点数（例：16点など）は入力しないでください。\n\n" +
-    "自動換算・最終成績の計算は Web 上で行われます。\n\n" +
-    "よろしいですか？"
-  );
-  if (!ok) return;
+   const ok = await openExcelDownloadNoticeModal();
+if (!ok) return;
+
     
     btn.disabled = true;
     try {
