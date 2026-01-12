@@ -430,8 +430,8 @@ function buildInputSheetAoA({ subject, criteriaState, students, scoreMap, showSk
   });
 
   const headers = showSkillLevelColumn
-    ? ["習熟度", ...baseHeaders, ...criteriaHeaders, "合計(参考)"]
-    : [...baseHeaders, ...criteriaHeaders, "合計(参考)"];
+    ? ["習熟度", ...baseHeaders, ...criteriaHeaders]
+    : [...baseHeaders, ...criteriaHeaders];
 
   const aoa = [];
   // 上部：モードセル（説明用。実際のプルダウン/保護は後で段階導入）
@@ -622,8 +622,8 @@ for (let i = 0; i < scoreColCount; i++) {
   cols[colIndex++] = { wch: 8 };
 }
 
-// 合計(参考)
-cols[colIndex++] = { wch: 12 };
+// 「合計(参考)」列は出力しないため、列幅定義も追加しない
+// cols[colIndex++] = { wch: 12 };
 
 wsInput["!cols"] = cols;
 
@@ -648,23 +648,24 @@ wsInput["!freeze"] = {
 // 合計（参考）：SUM 数式を挿入
 // ===============================
 
-// ヘッダ行は headers を含む行（"合計(参考)" を含む行）
-const headerRowIndex = inputAoA.findIndex(row =>
-  Array.isArray(row) && row.includes("合計(参考)")
-) + 1; // 1-based
-
-const dataStartRow = headerRowIndex + 1;
-
-// 点数開始列（1-based）
-const BASE_HEADERS_COUNT = 5;
-const scoreStartCol1 =
-  (showSkillLevelColumn ? 1 : 0) + BASE_HEADERS_COUNT + 1;
-
-const itemCount = (criteriaState?.items?.length ?? 0);
-
-if (itemCount > 0 && dataStartRow > 0) {
-  addSimpleSumFormula(wsInput, dataStartRow, scoreStartCol1, itemCount);
-}
+// Excel出力では「合計(参考)」列を作成しないため、SUM式も不要
+// // ヘッダ行は headers を含む行（"合計(参考)" を含む行）
+// const headerRowIndex = inputAoA.findIndex(row =>
+//   Array.isArray(row) && row.includes("合計(参考)")
+// ) + 1; // 1-based
+//
+// const dataStartRow = headerRowIndex + 1;
+//
+// // 点数開始列（1-based）
+// const BASE_HEADERS_COUNT = 5;
+// const scoreStartCol1 =
+//   (showSkillLevelColumn ? 1 : 0) + BASE_HEADERS_COUNT + 1;
+//
+// const itemCount = (criteriaState?.items?.length ?? 0);
+//
+// if (itemCount > 0 && dataStartRow > 0) {
+//   addSimpleSumFormula(wsInput, dataStartRow, scoreStartCol1, itemCount);
+// }
 
 XLSX.utils.book_append_sheet(wb, wsInput, sanitizeSheetName(subject.name || "入力"));
 
