@@ -28,6 +28,7 @@ window.currentSubjectMeta = currentSubjectMeta;
 let electiveModalSortMode = null;
 let electiveModalSourceStudents = [];
 let isSavedAfterLastEdit = false;
+let lastAutoAppliedCommonFilterSubjectId = null;
 // ===== 受講者登録ボタン：安全無効化制御 =====
 const electiveAddBtn = document.getElementById("electiveAddBtn");
 const electiveRemoveBtn = document.getElementById("electiveRemoveBtn");
@@ -538,10 +539,6 @@ filterDefs.forEach(def => {
 });
 
   area.appendChild(container);
-  // 初回のみ明示的にフィルタ適用
-  if (defaultBtn) {
-    applySkillLevelFilter(subject, defaultFilterKey);
-  }
 }
 
 // ================================
@@ -577,7 +574,6 @@ renderStudentRows(
 );
 window.__currentFilterKey = String(key ?? "all");
 window.__lastAppliedUnitKey = String(key ?? "all");
-applyAllReadOnlyPolicy(String(key ?? "all"));
   } finally {
     isRenderingTable = false;
   }
@@ -602,6 +598,7 @@ applyAllReadOnlyPolicy(String(key ?? "all"));
       updateAveragePointDisplay();
     }
   // applyRiskClassesToAllRows(); // disabled: avoid immediate row-level excess/red highlighting
+  applyReadOnlyState(String(key ?? "all"));
 }
 // ================================
 // 新規追加: 習熟度データを取得
@@ -1695,6 +1692,8 @@ async function handleSubjectChange(subjectId) {
   // ★ 追加：習熟度の注意文言は科目切替の最初に必ず消す（残留防止の唯一の消去ポイント）
   hideAllReadOnlyNotice();
 
+  lastAutoAppliedCommonFilterSubjectId = null;
+
   setUnsavedChanges(false);
     // ★重要：前科目の scoresDoc（completion 等）が残留すると、別科目が提出済みロックになる
   // 例：国語で completedUnits=["4","5"] が残ったまま数学を開くと 4組・5組が誤ロックされる
@@ -1970,6 +1969,12 @@ document
 // ★ STEP C フィルタ用：現在の表示学生を保持
 studentState.baseStudents = displayStudents.slice();
 studentState.currentStudents = displayStudents.slice();
+
+  if (currentSubjectMeta.isSkillLevel) {
+    renderSkillLevelFilter(subject);
+    applySkillLevelFilter(subject, "all");
+    return;
+  }
 
   // 選択科目モーダルは students が確定した後に表示（Reads0 方針）
   if (subject && subject.required === false) {
@@ -2407,10 +2412,18 @@ else if (!criteriaState.items.length) {
 ;
 if (isSpecial) {
   // 何も出さない（完全初期化済み）
-} else if (currentSubjectMeta.isSkillLevel) {
-  renderSkillLevelFilter(subject);
 } else {
   renderGroupOrCourseFilter(subject);
+}
+
+if (
+  !isSpecial &&
+  !currentSubjectMeta.isSkillLevel &&
+  currentSubjectMeta?.isCommon === true &&
+  lastAutoAppliedCommonFilterSubjectId !== subjectId
+) {
+  lastAutoAppliedCommonFilterSubjectId = subjectId;
+  applyGroupOrCourseFilter(subject, "all");
 }
 
   recalcFinalScoresAfterRestore(tbody);
@@ -2724,7 +2737,7 @@ if (
 
     // 再計算 + 行ハイライト適用
     applyRiskClassesToAllRows();
-    applyAllReadOnlyPolicy(filterKey);
+    applyReadOnlyState(filterKey);
   });
   // ★ 提出済みユニット判定（正本ベース）
 // ★ 提出済みユニット判定（正本ベース）
@@ -3537,71 +3550,48 @@ document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(e
 }
 
 // ================================
-// 共通科目の「全員(all)」は原則：閲覧専用
-// ただし習熟度科目だけ「習熟度欄」は全員でも編集可
+// 全員(all)表示時の閲覧専用ロック
 // ================================
-function applyAllReadOnlyPolicy(filterKey) {
-  clearAllReadOnlyNotice();
+function applyReadOnlyState(filterKey) {
   const meta = window.currentSubjectMeta || {};
   const isCommon = !!meta.isCommon;
   const isSkill = !!meta.isSkillLevel;
-  const isSpecial = meta.specialType === 1 || meta.specialType === 2;
+  const isAll = String(filterKey) === "all";
+  const shouldApply = isAll && (isCommon || isSkill);
 
-  const isAll = (filterKey == null) || (String(filterKey) === "all");
+  const controls = document.querySelectorAll(
+    "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
+  );
 
-
-
-  // 共通科目以外は何もしない
-  if (!isCommon) {
-    hideAllReadOnlyNotice();
-    return;
-  }
-
-  // ---- 共通科目 + 全員(all) ----
-  if (isAll) {
-    // 🔴 追加：モードタブを完全に殺す（二重保険）
-   
-        document
-      .querySelectorAll("#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea")
-      .forEach((el) => {
-        el.disabled = true;
-      });
-
-
-if (isAll) {
-  if (isSkill) {
-    // 習熟度科目 × 全員
-    document
-      .querySelectorAll("#scoreTableBody input.skill-level-input")
-      .forEach((el) => {
-        el.disabled = false;
-      });
-
-    showAllReadOnlyNotice(
-      "✏️ この画面から【習熟度】を入力してください（S / A1 / A2 / A3）。Excel等からのコピー＆ペーストも可能です。"
-    );
+  if (shouldApply) {
+    controls.forEach((el) => {
+      el.disabled = true;
+    });
+    if (isSkill) {
+      document
+        .querySelectorAll("#scoreTableBody input.skill-level-input")
+        .forEach((el) => {
+          el.disabled = false;
+        });
+      showAllReadOnlyNotice(
+        "✏️ この画面から【習熟度】を入力してください（S / A1 / A2 / A3）。Excel等からのコピー＆ペーストも可能です。"
+      );
+    } else {
+      showAllReadOnlyNotice(
+        "📘 この画面は【全体閲覧用】です。成績の入力・編集はできません。入力する場合は、組／コースを選択してください。"
+      );
+    }
   } else {
-    // 共通科目 × 全員
-    showAllReadOnlyNotice(
-      "📘 この画面は【全体閲覧用】です。成績の入力・編集はできません。入力する場合は、組／コースを選択してください。"
-    );
-  }
-} else {
-  // 全員でない（組／コース表示）
-  hideAllReadOnlyNotice();
-}
-
-    // ④ 全員(all)では提出ボタンも常に無効化
-    const submitBtn = document.getElementById("submitScoresBtn");
-    if (submitBtn) submitBtn.disabled = true;
-
-    return;
+    controls.forEach((el) => {
+      el.disabled = false;
+    });
+    hideAllReadOnlyNotice();
   }
 
-  // ---- 共通科目 + 組/コース表示 ----
-  hideAllReadOnlyNotice();
-
-  // この後の提出済み判定（existingロジック）が lock/unlock を決めるので、ここでは触らない
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (submitBtn) {
+    submitBtn.disabled = shouldApply;
+  }
 }
 
 // ================================
@@ -3692,10 +3682,6 @@ function showAllReadOnlyNotice(message) {
 function hideAllReadOnlyNotice() {
   const el = document.querySelector(".all-readonly-notice");
   if (el) el.remove();
-}
-
-function clearAllReadOnlyNotice() {
-  hideAllReadOnlyNotice();
 }
 
 /**

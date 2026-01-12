@@ -955,6 +955,25 @@ export function canSubmitScoresByVisibleRows() {
   };  
 }
 
+export function syncRowFilledState(tr) {
+  if (!tr) return;
+  const inputs = tr.querySelectorAll('input[data-criteria-name]');
+  if (!inputs || inputs.length === 0) return;
+
+  const allFilled = Array.from(inputs).every((input) => {
+    const rawValue = (input.value ?? "").toString().trim();
+    if (rawValue === "") return false;
+    const numeric = Number(rawValue);
+    return Number.isFinite(numeric);
+  });
+
+  if (allFilled) {
+    tr.dataset.allFilled = "1";
+  } else {
+    delete tr.dataset.allFilled;
+  }
+}
+
 
 function buildSubmittedSnapshotByUnit({ scoresDocData, subject, scope}) {
 
