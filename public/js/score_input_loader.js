@@ -1471,6 +1471,10 @@ function hasSubmittedUnit(unitsMap, unitKey) {
   return Object.prototype.hasOwnProperty.call(unitsMap, k);
 }
 
+function isCompletionOnlySubmission(subjectDocData) {
+  return subjectDocData?.completion?.isCompleted === true;
+}
+
 
 // ============================================
 // 提出UI更新（提出済み表示 / 再提出表示 / 期間外ロック）
@@ -1525,9 +1529,11 @@ window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
       window.__lastAppliedUnitKey ??
       "all";
 
-    const isSubmitted =
-  (currentUnitKey !== "all") &&
-  hasSubmittedUnit(unitsMap, String(currentUnitKey));
+    const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
+    const isSubmitted = isSpecialSubject
+      ? isCompletionOnlySubmission(data)
+      : (currentUnitKey !== "all") &&
+        hasSubmittedUnit(unitsMap, String(currentUnitKey));
 
     // ---- UI反映
     if (!inSubmitPeriod) {
@@ -2455,10 +2461,12 @@ const isScoreLocked = document.body.classList.contains("score-locked");
 // ===============================
 const completion = window.__latestScoresDocData?.completion;
 const currentUnitKey = window.__submissionContext?.unitKey;
+const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
+const shouldApplySubmittedLock = isSpecialSubject
+  ? isCompletionOnlySubmission(window.__latestScoresDocData)
+  : completion?.completedUnits?.includes(currentUnitKey);
 
-if (
-  completion?.completedUnits?.includes(currentUnitKey)
-) {
+if (shouldApplySubmittedLock) {
   showSubmittedLockNotice();
   lockScoreInputUI();
 } else {
@@ -2747,14 +2755,23 @@ const unitsMap =
 
 const isCommon = !!window.currentSubjectMeta?.isCommon;
 
-// 単一科目：all のときは unitKey を使う（例："5","M"など）
+// 単一科目：all のときは unitKey を使う（例:"5","M"など）
 // 共通科目：all のときは判定しない（今回の方針：文言を出さない）
 const effectiveKey =
   (!isCommon && (filterKey === "all" || filterKey == null))
     ? window.__submissionContext?.unitKey
     : filterKey;
 
-if (effectiveKey && effectiveKey !== "all" && hasSubmittedUnit(unitsMap, String(effectiveKey))) {
+const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
+const hasSpecialSubjectSubmission =
+  isSpecialSubject && isCompletionOnlySubmission(window.__latestScoresDocData);
+const hasUnitSubmission =
+  !isSpecialSubject &&
+  effectiveKey &&
+  effectiveKey !== "all" &&
+  hasSubmittedUnit(unitsMap, String(effectiveKey));
+
+if (hasSpecialSubjectSubmission || hasUnitSubmission) {
   lockScoreInputUI();
 
   // 文言は単一科目のみ表示（共通科目は今回は出さない）
@@ -3511,26 +3528,29 @@ function unlockScoreInputUI() {
   // ================================
   // ★ 提出済みユニットは解除しない
   // ================================
-   const activeFilterBtn =
+  const activeFilterBtn =
     document.querySelector("#groupFilterArea .filter-btn.active");
-   const rawKey = activeFilterBtn?.dataset?.filterKey;
-const unitKey =
-  (rawKey && rawKey !== "all")
-    ? rawKey
-    : (window.__submissionContext?.unitKey ?? "ALL");
+  const rawKey = activeFilterBtn?.dataset?.filterKey;
+  const unitKey =
+    (rawKey && rawKey !== "all")
+      ? rawKey
+      : (window.__submissionContext?.unitKey ?? "ALL");
 
   const unitsMap =
     window.__latestScoresDocData?.submittedSnapshot?.units || {};
 
-    // ★ 単一科目（ALL）も含めて「提出済みなら解除しない」
-   if (hasSubmittedUnit(unitsMap, String(unitKey))) {
+  const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
+  if (
+    (isSpecialSubject && isCompletionOnlySubmission(window.__latestScoresDocData)) ||
+    (!isSpecialSubject && hasSubmittedUnit(unitsMap, String(unitKey)))
+  ) {
     return;
   }
 
   // ================================
   // ↓↓↓ 以下は「未提出ユニットのみ」実行される
   // ================================
-document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(el => { el.disabled = false; });
+  document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(el => { el.disabled = false; });
 
   document.querySelectorAll(
     "input.skill-level-input, select.pass-fail-select, select.cert-select"
@@ -3545,8 +3565,6 @@ document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(e
   if (saveBtn) saveBtn.disabled = false;
   if (excelBtn) excelBtn.disabled = false;
   if (submitBtn) submitBtn.disabled = false;
-
-
 }
 
 // ================================
