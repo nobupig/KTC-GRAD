@@ -1056,23 +1056,50 @@ function setUnsavedChanges(flag) {
 }
 
 function buildScoresObjFromRow(tr, criteriaState) {
+  console.log("[BUILD DEBUG] criteriaState", criteriaState);
+  console.log("[BUILD DEBUG] criteriaState items", criteriaState?.items);
+  console.log("[BUILD DEBUG] criteriaState items length", criteriaState?.items?.length);
   const items = (criteriaState?.items) || [];
+  // criteriaState.items may be empty while criteria data is still loading or before initialization finishes,
+  // so zero length can occur during initial render/subject switch before criteriaState is hydrated.
   const scores = {};
-  const inputs = tr.querySelectorAll('input[type="number"]');
+  const inputs = Array.from(tr.querySelectorAll('input[type="number"], input[type="text"]'));
+  const inputMap = new Map();
 
   inputs.forEach((input) => {
-    const idx = Number(input.dataset.index || "0");
-    const item = items[idx];
-    const key = item?.name || input.dataset.itemName || `item_${idx}`;
+    const customKey = input.dataset.criteriaName || input.dataset.itemName;
+    if (customKey) {
+      inputMap.set(String(customKey), input);
+    }
+    const idx = Number(input.dataset.index);
+    if (!Number.isNaN(idx)) {
+      inputMap.set(`__idx_${idx}`, input);
+    }
+  });
 
-    const raw = (input.value ?? "").toString().trim();
+  const resolveInputForItem = (item, index) => {
+    const keyName = String(item?.name || `item_${index}`);
+    return (
+      inputMap.get(keyName) ||
+      inputMap.get(`__idx_${index}`) ||
+      (items.length === 1 ? inputs[0] : null)
+    );
+  };
+
+  items.forEach((item, index) => {
+    const input = resolveInputForItem(item, index);
+    if (!input) return;
+    const key = item?.name || input.dataset.itemName || `item_${index}`;
+    const raw = (input.value ?? "").trim();
     if (raw === "") return;
     const num = Number(raw);
     if (!Number.isFinite(num)) return;
-
     scores[key] = num;
   });
 
+  if (Object.keys(scores).length === 0) {
+    console.log("[BUILD DEBUG] empty scoresObj", tr.dataset.studentId);
+  }
   return scores;
 }
 
@@ -1471,8 +1498,11 @@ function hasSubmittedUnit(unitsMap, unitKey) {
   return Object.prototype.hasOwnProperty.call(unitsMap, k);
 }
 
-function isCompletionOnlySubmission(subjectDocData) {
-  return subjectDocData?.completion?.isCompleted === true;
+function isCompletionOnlySubmission(subjectMeta, subjectDocData) {
+  return (
+    subjectMeta?.specialType === 1 &&
+    subjectDocData?.completion?.isCompleted === true
+  );
 }
 
 
@@ -1529,9 +1559,9 @@ window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
       window.__lastAppliedUnitKey ??
       "all";
 
-    const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
-    const isSubmitted = isSpecialSubject
-      ? isCompletionOnlySubmission(data)
+    const completionOnly = isCompletionOnlySubmission(window.currentSubjectMeta, data);
+    const isSubmitted = completionOnly
+      ? true
       : (currentUnitKey !== "all") &&
         hasSubmittedUnit(unitsMap, String(currentUnitKey));
 
@@ -2461,9 +2491,12 @@ const isScoreLocked = document.body.classList.contains("score-locked");
 // ===============================
 const completion = window.__latestScoresDocData?.completion;
 const currentUnitKey = window.__submissionContext?.unitKey;
-const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
-const shouldApplySubmittedLock = isSpecialSubject
-  ? isCompletionOnlySubmission(window.__latestScoresDocData)
+const completionOnly = isCompletionOnlySubmission(
+  window.currentSubjectMeta,
+  window.__latestScoresDocData
+);
+const shouldApplySubmittedLock = completionOnly
+  ? true
   : completion?.completedUnits?.includes(currentUnitKey);
 
 if (shouldApplySubmittedLock) {
@@ -2762,16 +2795,17 @@ const effectiveKey =
     ? window.__submissionContext?.unitKey
     : filterKey;
 
-const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
-const hasSpecialSubjectSubmission =
-  isSpecialSubject && isCompletionOnlySubmission(window.__latestScoresDocData);
+const completionOnly = isCompletionOnlySubmission(
+  window.currentSubjectMeta,
+  window.__latestScoresDocData
+);
 const hasUnitSubmission =
-  !isSpecialSubject &&
+  !completionOnly &&
   effectiveKey &&
   effectiveKey !== "all" &&
   hasSubmittedUnit(unitsMap, String(effectiveKey));
 
-if (hasSpecialSubjectSubmission || hasUnitSubmission) {
+if (completionOnly || hasUnitSubmission) {
   lockScoreInputUI();
 
   // 文言は単一科目のみ表示（共通科目は今回は出さない）
@@ -2882,6 +2916,7 @@ export function initScoreInput() {
 
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
+      console.log("[SAVE DEBUG] click");
       if (!currentSubjectId) {
         alert("科目を選択してください。");
         return;
@@ -2897,6 +2932,7 @@ export function initScoreInput() {
 
       try {
         const rows = getSaveTargetRows(tbody);
+        console.log("[SAVE DEBUG] rows length", rows.length);
         if (rows.length === 0) {
           alert("保存対象の学生がありません。");
           return;
@@ -2951,6 +2987,8 @@ if (currentSubjectMeta.specialType === 2) {
           };
         }
 
+        console.log("[SAVE DEBUG] bulkScores keys", Object.keys(bulkScores));
+
         const saveCount = Object.keys(bulkScores).length;
         if (saveCount === 0 && !excessDirty) {
           showSaveSuccessToast();
@@ -2962,7 +3000,31 @@ if (currentSubjectMeta.specialType === 2) {
         }
 
         try {
+          console.log("[SAVE DEBUG] calling saveBulkStudentScores");
           await saveBulkStudentScores(bulkScores);
+          // DOMと状態を再同期
+          document
+            .querySelectorAll('#scoreTableBody tr[data-student-id]')
+            .forEach((tr) => {
+              // 非表示行はスキップ
+              if (tr.offsetParent === null) return;
+              if (typeof syncRowFilledState === "function") {
+                syncRowFilledState(tr);
+              }
+            });
+          window.updateSubmitUI?.();
+          // ===== 一時保存成功後：送信可否フラグをDOMから再構築 =====
+document
+  .querySelectorAll('#scoreTableBody tr[data-student-id]')
+  .forEach(tr => {
+    if (typeof syncRowFilledState === "function") {
+      syncRowFilledState(tr);
+    }
+  });
+
+// ★ 送信ボタン状態を再評価
+window.updateSubmitUI?.();
+
           isSavedAfterLastEdit = true;   // ★これがないと再提出が壊れる
            hasSavedSnapshot = true;      // ★提出判定用
         } catch (err) {
@@ -3539,11 +3601,11 @@ function unlockScoreInputUI() {
   const unitsMap =
     window.__latestScoresDocData?.submittedSnapshot?.units || {};
 
-  const isSpecialSubject = window.currentSubjectMeta?.specialType === 1;
-  if (
-    (isSpecialSubject && isCompletionOnlySubmission(window.__latestScoresDocData)) ||
-    (!isSpecialSubject && hasSubmittedUnit(unitsMap, String(unitKey)))
-  ) {
+  const completionOnly = isCompletionOnlySubmission(
+    window.currentSubjectMeta,
+    window.__latestScoresDocData
+  );
+  if (completionOnly || hasSubmittedUnit(unitsMap, String(unitKey))) {
     return;
   }
 

@@ -159,6 +159,10 @@ export function updateFinalScoreForRow(
   showAlert,
   rowIndex
 ) {
+  if (!criteriaState) {
+    return { hasError: false, errors: [] };
+  }
+
   const items = criteriaState.items || [];
   if (!items.length) {
     // 評価基準が無い場合は何もしない

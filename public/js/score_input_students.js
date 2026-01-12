@@ -93,6 +93,7 @@ import { activateQuotaErrorState } from "./quota_banner.js";
 import { CURRENT_YEAR } from "./config.js";
 import { db } from "./score_input_loader.js";
 import { getBaseColumns } from "./score_input_columns.js";
+import { updateAllFinalScores } from "./score_input_modes.js";
 
 
 
@@ -937,31 +938,79 @@ export function canSubmitScoresByVisibleRows() {
   let total = 0;
   let filled = 0;
 
-  rows.forEach(tr => {
-    // 表示されていない行は対象外（保険）
+  // ※ data-allFilled 依存はやめて、DOMの実態から毎回判定する
+  //   （モジュール境界や再描画でフラグが欠落しても提出判定が壊れないように）
+  rows.forEach((tr) => {
+    // 表示されていない行は対象外
     if (tr.offsetParent === null) return;
 
     total++;
 
-    if (tr.dataset.allFilled === "1") {
-      filled++;
+    // --- specialType (合/否・認定) ---
+    const sp1 = tr.querySelector("select.pass-fail-select");
+    if (sp1) {
+      if (String(sp1.value || "").trim() !== "") filled++;
+      return;
     }
+    const sp2 = tr.querySelector("select.cert-select");
+    if (sp2) {
+      if (String(sp2.value || "").trim() !== "") filled++;
+      return;
+    }
+
+    // --- 習熟度 ---
+    const skill = tr.querySelector("input.skill-level-input");
+    if (skill) {
+      const v = String(skill.value || "").trim().toUpperCase();
+      if (["S", "A1", "A2", "A3"].includes(v)) filled++;
+      return;
+    }
+
+    // --- 通常（点数入力） ---
+    const inputs = Array.from(
+      tr.querySelectorAll('input[type="text"], input[type="number"]')
+    ).filter((input) => {
+      if (input.disabled || input.readOnly) return false;
+      // display:none 等の“見えてない入力”は除外（列の表示/非表示で判定が壊れないように）
+      if (input.offsetParent === null) return false;
+      return true;
+    });
+
+    if (!inputs.length) return;
+
+    const allFilled = inputs.every((input) => {
+      const rawValue = String(input.value ?? "").trim();
+      if (rawValue === "") return false;
+      const numeric = Number(rawValue);
+      return Number.isFinite(numeric);
+    });
+
+    if (allFilled) filled++;
   });
 
   return {
     ok: total > 0 && total === filled,
     total,
-    filled
-  };  
+    filled,
+    reason:
+      total > 0 && total !== filled
+        ? `未入力があります（${filled}/${total} 行入力済み）`
+        : "",
+  };
 }
+
 
 export function syncRowFilledState(tr) {
   if (!tr) return;
-  const inputs = tr.querySelectorAll('input[data-criteria-name]');
-  if (!inputs || inputs.length === 0) return;
+  const inputs = Array.from(tr.querySelectorAll('input[type="text"], input[type="number"]'))
+    .filter((input) => !input.disabled && !input.readOnly);
+  if (!inputs.length) {
+    delete tr.dataset.allFilled;
+    return;
+  }
 
-  const allFilled = Array.from(inputs).every((input) => {
-    const rawValue = (input.value ?? "").toString().trim();
+  const allFilled = inputs.every((input) => {
+    const rawValue = (input.value ?? "").trim();
     if (rawValue === "") return false;
     const numeric = Number(rawValue);
     return Number.isFinite(numeric);
