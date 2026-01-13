@@ -583,6 +583,8 @@ export function renderStudentRows(
         }
         studentState.skillLevelsMap[studentId] = saveValue;
         scheduleSkillLevelSave(subjectId, studentId, saveValue);
+        // ★ UI側も未保存として扱う（必要なら）
+        if (typeof window.setUnsavedChanges === "function") window.setUnsavedChanges(true);
       });
       input.addEventListener("blur", () => {
         if (!FINAL_SKILL_ALLOWED.includes(input.value)) {

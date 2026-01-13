@@ -572,8 +572,7 @@ renderStudentRows(
   studentState,
   window.__latestScoresDocData?.completion
 );
-window.__currentFilterKey = String(key ?? "all");
-window.__lastAppliedUnitKey = String(key ?? "all");
+ window.__currentFilterKey = String(key ?? "all");
   } finally {
     isRenderingTable = false;
   }
@@ -590,7 +589,7 @@ window.__lastAppliedUnitKey = String(key ?? "all");
   updateStudentCountDisplay(filtered.length);
   // ===== FIX: 習熟度フィルタ後の表示再構築（DOMのみ / Firestore readなし）=====
     const hasNumberInputs =
-    tbody && tbody.querySelectorAll('input[data-index]:not(.skill-level-input)');
+    tbody && tbody.querySelectorAll('input[data-index]:not(.skill-level-input)').length > 0;
 
     if (hasNumberInputs) {
       recalcFinalScoresAfterRestore(tbody);
@@ -689,6 +688,7 @@ const criteriaCache = new Map();
 const scoresCache = new Map();
 const skillCache = new Map();
 const tempScoresMap = new Map();
+let stashedUnsavedChanges = false;
 let isRenderingTable = false;
 let isProgrammaticInput = false;
 // 超過学生 state（モーダルと保存連携で使用）
@@ -940,18 +940,19 @@ export function recalcFinalScoresAfterRestore(tbodyEl) {
       hasAnyInput = true;
       if (!(Number.isFinite(max) && max > 0 && val >= max)) allPerfect = false;
 
+            // ★ 上限超過は「赤枠」＋「計算に含めない」
+             if (Number.isFinite(max) && max > 0 && val > max) {
+                input.classList.add("ktc-input-error");
+                allPerfect = false;
+                continue;
+              } else {
+                input.classList.remove("ktc-input-error");
+              }
+
       // 比率計算： (val/max) * weight を合算 → 最終的に 0..100
       if (Number.isFinite(max) && max > 0 && w > 0) {
         sumWeighted += (val / max) * w;
       }
-      // ★ 上限超過は「赤枠」＋「計算に含めない」（A仕様）
-if (Number.isFinite(max) && max > 0 && val > max) {
-  input.classList.add("ktc-input-error");
-  allPerfect = false;
-  continue; // ← ここが重要：寄与点に入れない
-} else {
-  input.classList.remove("ktc-input-error");
-}
 
     }
 
@@ -1116,21 +1117,32 @@ function hasInputErrors(tbody) {
 
 function stashCurrentInputScores(tbodyEl) {
   if (!tbodyEl) return;
-  const inputs = tbodyEl.querySelectorAll(
-    "input[data-student-id][data-criteria-name]"
-  );
 
-  inputs.forEach((input) => {
-    const sid = input.dataset.studentId;
-    const crit = input.dataset.criteriaName;
-    const val = input.value;
+  // ★ 未保存フラグも退避（これがないと「保存ボタンが死ぬ」）
+  stashedUnsavedChanges = hasUnsavedChanges;
 
-    if (!sid || !crit || val === "") return;
+  // ★ 前回の退避が残ると混ざるので必ずクリア
+  tempScoresMap.clear();
 
-    if (!tempScoresMap.has(sid)) {
-      tempScoresMap.set(sid, {});
-    }
-    tempScoresMap.get(sid)[crit] = Number(val);
+  // 点数入力：criteriaName をキーに全て退避（空欄も含める）
+  const scoreInputs = tbodyEl.querySelectorAll("input[data-student-id][data-criteria-name]");
+  scoreInputs.forEach((input) => {
+    const sid = String(input.dataset.studentId || "");
+    const crit = String(input.dataset.criteriaName || "");
+    if (!sid || !crit) return;
+
+    if (!tempScoresMap.has(sid)) tempScoresMap.set(sid, {});
+    // ★ 空欄も保持（戻ったときの状態再現のため）
+    tempScoresMap.get(sid)[crit] = (input.value ?? "").toString();
+  });
+
+  // 習熟度入力も退避（同じMap内に _skill で保存）
+  const skillInputs = tbodyEl.querySelectorAll("input.skill-level-input[data-student-id]");
+  skillInputs.forEach((input) => {
+    const sid = String(input.dataset.studentId || "");
+    if (!sid) return;
+    if (!tempScoresMap.has(sid)) tempScoresMap.set(sid, {});
+    tempScoresMap.get(sid).__skill = (input.value ?? "").toString();
   });
 }
 
@@ -1138,23 +1150,53 @@ function restoreStashedScores(tbodyEl) {
   if (!tbodyEl) return;
   if (!tempScoresMap.size) return;
 
-  const inputs = tbodyEl.querySelectorAll(
-    "input[data-student-id][data-criteria-name]"
-  );
-
   isProgrammaticInput = true;
   try {
-  inputs.forEach((input) => {
-    const sid = input.dataset.studentId;
-    const crit = input.dataset.criteriaName;
-    const score = tempScoresMap.get(sid)?.[crit];
-    if (score == null) return;
+    // 点数入力の復元
+    const scoreInputs = tbodyEl.querySelectorAll("input[data-student-id][data-criteria-name]");
+    scoreInputs.forEach((input) => {
+      const sid = String(input.dataset.studentId || "");
+      const crit = String(input.dataset.criteriaName || "");
+      if (!sid || !crit) return;
+      const v = tempScoresMap.get(sid)?.[crit];
+      if (v === undefined) return;
+      input.value = String(v);
+    });
 
-    input.value = score;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+    // 習熟度入力の復元
+    const skillInputs = tbodyEl.querySelectorAll("input.skill-level-input[data-student-id]");
+    skillInputs.forEach((input) => {
+      const sid = String(input.dataset.studentId || "");
+      const v = tempScoresMap.get(sid)?.__skill;
+      if (v === undefined) return;
+      input.value = String(v);
+    });
   } finally {
     isProgrammaticInput = false;
+  }
+
+  // ★ 復元後にまとめて再計算（ここが初回入力の効き/赤点ハイライトの根本）
+  try { recalcFinalScoresAfterRestore(tbodyEl); } catch (e) {}
+  try { syncFinalScoresFromTbody(tbodyEl); } catch (e) {}
+  try { refreshRiskClassesForVisibleRows(); } catch (e) {}
+  try { updateAveragePointDisplay(); } catch (e) {}
+
+  // ★ 保存ボタン状態を戻す（これがないと「保存が死ぬ」）
+  setUnsavedChanges(!!stashedUnsavedChanges);
+  if (stashedUnsavedChanges) isSavedAfterLastEdit = false;
+   // ★ フィルタ／ソート後に状態を完全に復元する（重要）
+  recalcFinalScoresAfterRestore(tbodyEl);
+  syncFinalScoresFromTbody(tbodyEl);
+  applyRiskClassesToAllRows();
+  updateAveragePointDisplay();
+  refreshSaveButtonState();
+  // ★ フィルタ再描画後に未保存状態と保存ボタンを正しく戻す
+  if (stashedUnsavedChanges) {
+    setUnsavedChanges(true);
+  }
+  // specialType 以外は DOM から保存可否を再評価（既存方針に合わせる）
+  if (!(currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2)) {
+    refreshSaveButtonState();
   }
 }
 
@@ -2095,7 +2137,14 @@ studentState.lockedUnitInfo = {
       studentState,
       window.__latestScoresDocData?.completion
     );
-
+// ★ 初回描画直後に状態を確定させる（超重要）
+    requestAnimationFrame(() => {
+      recalcFinalScoresAfterRestore(tbody);
+      syncFinalScoresFromTbody(tbody);
+      applyRiskClassesToAllRows();
+      updateAveragePointDisplay();
+      refreshSaveButtonState();
+    });
 
 // ================================
 // STEP1: 提出単位・完了条件の確定
