@@ -169,7 +169,7 @@ export function updateFinalScoreForRow(
     return { hasError: false, errors: [] };
   }
 
-  const inputs = tr.querySelectorAll("input[data-index]:not(.skill-level-input)");
+  const inputs = tr.querySelectorAll("input[data-index]");
   const { studentId, studentName } = getStudentInfoFromRow(tr);
 
   const alertFn =
@@ -186,6 +186,14 @@ export function updateFinalScoreForRow(
   inputs.forEach((input) => {
     const idx = Number(input.dataset.index || "0");
     const item = items[idx];
+    console.log("[CHECK]", {
+  idx,
+  itemsLength: items.length,
+  item,
+  value: input.value,
+  datasetIndex: input.dataset.index
+});
+
     const percent = Number((criteriaState.normalizedWeights || [])[idx] ?? (item?.percent || 0));
 
 
@@ -416,12 +424,12 @@ export function updateAllFinalScores(
 // ================================
 function setupAutoRecalcOnInput(tbody, criteriaState, context) {
   tbody.addEventListener("input", (ev) => {
+    console.log("[INPUT EVENT FIRED]", ev.target);
     const target = ev.target;
 
     if (!(target instanceof HTMLInputElement)) return;
     if (!target.dataset.index) return;                 // ← 点数欄
-    if (target.classList.contains("skill-level-input")) return;
-
+    
     updateAllFinalScores(
       tbody,
       criteriaState,
@@ -449,14 +457,23 @@ export function attachInputHandlers(
   context,
   showAlert
 ) {
-  tbody.addEventListener("input", (ev) => {
+  const wrapper = document.querySelector(".score-table-wrapper");
+
+if (wrapper) {
+  const onEdit = (ev) => {
     const target = ev.target;
     if (!(target instanceof HTMLInputElement)) return;
-    if (target.classList.contains("skill-level-input")) return;
+    if (!target.dataset.index) return;
 
     const tr = target.closest("tr");
     if (!tr) return;
 
     updateFinalScoreForRow(tr, criteriaState, context, showAlert);
-  });
+    syncRowFilledState(tr);
+  };
+
+  wrapper.addEventListener("input", onEdit);
+  wrapper.addEventListener("change", onEdit);
+}
+
 }

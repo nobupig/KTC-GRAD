@@ -2051,7 +2051,7 @@ studentState.currentStudents = displayStudents.slice();
   if (currentSubjectMeta.isSkillLevel) {
     renderSkillLevelFilter(subject);
     applySkillLevelFilter(subject, "all");
-    return;
+    
   }
 
   // 選択科目モーダルは students が確定した後に表示（Reads0 方針）
@@ -2495,8 +2495,8 @@ else if (!criteriaState.items.length) {
   }
 
 ;
-if (isSpecial) {
-  // 何も出さない（完全初期化済み）
+if (isSpecial || currentSubjectMeta.isSkillLevel) {
+  // 特別科目・習熟度科目では組ソートを出さない
 } else {
   renderGroupOrCourseFilter(subject);
 }
