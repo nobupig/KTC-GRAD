@@ -603,7 +603,26 @@ renderStudentRows(
     }
   // applyRiskClassesToAllRows(); // disabled: avoid immediate row-level excess/red highlighting
   applyReadOnlyState(String(key ?? "all"));
+  syncSubmittedLockForSkillFilter(String(key ?? "all"));
 }
+
+function syncSubmittedLockForSkillFilter(filterKey) {
+  if (!window.currentSubjectMeta?.isSkillLevel) return;
+
+  const completion = window.__latestScoresDocData?.completion;
+  const key = String(filterKey || "").toUpperCase();
+  const isSkillUnit = ["S", "A1", "A2", "A3"].includes(key);
+  const isSubmitted = isSkillUnit && completion?.completedUnits?.includes(key);
+
+  if (isSubmitted) {
+    showSubmittedLockNotice();
+    lockScoreInputUI();
+  } else {
+    hideSubmittedLockNotice();
+    unlockScoreInputUI();
+  }
+}
+
 // ================================
 // 新規追加: 習熟度データを取得
 // ================================
@@ -2540,18 +2559,23 @@ updateElectiveRegistrationButtons(subject);
 const isScoreLocked = document.body.classList.contains("score-locked");
 // ※ ここで handleSubjectChange を終了しない（下の「提出済み文言再表示」まで必ず到達させる）
 
-// ===============================
-// 提出済み文言の最終判定（completion 正本）
-// ===============================
 const completion = window.__latestScoresDocData?.completion;
-const currentUnitKey = window.__submissionContext?.unitKey;
 const completionOnly = isCompletionOnlySubmission(
   window.currentSubjectMeta,
   window.__latestScoresDocData
 );
-const shouldApplySubmittedLock = completionOnly
-  ? true
-  : completion?.completedUnits?.includes(currentUnitKey);
+
+// ★習熟度は S/A1/A2/A3 で提出済み判定する
+let shouldApplySubmittedLock = false;
+if (completionOnly) {
+  shouldApplySubmittedLock = true;
+} else if (window.currentSubjectMeta?.isSkillLevel) {
+  const k = String(window.currentSkillFilter || "").toUpperCase();
+  shouldApplySubmittedLock = ["S", "A1", "A2", "A3"].includes(k) && completion?.completedUnits?.includes(k);
+} else {
+  const currentUnitKey = window.__submissionContext?.unitKey;
+  shouldApplySubmittedLock = completion?.completedUnits?.includes(currentUnitKey);
+}
 
 if (shouldApplySubmittedLock) {
   showSubmittedLockNotice();
@@ -2560,6 +2584,7 @@ if (shouldApplySubmittedLock) {
   hideSubmittedLockNotice();
   unlockScoreInputUI();
 }
+
 
 }
 
