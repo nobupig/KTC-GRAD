@@ -545,70 +545,99 @@ filterDefs.forEach(def => {
 // 新規追加: 習熟度フィルタ適用
 // ================================
 function applySkillLevelFilter(subject, key) {
-    window.currentSkillFilter = key;   // "S" / "A1" / "A2" / "A3" / "all" / "unset"
-   // ❌ unitKey は変更しない（習熟度は提出単位ではない）
-  const baseList = (studentState.baseStudents || studentState.currentStudents || []).slice();
+  const normalizedKey = String(key ?? "all").toLowerCase();
+  const isSkill = !!window.currentSubjectMeta?.isSkillLevel;
+
+  // ★ 表示状態の正本
+  window.currentSkillFilter = normalizedKey;
+
+  const baseList =
+    (studentState.baseStudents || studentState.currentStudents || []).slice();
   const levelsMap = studentState.skillLevelsMap || {};
   let filtered = baseList;
-  if (key === "all") {
-    // すべて
+
+  if (normalizedKey === "all") {
     filtered = baseList;
-  } else if (["S","A1","A2","A3"].includes(key)) {
-    filtered = baseList.filter(stu => (levelsMap[stu.studentId] || "") === key);
-  } else if (key === "unset") {
-    filtered = baseList.filter(stu => !levelsMap[stu.studentId] || levelsMap[stu.studentId] === "");
+       } else if (["s", "a1", "a2", "a3"].includes(normalizedKey)) {
+    filtered = baseList.filter(
+      stu => (levelsMap[stu.studentId] || "").toLowerCase() === normalizedKey
+    );
+  } else if (normalizedKey === "unset") {
+    filtered = baseList.filter(
+      stu => !levelsMap[stu.studentId] || levelsMap[stu.studentId] === ""
+    );
   }
+
   stashCurrentInputScores(tbody);
   isRenderingTable = true;
   try {
-renderStudentRows(
-  tbody,
-  subject,
-  filtered,
-  criteriaState.items,
-  (tr) => {
-    recalcFinalScoresAfterRestore(tbody)
-  },
-  studentState,
-  window.__latestScoresDocData?.completion
-);
- window.__currentFilterKey = String(key ?? "all");
-  
-    // ★重要：フィルタ再描画後、Firestore保存済み点数をDOMへ復元する
-    // これが無いと「別フィルタへ移動→戻る」で点数が空になる
-    applySavedScoresToTable(window.__latestScoresDocData?.students || {}, tbody);
+    renderStudentRows(
+      tbody,
+      subject,
+      filtered,
+      criteriaState.items,
+      () => {
+        recalcFinalScoresAfterRestore(tbody);
+      },
+      studentState,
+      window.__latestScoresDocData?.completion
+    );
 
+    window.__currentFilterKey = normalizedKey;
+
+    applySavedScoresToTable(
+      window.__latestScoresDocData?.students || {},
+      tbody
+    );
   } finally {
     isRenderingTable = false;
   }
+
   restoreStashedScores(tbody);
+
   // 習熟度値の反映
-  if (currentSubjectMeta.isSkillLevel && studentState.skillLevelsMap) {
-    const inputs = tbody.querySelectorAll('input.skill-level-input');
-    inputs.forEach(input => {
+  if (isSkill && studentState.skillLevelsMap) {
+    tbody.querySelectorAll("input.skill-level-input").forEach(input => {
       const sid = input.dataset.studentId;
       input.value = studentState.skillLevelsMap[sid] || "";
     });
   }
+
   studentState.currentStudents = filtered.slice();
   updateStudentCountDisplay(filtered.length);
-  // ===== FIX: 習熟度フィルタ後の表示再構築（DOMのみ / Firestore readなし）=====
-    const hasNumberInputs =
-    tbody && tbody.querySelectorAll('input[data-index]:not(.skill-level-input)').length > 0;
 
-    if (hasNumberInputs) {
-      recalcFinalScoresAfterRestore(tbody);
-    } else {
-      updateAveragePointDisplay();
-    }
-  // applyRiskClassesToAllRows(); // disabled: avoid immediate row-level excess/red highlighting
-  applyReadOnlyState(String(key ?? "all"));
-  syncSubmittedLockForSkillFilter(String(key ?? "all"));
+  const hasNumberInputs =
+    tbody &&
+    tbody.querySelectorAll(
+      "input[data-index]:not(.skill-level-input)"
+    ).length > 0;
+
+  if (hasNumberInputs) {
+    recalcFinalScoresAfterRestore(tbody);
+  } else {
+    updateAveragePointDisplay();
+  }
+
+  // ★ UI 状態の再評価は「ここで1回だけ」
+  window.updateSubmitUI?.({
+    subjectDocData: window.__latestScoresDocData
+  });
+  // ===============================
+// ★ Step A：全員表示時のロック制御（最終位置）
+// ===============================
+if (normalizedKey === "all") {
+  applyReadOnlyState("all");
+} else {
+  applyReadOnlyState(normalizedKey);
 }
+
+}
+
+
 
 function syncSubmittedLockForSkillFilter(filterKey) {
   if (!window.currentSubjectMeta?.isSkillLevel) return;
-
+  if (String(filterKey) === "all") return;
   const completion = window.__latestScoresDocData?.completion;
   const key = String(filterKey || "").toUpperCase();
   const isSkillUnit = ["S", "A1", "A2", "A3"].includes(key);
@@ -1840,6 +1869,16 @@ try {
     return;
 
   }
+
+  // ★ 習熟度科目：同一科目でも初回は必ず全員ロックを適用
+if (
+  subjectId === currentSubjectId &&
+  window.currentSubjectMeta?.isSkillLevel &&
+  window.currentSkillFilter == null
+) {
+  applySkillLevelFilter(window.currentSubject, "all");
+}
+
   // ▼ 同一科目の再読込防止（Reads削減の核心）
   if (subjectId === currentSubjectId) {
   if (DEBUG) console.log("[SKIP] same subjectId, reload skipped");
@@ -2072,11 +2111,10 @@ document
 studentState.baseStudents = displayStudents.slice();
 studentState.currentStudents = displayStudents.slice();
 
-  if (currentSubjectMeta.isSkillLevel) {
-    renderSkillLevelFilter(subject);
-    applySkillLevelFilter(subject, "all");
-    
-  }
+if (currentSubjectMeta.isSkillLevel) {
+  renderSkillLevelFilter(subject);
+  window.currentSkillFilter = "all"; // 初期状態を全員に固定
+}
 
   // 選択科目モーダルは students が確定した後に表示（Reads0 方針）
   if (subject && subject.required === false) {
@@ -2576,15 +2614,37 @@ if (completionOnly) {
   const currentUnitKey = window.__submissionContext?.unitKey;
   shouldApplySubmittedLock = completion?.completedUnits?.includes(currentUnitKey);
 }
+const isSkillAllView =
+  window.currentSubjectMeta?.isSkillLevel &&
+  String(window.currentSkillFilter || "").toLowerCase() === "all";
+
+// ================================
+// ★最終：ロック状態は applyReadOnlyState に統一
+// ================================
+const filterKeyForReadOnly = (() => {
+  if (window.currentSubjectMeta?.isSkillLevel) {
+    return String(window.currentSkillFilter ?? "all").toLowerCase();
+  }
+  // 通常科目は "all" でも applyReadOnlyState が unlock してくれる
+  return "all";
+})();
 
 if (shouldApplySubmittedLock) {
+  // 提出済み（最優先）→ ここだけは「全操作禁止」にしたいので専用キーを使う
   showSubmittedLockNotice();
-  lockScoreInputUI();
+  hideAllReadOnlyNotice();
+  applyReadOnlyState("submitted"); // ★後述：applyReadOnlyState に追加する
+} else if (isSkillAllView) {
+  hideSubmittedLockNotice();
+  showAllReadOnlyNotice(
+    "📘 この画面は【全体閲覧用】です。習熟度の入力は「全員」で入力してください。"
+  );
+  applyReadOnlyState("all");
 } else {
   hideSubmittedLockNotice();
-  unlockScoreInputUI();
+  hideAllReadOnlyNotice();
+  applyReadOnlyState(filterKeyForReadOnly);
 }
-
 
 }
 
@@ -3642,23 +3702,6 @@ if (typeof window !== "undefined") {
 // ===============================
 function lockScoreInputUI() {
   // 入力ロック
-  document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(el => {
-    el.disabled = true;
-  });
-
-  const saveBtnEl = document.getElementById("saveBtn");       // ★正しいID
-const excelBtnEl = document.getElementById("excelDownloadBtn");
-const submitBtnEl = document.getElementById("submitScoresBtn");
-
-if (saveBtnEl) saveBtnEl.disabled = true;
-if (excelBtnEl) excelBtnEl.disabled = true;
-if (submitBtnEl) submitBtnEl.disabled = true;
-
-// スキル入力やselectも止める（3年以上共通で漏れが出やすい）
-document.querySelectorAll("input.skill-level-input, select.pass-fail-select, select.cert-select").forEach(el => {
-  el.disabled = true;
-});
-
 }
 
 
@@ -3688,17 +3731,6 @@ function unlockScoreInputUI() {
     return;
   }
 
-  // ================================
-  // ↓↓↓ 以下は「未提出ユニットのみ」実行される
-  // ================================
-  document.querySelectorAll("input[data-index]:not(.skill-level-input)").forEach(el => { el.disabled = false; });
-
-  document.querySelectorAll(
-    "input.skill-level-input, select.pass-fail-select, select.cert-select"
-  ).forEach(el => {
-    el.disabled = false;
-  });
-
   const saveBtn = document.getElementById("saveBtn");
   const excelBtn = document.getElementById("excelDownloadBtn");
   const submitBtn = document.getElementById("submitScoresBtn");
@@ -3715,43 +3747,76 @@ function applyReadOnlyState(filterKey) {
   const meta = window.currentSubjectMeta || {};
   const isCommon = !!meta.isCommon;
   const isSkill = !!meta.isSkillLevel;
-  const isAll = String(filterKey) === "all";
-  const shouldApply = isAll && (isCommon || isSkill);
+
+ const key = String(filterKey || "").toLowerCase();
+if (key === "submitted") {
+  // 提出済みは完全ロック（習熟度も含めて編集不可）
+  const controls = document.querySelectorAll(
+    "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
+  );
+  controls.forEach(el => { el.disabled = true; });
+
+  const saveBtn = document.getElementById("saveBtn");
+  const excelBtn = document.getElementById("excelDownloadBtn");
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (saveBtn) saveBtn.disabled = true;
+  if (excelBtn) excelBtn.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
+  return;
+}
+  const isAll = key === "all";
+  const isSkillUnit = ["s", "a1", "a2", "a3"].includes(key.toLowerCase());
 
   const controls = document.querySelectorAll(
     "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
   );
 
-  if (shouldApply) {
-    controls.forEach((el) => {
-      el.disabled = true;
-    });
-    if (isSkill) {
-      document
-        .querySelectorAll("#scoreTableBody input.skill-level-input")
-        .forEach((el) => {
-          el.disabled = false;
-        });
-      showAllReadOnlyNotice(
-        "✏️ この画面から【習熟度】を入力してください（S / A1 / A2 / A3）。Excel等からのコピー＆ペーストも可能です。"
-      );
-    } else {
-      showAllReadOnlyNotice(
-        "📘 この画面は【全体閲覧用】です。成績の入力・編集はできません。入力する場合は、組／コースを選択してください。"
-      );
-    }
-  } else {
-    controls.forEach((el) => {
-      el.disabled = false;
-    });
-    hideAllReadOnlyNotice();
+  // まず全部ロック
+  controls.forEach(el => {
+    el.disabled = true;
+  });
+
+  if (isAll && isSkill) {
+    // ================================
+    // 全員 × 習熟度科目
+    // → 習熟度だけ入力可
+    // ================================
+    document
+      .querySelectorAll("#scoreTableBody input.skill-level-input")
+      .forEach(el => {
+        el.disabled = false;
+      });
+
+    showAllReadOnlyNotice(
+      "✏️ この画面では【習熟度】のみ入力できます。"
+    );
+    return;
   }
 
-  const submitBtn = document.getElementById("submitScoresBtn");
-  if (submitBtn) {
-    submitBtn.disabled = shouldApply;
+  if (isSkillUnit) {
+    // ================================
+    // S / A1 / A2 / A3
+    // → 習熟度は入力不可、点数は入力可
+    // ================================
+    document
+      .querySelectorAll(
+        "#scoreTableBody input[data-index]:not(.skill-level-input)"
+      )
+      .forEach(el => {
+        el.disabled = false;
+      });
+
+    hideAllReadOnlyNotice();
+    return;
   }
+
+  // その他（通常科目など）
+  controls.forEach(el => {
+    el.disabled = false;
+  });
+  hideAllReadOnlyNotice();
 }
+
 
 // ================================
 // 提出済み注意文言の表示（共通）
