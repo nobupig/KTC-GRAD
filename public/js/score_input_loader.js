@@ -631,6 +631,8 @@ if (normalizedKey === "all") {
   applyReadOnlyState(normalizedKey);
 }
 
+  console.log("[UI STATE][applySkillLevelFilter]", deriveUIState());
+
 }
 
 
@@ -1598,6 +1600,41 @@ function isCompletionOnlySubmission(subjectMeta, subjectDocData) {
     subjectMeta?.specialType === 1 &&
     subjectDocData?.completion?.isCompleted === true
   );
+}
+
+// ================================
+// UI State Derivation（Step B-1）
+// ================================
+function deriveUIState() {
+  const meta = window.currentSubjectMeta || {};
+  const isSkill = !!meta.isSkillLevel;
+
+  const filterKey = isSkill
+    ? String(window.currentSkillFilter ?? "all").toLowerCase()
+    : "all";
+
+  const completion = window.__latestScoresDocData?.completion;
+  const completedUnits = completion?.completedUnits || [];
+
+  let isSubmitted = false;
+
+  if (isSkill) {
+    if (filterKey !== "all") {
+      isSubmitted = completedUnits.includes(filterKey.toUpperCase());
+    }
+  } else {
+    const unitKey = window.__submissionContext?.unitKey;
+    if (unitKey) {
+      isSubmitted = completedUnits.includes(unitKey);
+    }
+  }
+
+  return {
+    isSkill,
+    filterKey,
+    isSubmitted,
+    isAllView: filterKey === "all",
+  };
 }
 
 
@@ -2629,22 +2666,34 @@ const filterKeyForReadOnly = (() => {
   return "all";
 })();
 
-if (shouldApplySubmittedLock) {
-  // 提出済み（最優先）→ ここだけは「全操作禁止」にしたいので専用キーを使う
+// ================================
+// ★ Step B-3：UIロック制御の一本化
+// ================================
+const ui = deriveUIState();
+
+if (ui.isSubmitted) {
+  // 提出済み：最優先で完全ロック
   showSubmittedLockNotice();
   hideAllReadOnlyNotice();
-  applyReadOnlyState("submitted"); // ★後述：applyReadOnlyState に追加する
-} else if (isSkillAllView) {
+  applyReadOnlyState("submitted");
+
+} else if (ui.isSkill && ui.isAllView) {
+  // 習熟度 × 全員：閲覧モード（習熟度のみ入力可）
   hideSubmittedLockNotice();
   showAllReadOnlyNotice(
-    "📘 この画面は【全体閲覧用】です。習熟度の入力は「全員」で入力してください。"
+    "📘 この画面は【全体閲覧用】です。習熟度のみ入力できます。"
   );
   applyReadOnlyState("all");
+
 } else {
+  // それ以外：通常入力可
   hideSubmittedLockNotice();
   hideAllReadOnlyNotice();
-  applyReadOnlyState(filterKeyForReadOnly);
+  applyReadOnlyState(ui.filterKey);
 }
+
+// 観測ログ（必要なら残す）
+console.log("[UI STATE][handleSubjectChange][applied]", ui);
 
 }
 
