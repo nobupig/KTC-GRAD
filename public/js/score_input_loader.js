@@ -573,6 +573,11 @@ renderStudentRows(
   window.__latestScoresDocData?.completion
 );
  window.__currentFilterKey = String(key ?? "all");
+  
+    // ★重要：フィルタ再描画後、Firestore保存済み点数をDOMへ復元する
+    // これが無いと「別フィルタへ移動→戻る」で点数が空になる
+    applySavedScoresToTable(window.__latestScoresDocData?.students || {}, tbody);
+
   } finally {
     isRenderingTable = false;
   }
