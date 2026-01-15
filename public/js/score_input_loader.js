@@ -22,7 +22,17 @@ let currentSubjectMeta = {
 
 window.currentSubjectMeta = currentSubjectMeta;
 
-
+// ================================
+// ★ Step C-②: 再描画後に適用する「保存済みスコア」の正本を返す
+// 優先順位：直近保存（UI正本）→ snapshot listener → 何も無ければ空
+// ================================
+function getLatestSavedStudentsMap() {
+  return (
+    window.__latestSavedSnapshot?.students ||
+    window.__latestScoresDocData?.students ||
+    {}
+  );
+}
 // 選択科目モーダル用ソートモード
 // "group" | "course" | null
 let electiveModalSortMode = null;
@@ -585,10 +595,8 @@ function applySkillLevelFilter(subject, key) {
 
     window.__currentFilterKey = normalizedKey;
 
-    applySavedScoresToTable(
-      window.__latestScoresDocData?.students || {},
-      tbody
-    );
+       // ★ Step C-②: 再描画後は「直近保存→listener」の順で必ず反映
+    applySavedScoresToTable(getLatestSavedStudentsMap(), tbody);
   } finally {
     isRenderingTable = false;
   }
@@ -2285,6 +2293,8 @@ console.log(
  // ===== 途中再開：savedScores を input に反映 → 表示を再構築（Firestore reads 追加なし） =====
 if (savedScores) {
   console.log(savedScores);
+    // ★ Step C-②: 途中再開で取得した保存済みも「UI正本」に同期
+  window.__latestSavedSnapshot = savedData; // students/excessStudents をまとめて保持
 
   // 1) savedScores → input.value へ反映（イベントは発火しない）
   applySavedScoresToTable(savedScores, tbody);
@@ -2769,7 +2779,19 @@ await runTransaction(db, async (tx) => {
 // 保存成功後：base を更新（"SAVED"は禁止）
 ignoreNextSnapshot = true;
 lastSavedByMeAt = Date.now();
-scoreVersionBaseMap.set(sid, baseVersion + 1);
+
+ // ================================
+ // ★ Step C-②: UI復元用 正本スナップショットを更新
+ // （再描画後の applySavedScoresToTable がこれを最優先で使う）
+ // ================================
+ window.__latestSavedSnapshot ??= {};
+ window.__latestSavedSnapshot.students ??= {};
+ window.__latestSavedSnapshot.students[sid] = {
+   scores: scoresObj || {},
+   version: baseVersion + 1,
+  updatedAt: Date.now(),
+   updatedBy: email,
+ };
 
 }
 
@@ -2836,6 +2858,21 @@ payload[studentId] = {
   const baseV = scoreVersionBaseMap.get(sid) ?? 0;
   scoreVersionBaseMap.set(sid, baseV + 1);
 });
+// ================================
+// ★ Step C-②: UI復元用 正本スナップショットを更新（bulk）
+// ================================
+window.__latestSavedSnapshot ??= {};
+window.__latestSavedSnapshot.students ??= {};
+for (const sid of studentIds) {
+   // bulkScores[sid] の中身は { scores: {...} } で来ている前提
+   const row = bulkScores[sid] || {};
+   window.__latestSavedSnapshot.students[sid] = {
+     ...row,
+     version: scoreVersionBaseMap.get(sid) ?? 0,
+     updatedAt: Date.now(),
+     updatedBy: email,
+   };
+ }
   if (excessDirty) {
     excessDirty = false;
   }
@@ -2944,6 +2981,10 @@ function applyGroupOrCourseFilter(subject, filterKey) {
         studentState,
         window.__latestScoresDocData?.completion
       );
+
+      // ★ Step C-②: 再描画直後に保存済みスコアを必ず反映（消失防止）
+        applySavedScoresToTable(getLatestSavedStudentsMap(), tbody);
+
 // ★ specialType（習熟度など）の場合は number input 依存の判定をスキップ
 if (!(currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2)) {
   refreshSaveButtonState();
@@ -3797,6 +3838,11 @@ function applyReadOnlyState(filterKey) {
   const isCommon = !!meta.isCommon;
   const isSkill = !!meta.isSkillLevel;
 
+    // ★ 入力単位が複数ある科目か？
+  const hasMultipleUnits =
+    Array.isArray(window.__submissionContext?.requiredUnits) &&
+    window.__submissionContext.requiredUnits.length > 1;
+
  const key = String(filterKey || "").toLowerCase();
 if (key === "submitted") {
   // 提出済みは完全ロック（習熟度も含めて編集不可）
@@ -3858,7 +3904,17 @@ if (key === "submitted") {
     hideAllReadOnlyNotice();
     return;
   }
-
+  // ================================
+  // 通常科目 × 全員（all）
+  // → 数値入力はすべてロック
+  // ================================
+  if (isAll && !isSkill && hasMultipleUnits) {
+    // すでに全ロック済みなので何もしない
+    showAllReadOnlyNotice(
+      "🔒 この画面では【全員表示】のため成績は入力できません。"
+    );
+    return;
+  }
   // その他（通常科目など）
   controls.forEach(el => {
     el.disabled = false;
