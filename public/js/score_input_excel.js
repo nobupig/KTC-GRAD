@@ -45,7 +45,30 @@ function buildHowToSheetAoA(subjectMeta) {
  */
 async function promptTargetStudentsIfNeeded({ subject, currentSubjectMeta, studentState }) {
   const all = Array.isArray(studentState?.allStudents) ? studentState.allStudents : [];
-  const visible = Array.isArray(studentState?.visibleStudents) ? studentState.visibleStudents : all;
+
+  // ★ visible の正本は「今表示されている DOM 行」
+  const visibleFromDOM = (() => {
+    const tbody = document.getElementById("scoreTableBody");
+    if (!tbody) return null;
+
+    const ids = Array.from(
+      tbody.querySelectorAll("tr[data-student-id]")
+    )
+      .map(tr => String(tr.dataset.studentId || "").trim())
+      .filter(Boolean);
+
+    if (ids.length === 0) return null;
+
+    const byId = new Map(all.map(s => [String(s.studentId), s]));
+    const picked = ids.map(id => byId.get(id)).filter(Boolean);
+
+    return picked.length > 0 ? picked : null;
+  })();
+
+  const visible =
+    Array.isArray(studentState?.visibleStudents) && studentState.visibleStudents.length > 0
+      ? studentState.visibleStudents
+      : (visibleFromDOM || all);
 
   if (!subject) return { students: visible, label: "all" };
 
@@ -378,7 +401,7 @@ function collectScoresFromDOM(criteriaState) {
     const sid = tr.dataset.studentId;
     if (!sid) continue;
 
-    const inputs = Array.from(tr.querySelectorAll("input[type='number']"));
+   const inputs = Array.from(tr.querySelectorAll("input[data-index]:not(.skill-level-input)"));
     const scores = new Array(itemCount).fill("");
 
     for (let i = 0; i < itemCount; i++) {
