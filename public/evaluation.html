@@ -986,6 +986,12 @@ document.getElementById("criteriaInfoCloseBtn")?.addEventListener("click", close
     }
 
     function unlockUIForEdit() {
+        // ★ 提出済み unit では編集UIを一切アンロックしない
+  const ui = window.getCurrentUIState?.();
+  if (ui?.isSubmitted) {
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
       criteriaTbody.querySelectorAll("input").forEach((inp) => {
         inp.readOnly = false;
         inp.disabled = false;

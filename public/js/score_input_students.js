@@ -479,6 +479,12 @@ export function populateSubjectSelect(subjectSelect, teacherSubjects, buildSubje
  * @param {(tr: HTMLTableRowElement) => void} onScoreInputChange
  * @param {{ skillLevelsMap?: object }} [studentState]
  */
+  // ================================
+// ★ 修正B-1：初期描画フラグ ON
+// ================================
+window.__initialRender = true;
+
+
 export function renderStudentRows(
   tbody,
   subject,
@@ -489,6 +495,18 @@ export function renderStudentRows(
   completion
 )
  {
+  window.__switchingUnit = true;
+  // ★ 共通科目のユニット切替時、残留 input 値を完全にリセット
+  const saveBtn = document.getElementById("saveBtn");
+  const saveTempBtn = document.getElementById("saveTempBtn");
+  if (saveBtn) saveBtn.disabled = true;
+  if (saveTempBtn) saveTempBtn.disabled = true;
+  // ★ 未保存状態も強制クリア
+  if (typeof window.setUnsavedChanges === "function") {
+    window.setUnsavedChanges(false);
+  }
+
+
   // ===== 表の総列数を動的に計算（specialType/習熟度/評価基準の違いで崩れないようにする） =====
   const getTotalColumnCount = () => {
     let count = 0;
@@ -561,7 +579,7 @@ export function renderStudentRows(
         input.style.textAlign = "center"; // ★ 追加
 
       const isAllView = String(window.__currentFilterKey || "all") === "all";
-      input.disabled = isAllView ? (subject?.isSkillLevel !== true) : false;
+      input.disabled = isAllView; // ★全員表示は問答無用で閲覧専用
       input.className = "skill-level-input skill-input";
       input.maxLength = 2;
       input.dataset.studentId = studentId;
@@ -584,7 +602,9 @@ export function renderStudentRows(
         studentState.skillLevelsMap[studentId] = saveValue;
         scheduleSkillLevelSave(subjectId, studentId, saveValue);
         // ★ UI側も未保存として扱う（必要なら）
-        if (typeof window.setUnsavedChanges === "function") window.setUnsavedChanges(true);
+     if (!isAllView && typeof window.setUnsavedChanges === "function") {
+  window.setUnsavedChanges(true);
+}
       });
       input.addEventListener("blur", () => {
         if (!FINAL_SKILL_ALLOWED.includes(input.value)) {
@@ -632,7 +652,7 @@ const selectEl1 = specialSelect;
 const setFilled1 = () => {
   tr.dataset.allFilled = selectEl1.value ? "1" : "0";
 };
-setFilled1();
+
 selectEl1.addEventListener("input", setFilled1);
 
 
@@ -662,7 +682,7 @@ const selectEl2 = specialSelect;
 const setFilled2 = () => {
   tr.dataset.allFilled = selectEl2.value ? "1" : "0";
 };
-setFilled2();
+
 selectEl2.addEventListener("input", setFilled2);
 
 
@@ -672,8 +692,20 @@ selectEl2.addEventListener("input", setFilled2);
   td.textContent = "-";
   tr.appendChild(td);
 
-// ===== 通常科目（数値入力） =====
-} else {
+  // ================================
+  // ★ 単一科目：入力が存在しないため
+  // ★ 「行が表示された」ことを編集開始とみなす
+  // ================================
+  const ui = window.getCurrentUIState?.();
+  if (
+    !window.__initialRender &&
+    !ui?.isAllView &&
+    !ui?.isSubmitted
+  ) {
+    window.setUnsavedChanges?.(true);
+  }
+}
+ else {
   criteriaItems.forEach((item, index) => {
     const td = document.createElement("td");
     const input = document.createElement("input");
@@ -684,6 +716,14 @@ input.inputMode = "decimal"; // ← モバイル用
 input.addEventListener("input", () => {
   // 数字と . 以外を即座に除去（valueは破壊しない）
   input.value = input.value.replace(/[^\d.]/g, "");
+  
+  // ★ 単一科目でも途中保存を可能にする
+  if (
+    !window.__initialRender &&
+    typeof window.setUnsavedChanges === "function"
+  ) {
+    window.setUnsavedChanges(true);
+  }
 });
 input.addEventListener("blur", () => {
   if (input.value === "") return;
@@ -802,6 +842,14 @@ if (isLocked) {
 
     tbody.appendChild(tr);
   }
+  window.__initialRender = false;
+  
+ // ================================
+  // ★ 修正②：ユニット切替完了フラグOFF（1フレーム遅らせる）
+  // ================================
+ requestAnimationFrame(() => {
+    window.__switchingUnit = false;
+ });
 }
 // ===== 特別科目用：表示文字変換 =====
 function toSpecialDisplay(specialType, value) {
@@ -1003,6 +1051,8 @@ export function canSubmitScoresByVisibleRows() {
 
 
 export function syncRowFilledState(tr) {
+    // ★ 修正B-2：初期描画中は filled 判定をしない
+  if (window.__initialRender) return;
   if (!tr) return;
   const inputs = Array.from(tr.querySelectorAll('input[type="text"], input[type="number"]'))
     .filter((input) => !input.disabled && !input.readOnly);
@@ -1309,6 +1359,14 @@ await updateDoc(ref, {
   completion,      // ★これを追加
   updatedAt: now,
 });
+// ================================
+// ★ 修正②：送信成功直後に unitKey 正本を確定
+// ================================
+const ui = getCurrentUIState();
+if (ui) {
+  ui.isSubmitted = true; // この unit は提出済み
+  ui.hasInput = false;   // 送信後は一時保存が復活しない
+}
 
 // ================================
 // STEP3-B: completion を teacherSubjects に複写（確実版）
@@ -1395,7 +1453,7 @@ try {
   }
 
   // 一時保存も無効化
-  const saveBtn = document.getElementById("saveTempBtn");
+  const saveBtn = document.getElementById("saveBtn");
   if (saveBtn) saveBtn.disabled = true;
 
   // 表示中の行を即ロック
@@ -1503,8 +1561,15 @@ try {
   });
 
   // ② 入力変更をすべて拾う（input / change）
-  tbody.addEventListener("input", update, true);
-  tbody.addEventListener("change", update, true);
+  tbody.addEventListener("input", (ev) => {
+   if (!ev.isTrusted) return; // ★ ユーザー操作以外は無視
+   update();
+ }, true);
+
+  tbody.addEventListener("change", (ev) => {
+   if (!ev.isTrusted) return; // ★ 同上
+   update();
+ }, true);
 })();
 
 // ★ unitKey 決定関数（確定仕様）

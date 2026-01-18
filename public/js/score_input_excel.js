@@ -324,18 +324,9 @@ panel.innerHTML = `
       </span>
       で行われます。
     </li>
-    <li>
-      Excelの
-      <span style="
-        background:#e0f2fe;
-        padding:2px 6px;
-        border-radius:4px;
-        font-weight:600;
-      ">
-        合計（参考）
-      </span>
-      欄は確認用で、成績確定には使用されません。
-    </li>
+    
+   
+    
   </ul>
 `;
 
