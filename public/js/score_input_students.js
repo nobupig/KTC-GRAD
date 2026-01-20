@@ -499,8 +499,7 @@ export function renderStudentRows(
   // ★ 共通科目のユニット切替時、残留 input 値を完全にリセット
   const saveBtn = document.getElementById("saveBtn");
   const saveTempBtn = document.getElementById("saveTempBtn");
-  if (saveBtn) saveBtn.disabled = true;
-  if (saveTempBtn) saveTempBtn.disabled = true;
+  // Button state is now controlled centrally by updateSubmitUI
   // ★ 未保存状態も強制クリア
   if (typeof window.setUnsavedChanges === "function") {
     window.setUnsavedChanges(false);
@@ -528,6 +527,13 @@ export function renderStudentRows(
     return count;
   };
 
+  console.log(
+    "[RENDER START]",
+    {
+      tbodyChildCountBefore: tbody.children.length,
+      disabledInputsBefore: tbody.querySelectorAll("input[disabled], select[disabled], textarea[disabled]").length
+    }
+  );
    tbody.innerHTML = "";
 
   // 科目未選択
@@ -753,7 +759,11 @@ input.pattern = "^\\d*(\\.\\d*)?$"; // 数値＋小数のみ
 input.placeholder = `0～${item.max}`;
 
 
- const isAllView = String(window.__currentFilterKey || "all") === "all";
+ const requiredUnits = window.__submissionContext?.requiredUnits;
+const hasMultipleUnits =
+  Array.isArray(requiredUnits) && requiredUnits.length > 1;
+const isAllView =
+  String(window.__currentFilterKey || "all") === "all" && hasMultipleUnits;
 if (isAllView) input.disabled = true;
 
     input.dataset.index = String(index);
@@ -830,6 +840,17 @@ if (subject?.isSkillLevel === true) {
 }
 
 if (isLocked) {
+  console.log(
+    "[ROW LOCK CHECK]",
+    {
+      studentId: student.studentId || student.id || student.studentNumber,
+      unitKey,
+      completedUnits: completion?.completedUnits,
+      isLockedByCompletion: completion?.completedUnits?.includes(unitKey),
+      skillFilter: window.currentSkillFilter,
+      submissionContextUnit: window.__submissionContext?.unitKey
+    }
+  );
   tr.classList.add("locked-row");
 
   // 行内の input / select を全て無効化
@@ -1183,7 +1204,7 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
     return ["1", "2", "3", "4", "5"];
   }
 
-  return ["M", "E", "I", "CA"];
+  return ["M", "E", "I", "C", "A"];
 }
 
 
@@ -1297,8 +1318,15 @@ if (subject?.isSkillLevel === true) {
     ? Object.keys(snapshotByUnit.units)
     : [];
 
+  // CA が残っている既存データに対しては C/A に展開して扱う（保存時は CA を残さない）
+  const normalize = (arr) =>
+    (arr || []).flatMap((k) => (String(k) === "CA" ? ["C", "A"] : [String(k)]));
+
+  const existingUnitsNorm = normalize(existingUnits);
+  const newUnitsNorm = normalize(newUnits);
+
   const completedUnits = Array.from(
-    new Set([...existingUnits, ...newUnits])
+    new Set([...existingUnitsNorm, ...newUnitsNorm])
   );
 
   const isCompleted = requiredUnits.every(u =>
@@ -1360,13 +1388,8 @@ await updateDoc(ref, {
   updatedAt: now,
 });
 // ================================
-// ★ 修正②：送信成功直後に unitKey 正本を確定
+// 送信成功後: Firestore 更新のみ（UI 操作は行わない）
 // ================================
-const ui = getCurrentUIState();
-if (ui) {
-  ui.isSubmitted = true; // この unit は提出済み
-  ui.hasInput = false;   // 送信後は一時保存が復活しない
-}
 
 // ================================
 // STEP3-B: completion を teacherSubjects に複写（確実版）
@@ -1438,41 +1461,7 @@ await updateDoc(tsRef, {
 }
 
 
-    // ★ 送信直後フラグ（自動UI更新による復活防止）
-    window.__justSubmitted = true;
-
-// ===============================
-// STEP3-1：送信直後に即ロック
-// ===============================
-try {
-  // 提出ボタンを即ロック
-  const submitBtn = document.getElementById("submitScoresBtn");
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "提出済み";
-  }
-
-  // 一時保存も無効化
-  const saveBtn = document.getElementById("saveBtn");
-  if (saveBtn) saveBtn.disabled = true;
-
-  // 表示中の行を即ロック
-  const tbody = document.getElementById("scoreTableBody");
-  if (tbody) {
-    tbody.querySelectorAll("tr").forEach((tr) => {
-      if (tr.offsetParent === null) return;
-      tr.classList.add("locked-row");
-      tr.querySelectorAll("input, select, textarea").forEach((el) => {
-        el.disabled = true;
-      });
-    });
-    if (typeof window.showSubmittedLockNotice === "function") {
-  window.showSubmittedLockNotice();
-}
-  }
-} catch (e) {
-  console.warn("[STEP3-1] immediate lock skipped:", e);
-}
+    // NOTE: UI はここでは一切操作しない（snapshot listener / updateSubmitUI に委譲）
 const goNext = window.confirm(
   "送信しました。\n別の組・コースの入力を続けますか？"
 );
@@ -1507,70 +1496,7 @@ if (submitBtn) {
   });
 }
 
-// ============================================
-// 自己完結型：送信ボタン状態の自動監視
-// ============================================
-(function setupSubmitButtonAutoWatcher() {
-  const btn = document.getElementById("submitScoresBtn");
-  if (!btn) return;
 
- // 初期状態（提出UIの最終判定に委譲）
-try {
-  if (typeof window.updateSubmitUI === "function") {
-    window.updateSubmitUI({
-      subjectDocData: window.__latestScoresDocData || {},
-      periodData: window.__latestPeriodData || {},
-    });
-  } else {
-    btn.disabled = !canSubmitScoresByVisibleRows().ok;
-  }
-} catch (_) {}
-
-
-  // 成績表全体を監視（再描画・入力変更をすべて拾う）
-  const tbody = document.getElementById("scoreTableBody");
-  if (!tbody) return;
-
- const update = () => {
-  try {
-        // ★ 送信直後は自動更新を完全停止（即ロック維持）
-    if (window.__justSubmitted) {
-      btn.disabled = true;
-      btn.textContent = "提出済み";
-      
-    }
-
-    if (typeof window.updateSubmitUI === "function") {
-      window.updateSubmitUI({
-        subjectDocData: window.__latestScoresDocData || {},
-        periodData: window.__latestPeriodData || {},
-      });
-    } else {
-      const check = canSubmitScoresByVisibleRows();
-      btn.disabled = !check.ok;
-    }
-  } catch (e) {
-    btn.disabled = true;
-  }
-};
-  // ① 行の追加・削除・再描画を監視
-  const observer = new MutationObserver(update);
-  observer.observe(tbody, {
-    childList: true,
-    subtree: true,
-  });
-
-  // ② 入力変更をすべて拾う（input / change）
-  tbody.addEventListener("input", (ev) => {
-   if (!ev.isTrusted) return; // ★ ユーザー操作以外は無視
-   update();
- }, true);
-
-  tbody.addEventListener("change", (ev) => {
-   if (!ev.isTrusted) return; // ★ 同上
-   update();
- }, true);
-})();
 
 // ★ unitKey 決定関数（確定仕様）
 function getUnitKeyForStudent(student, subject) {
