@@ -1902,153 +1902,70 @@ function removeSubmittedBanner() {
 
 
 // ============================================
-// 提出UI更新（提出済み表示 / 再提出表示 / 期間外ロック）
+// updateSubmitUI（フェーズ1：保存・送信のみ）
 // ============================================
-// NOTE: この関数は判定ロジックのみを担当します。
-// UI の具体的な反映（submit ボタン／ステータスバッジの DOM 操作）は
-// `applyUIState` に委譲してください。条件分岐・return 構造は変更しないこと。
 window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
-  if (
-    !window.__latestScoresDocData ||
-    (
-      !window.__latestScoresDocData.completion &&
-      !window.__latestScoresDocData.submittedByUnit &&
-      !window.__latestScoresDocData.submittedSnapshot
-    )
-  ) {
-    return;
+  // 前提データが無ければ何もしない
+  if (!window.__latestScoresDocData) return;
+
+  // 期間チェック（送信可否にのみ影響）
+  const now = Date.now();
+  const toMillis = (v) =>
+    typeof v?.toMillis === "function" ? v.toMillis() : Date.parse(v);
+
+  const p = periodData || {};
+  const submitStart =
+    toMillis(p.submitStart) ??
+    toMillis(p.submitStartAt) ??
+    toMillis(p.submit_from);
+  const submitEnd =
+    toMillis(p.submitEnd) ??
+    toMillis(p.submitEndAt) ??
+    toMillis(p.submit_to);
+
+  const inSubmitPeriod =
+    (!submitStart || now >= submitStart) &&
+    (!submitEnd || now <= submitEnd);
+
+  // 保存状態（既存の状態管理を尊重）
+  const unitState = getCurrentUnitState?.() || {};
+  const hasUnsaved =
+    unitState.hasUnsavedChanges ??
+    (typeof hasUnsavedChanges !== "undefined" ? hasUnsavedChanges : false);
+  const isSavedAfterEdit =
+    unitState.isSavedAfterLastEdit ??
+    (typeof isSavedAfterLastEdit !== "undefined" ? isSavedAfterLastEdit : false);
+
+  // 行入力チェック（S0/S1/S2の判定に使用）
+  const rowCheck = canSubmitScoresByVisibleRows?.() || { ok: false };
+
+  // --- 保存ボタン制御 ---
+  const saveBtn = document.getElementById("saveBtn");
+  if (saveBtn) {
+    // 入力が1つでもあれば保存可（S1以降）
+    saveBtn.disabled = !hasUnsaved;
   }
-    
-  const unitKey = window.__submissionContext?.unitKey;
 
-  // ★ unitKey 未確定時は「何もしない」ではなく「必ず初期化して終了」
-  if (!unitKey) {
-      return;
-  }
-  
-  window.__inUpdateSubmitUI = true;
-  try {
-    // ★ 提出済み判定（唯一の基準: isCurrentUnitSubmitted）
-    const isSubmitted = isCurrentUnitSubmitted();
+  // --- 送信ボタン制御 ---
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (submitBtn) {
+    // 送信可の条件：
+    // 1) 全行入力OK（rowCheck.ok）
+    // 2) 保存済み（isSavedAfterEdit）
+    // 3) 送信期間内（inSubmitPeriod）
+    const canSubmit = rowCheck.ok && isSavedAfterEdit && inSubmitPeriod;
 
-    // ① 判定不能な間は何もしない
-    if (isSubmitted === null) {
-      return;
-    }
-
-    // ユニット切替中は UI を変更せず終了（UI 操作は updateSubmitUI のみ）
-    if (window.__switchingUnit) {
-      return;
-    }
-    if (isSubmitted) {
-      // 提出済み状態：最優先で表示・ロックを行い処理を止める
-      showSubmittedBanner();
-      showSubmittedLockNotice?.();
-      try { lockScoreInputUI(); } catch (e) {}
-      const saveBtn = document.getElementById("saveBtn");
-      if (saveBtn) saveBtn.disabled = true;
-
-
-
-      setUnsavedChanges(false);
-      return; // 完全遮断
-    }
-
-    // 未提出：提出表示は消す・ロック解除を確実に行う
-    hideSubmittedLockNotice?.();
-    removeSubmittedBanner();
-    hideAllReadOnlyNotice?.();
-    try { unlockScoreInputUI(); } catch (e) {}
-
-    // UI 状態の正本を取得（未提出の場合のみ必要）
-    const ui = deriveUIState();
-
-    // ================================
-    // ★ 全員表示（閲覧モード）制御はここで行う
-    // ================================
-    if (ui.isAllView) {
-      // 全員表示は入力不可表示にする（提出済みが最優先なのでここは未提出時のみ）
-      showAllReadOnlyNotice(
-        "🔒 この画面は全体閲覧用です。成績の入力・編集はできません。入力する場合は組／コースを選択してください。"
-      );
-      const saveBtn2 = document.getElementById("saveBtn");
-      if (saveBtn2) saveBtn2.disabled = true;
-      
-      return;
-    }
-
-    // 通常表示：Ensure any AllView notice is hidden
-    hideAllReadOnlyNotice();
-
-    // ================================
-    // ★ 期間チェック
-    // ================================
-    const now = Date.now();
-    const toMillis = (v) =>
-      typeof v?.toMillis === "function" ? v.toMillis() : Date.parse(v);
-
-    const p = periodData || {};
-    const submitStart =
-      toMillis(p.submitStart) ??
-      toMillis(p.submitStartAt) ??
-      toMillis(p.submit_from);
-    const submitEnd =
-      toMillis(p.submitEnd) ??
-      toMillis(p.submitEndAt) ??
-      toMillis(p.submit_to);
-
-    const inSubmitPeriod =
-      (!submitStart || now >= submitStart) &&
-      (!submitEnd || now <= submitEnd);
-
-    if (!inSubmitPeriod) {
-      return;
-    }
-
-    // ================================
-    // ★ 行入力チェック
-    // ================================
-    const rowCheck = canSubmitScoresByVisibleRows();
-    if (!rowCheck.ok) {
-      return;
-    }
-
-    // ================================
-    // ★ 未保存変更チェック
-    // ================================
-    if (!isSavedAfterLastEdit && ui.hasUnit)  {
-      return;
-    }
-
-    // ================================
-    // ★ 提出可能
-    // ================================
-    // ================================
-    // ★ 提出可能
-    // ================================
-    
-
-  } catch (e) {
-    console.warn("[updateSubmitUI]", e);
-  } finally {
-    // Single centralized call to applyUIState: ensures submit button/badge updates
-    try {
-      window.applyUIState?.({
-        subject: window.currentSubject,
-        subjectMeta: window.currentSubjectMeta,
-        ui: window.getCurrentUIState?.(),
-        completion: window.__latestScoresDocData?.completion,
-        saveState: {
-          hasUnsaved: (getCurrentUnitState()?.hasUnsavedChanges ?? (typeof hasUnsavedChanges !== 'undefined' ? hasUnsavedChanges : false)),
-          isSavedAfterEdit: (getCurrentUnitState()?.isSavedAfterLastEdit ?? (typeof isSavedAfterLastEdit !== 'undefined' ? isSavedAfterLastEdit : false)),
-        },
-      });
-    } catch (e) {
-      // noop
-    }
-    window.__inUpdateSubmitUI = false;
+    submitBtn.disabled = !canSubmit;
+    submitBtn.textContent = canSubmit
+      ? "教務へ送信"
+      : !rowCheck.ok
+        ? "未入力があります"
+        : !isSavedAfterEdit
+          ? "保存してから提出"
+          : "提出期間外";
   }
 };
+
 
 
 
@@ -2122,27 +2039,30 @@ if (ok) {
 async function handleSubjectChange(subjectId) {
   window.isSubjectChanging = true;
 
+  // =====================================================
+  // ★ 前科目の「全員表示ロック」残留を最優先で掃除する
+  //  - __currentFilterKey が "all" のまま
+  //  - __submissionContext.requiredUnits が複数のまま
+  //  が残ると、単一科目でも applyReadOnlyState("all") が誤発火する
+  // =====================================================
+  window.__currentFilterKey = null;
+  window.__lastAppliedUnitKey = null;
+  window.__submissionContext = { requiredUnits: [], unitKey: null };
 
+  // ★ 前科目の scoresDoc(completion等) を先に破棄（unlock の誤判定を防ぐ）
+  window.__latestScoresDocData = null;
+
+  // ★ 表示・ロック残留の掃除（前科目DOMが残っていても解除する）
   hideAllReadOnlyNotice();
-  try {
-    applyReadOnlyState(null);
-  } catch (e) {}
+  try { applyReadOnlyState(null); } catch (e) {}
   try { unlockScoreInputUI(); } catch (e) {}
-
-  // ★ 追加：習熟度の注意文言は科目切替の最初に必ず消す（残留防止の唯一の消去ポイント）
-  hideAllReadOnlyNotice();
 
   lastAutoAppliedCommonFilterSubjectId = null;
 
   setUnsavedChanges(false);
-    // ★重要：前科目の scoresDoc（completion 等）が残留すると、別科目が提出済みロックになる
-  // 例：国語で completedUnits=["4","5"] が残ったまま数学を開くと 4組・5組が誤ロックされる
-  window.__latestScoresDocData = null;
 
-   // ★ Step D-②③
+  // ★ Step D-②③
   window.currentUnitKey = null;
-
-  
   hasSavedSnapshot = false; // ★科目切替直後はいったん未保存扱い（復元でtrueにする）
  
   const subject = findSubjectById(subjectId);
@@ -3203,78 +3123,99 @@ export async function saveStudentScoresWithAlert(subjectId, studentId, scoresObj
 // ================================
 // ★ STEP C：共通科目フィルタ UI 生成
 // ================================
+// =====================================================
+// renderGroupOrCourseFilter
+// フェーズ2：フィルタUI構造のみを決める正本
+//  - 単一科目：フィルタUIなし
+//  - 共通／習熟度：フィルタUIあり、初期は「全員」
+// ※ ここでは入力可否・ロック・提出済みは一切触らない
+// =====================================================
 function renderGroupOrCourseFilter(subject) {
   const area = document.getElementById("groupFilterArea");
   if (!area) return;
 
-  area.innerHTML = ""; // クリア
+  // いったんクリア
+  area.innerHTML = "";
+
+  if (!subject) return;
 
   const grade = String(subject.grade || "");
   const course = String(subject.course || "").toUpperCase();
 
+  // -----------------------------------------------
+  // 単一科目判定
+  // ・選択科目は学年に依らず単一
+  // ・共通(G/COMMON) 以外は単一として扱う
+  // -----------------------------------------------
   const isCommon = (!course || course === "G" || course === "COMMON");
+  const isSingle = !isCommon;
 
-  if (!isCommon) {
-    // 共通科目でなければ非表示
+  // 単一科目：フィルタUIを出さない（ここで終了）
+  if (isSingle) {
+    // 念のためフィルタ関連の状態を初期化
+    window.__currentFilterKey = null;
+    window.__submissionContext = { requiredUnits: ["__SINGLE__"], unitKey: "__SINGLE__" };
     return;
   }
 
-  let filters = [];
+  // -----------------------------------------------
+  // 共通／習熟度科目：フィルタUIを構築
+  // 初期表示は必ず「全員」
+  // -----------------------------------------------
 
+  let filters = [];
   if (grade === "1" || grade === "2") {
-    // 1～2年は組フィルタ（1〜5組）
+    // 1・2年：組フィルタ
     filters = ["all", "1", "2", "3", "4", "5"];
   } else {
-    // 3年以上はコースフィルタ（M/E/I/CA）
+    // 3年以上：コースフィルタ
     filters = ["all", "M", "E", "I", "CA"];
   }
 
   const container = document.createElement("div");
   container.className = "filter-button-group";
 
-  filters.forEach(key => {
+  filters.forEach((key) => {
     const btn = document.createElement("button");
     btn.className = "filter-btn";
     btn.dataset.filterKey = key;
     btn.textContent = (key === "all") ? "全員" : key;
 
-    // 初期状態は「全員」をアクティブに
+    // 初期状態は必ず「全員」をアクティブ
     if (key === "all") {
       btn.classList.add("active");
     }
 
-btn.addEventListener("click", () => {
+    btn.addEventListener("click", () => {
+      // active 切り替え（UI正本）
+      container.querySelectorAll(".filter-btn").forEach(b =>
+        b.classList.remove("active")
+      );
+      btn.classList.add("active");
 
-  // ================================
-  // ★ active クラスをここで切り替える（UI正本）
-  // ================================
-  const area = document.getElementById("groupFilterArea");
-  if (area) {
-    area.querySelectorAll(".filter-btn").forEach(b =>
-      b.classList.remove("active")
-    );
-    btn.classList.add("active");
-  }
+      // フィルタ状態の更新（ロック等は後フェーズ）
+      window.__currentFilterKey = key;
+      window.__submissionContext = window.__submissionContext || {};
+      window.__submissionContext.requiredUnits = filters.filter(k => k !== "all");
+      window.__submissionContext.unitKey = (key === "all") ? null : String(key);
 
-  // ================================
-  // ★ unitKey 正本
-  // ================================
-  window.__submissionContext = window.__submissionContext || {};
-  window.__submissionContext.unitKey =
-    key && key !== "all" ? String(key) : null;
-
-  console.log("[SET unitKey]", window.__submissionContext.unitKey);
-
-  applyGroupOrCourseFilter(subject, key);
-});
-
-
+      applyGroupOrCourseFilter(subject, key);
+    });
 
     container.appendChild(btn);
   });
 
   area.appendChild(container);
+
+  // 初期表示：必ず「全員」
+  window.__currentFilterKey = "all";
+  window.__submissionContext = {
+    requiredUnits: filters.filter(k => k !== "all"),
+    unitKey: null
+  };
+  applyGroupOrCourseFilter(subject, "all");
 }
+
 
 // ================================
 // STEP C：フィルタ処理本体

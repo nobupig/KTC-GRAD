@@ -495,6 +495,30 @@ export function renderStudentRows(
   completion
 )
  {
+    // =====================================================
+  // フェーズ3：表示状態の正本（最上位で一度だけ判定）
+  // =====================================================
+  const ctx = window.__submissionContext || {};
+  const scoresDoc = window.__latestScoresDocData || {};
+  const comp = completion || scoresDoc.completion || null;
+
+  const filterKey = String(window.__currentFilterKey || "");
+  const isAllView = filterKey === "all";
+
+  const isSingle =
+    Array.isArray(ctx.requiredUnits) &&
+    ctx.requiredUnits.length === 1 &&
+    ctx.requiredUnits[0] === "__SINGLE__";
+
+  // 科目提出完了（S4）
+  const isSubjectCompleted = isSingle
+    ? !!scoresDoc.submittedSnapshot
+    : !!comp?.isCompleted;
+
+  // 全員表示は共通／習熟度のみ有効
+  const isAllViewReadOnly = !isSingle && isAllView && subject?.isSkillLevel !== true;
+
+  
   window.__switchingUnit = true;
   // ★ 共通科目のユニット切替時、残留 input 値を完全にリセット
   const saveBtn = document.getElementById("saveBtn");
@@ -584,8 +608,7 @@ export function renderStudentRows(
         input.style.width = "48px";     // ★ 追加（入力欄を中央に見せる）
         input.style.textAlign = "center"; // ★ 追加
 
-      const isAllView = String(window.__currentFilterKey || "all") === "all";
-      input.disabled = isAllView; // ★全員表示は問答無用で閲覧専用
+
       input.className = "skill-level-input skill-input";
       input.maxLength = 2;
       input.dataset.studentId = studentId;
@@ -759,13 +782,6 @@ input.pattern = "^\\d*(\\.\\d*)?$"; // 数値＋小数のみ
 input.placeholder = `0～${item.max}`;
 
 
- const requiredUnits = window.__submissionContext?.requiredUnits;
-const hasMultipleUnits =
-  Array.isArray(requiredUnits) && requiredUnits.length > 1;
-const isAllView =
-  String(window.__currentFilterKey || "all") === "all" && hasMultipleUnits;
-if (isAllView) input.disabled = true;
-
     input.dataset.index = String(index);
     input.dataset.criteriaName = item.name;
     input.dataset.studentId = String(stu.studentId);
@@ -802,69 +818,67 @@ if (subject?.specialType === 1 || subject?.specialType === 2) {
 }
 
 tr.appendChild(finalTd);
-// ================================
-// 提出済ユニットの編集ロックUI（completion基準）
-// ================================
 
-let unitKey = null;
-
-// 習熟度科目では unitKey（組）を生成しない
-if (!subject?.isSkillLevel) {
-  unitKey = getUnitKeyForStudent(stu, subject);
-}
-
-
-const completedUnits =
-  Array.isArray(completion?.completedUnits)
-    ? completion.completedUnits
-    : [];
-
-
-// ================================
-// ★ ロック判定（科目タイプ別）
-// ================================
-let isLocked = false;
-
-// 習熟度科目：unitKey（組）という概念を使わない
-if (subject?.isSkillLevel === true) {
-  const currentUnit = String(window.currentSkillFilter || "").toUpperCase();
-  isLocked = completion?.completedUnits?.includes(currentUnit);
-}
-
- else if (completedUnits.includes("__SINGLE__")) {
-  isLocked = true;
-
-// 通常・共通科目（組／コース単位）
-} else {
-  isLocked = completedUnits.includes(unitKey);
-}
-
-if (isLocked) {
-  console.log(
-    "[ROW LOCK CHECK]",
-    {
-      studentId: student.studentId || student.id || student.studentNumber,
-      unitKey,
-      completedUnits: completion?.completedUnits,
-      isLockedByCompletion: completion?.completedUnits?.includes(unitKey),
-      skillFilter: window.currentSkillFilter,
-      submissionContextUnit: window.__submissionContext?.unitKey
-    }
-  );
-  tr.classList.add("locked-row");
-
-  // 行内の input / select を全て無効化
-  tr.querySelectorAll("input, select").forEach(el => {
-    el.disabled = true;
-  });
-
-  tr.title = "このユニットは既に提出済みのため編集できません";
-}
 
     tbody.appendChild(tr);
   }
   window.__initialRender = false;
   
+// =====================================================
+// ★ フェーズ3：DOM生成後にロック状態を適用（正本）
+// =====================================================
+// =====================================================
+// ★ フェーズ3：DOM生成後にロック状態を適用（正本）
+// =====================================================
+requestAnimationFrame(() => {
+  // --- 最上位：科目提出完了（全ロック） ---
+  if (isSubjectCompleted) {
+    try { lockScoreInputUI?.(); } catch {}
+    return;
+  }
+
+  // --- 習熟度：全員表示（習熟度欄だけ編集可、成績欄はロック） ---
+  if (subject?.isSkillLevel === true && isAllView) {
+    // まず全体を「解除」してから、狙ったものだけロックする（混在事故防止）
+    try { unlockScoreInputUI?.(); } catch {}
+
+    // 成績欄（=習熟度以外）をロック
+    tbody
+      .querySelectorAll('input:not(.skill-level-input), select, textarea')
+      .forEach(el => { el.disabled = true; });
+
+    // 習熟度欄だけ編集可
+    tbody
+      .querySelectorAll('input.skill-level-input')
+      .forEach(el => { el.disabled = false; });
+
+    return;
+  }
+
+  // --- 共通科目：全員表示（全ロック） ---
+  if (isAllViewReadOnly) {
+    try { lockScoreInputUI?.(); } catch {}
+    return;
+  }
+
+  // --- 習熟度：ユニット表示（習熟度欄のみロック、成績欄は編集可） ---
+  if (subject?.isSkillLevel === true && !isAllView) {
+    try { unlockScoreInputUI?.(); } catch {}
+
+    // 習熟度欄だけロック
+    tbody
+      .querySelectorAll('input.skill-level-input')
+      .forEach(el => { el.disabled = true; });
+
+    return;
+  }
+
+  // --- 通常（全解除） ---
+  try { unlockScoreInputUI?.(); } catch {}
+});
+
+
+
  // ================================
   // ★ 修正②：ユニット切替完了フラグOFF（1フレーム遅らせる）
   // ================================
