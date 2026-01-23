@@ -62,19 +62,15 @@ function ensureUIStateForUnit(unitKey) {
 
 // Helper: determine whether the currently selected unit is submitted
 function isCurrentUnitSubmitted() {
-  const subjectMeta = window.currentSubjectMeta;
+   const subjectMeta = window.currentSubjectMeta;
   const doc = window.__latestScoresDocData;
-    // ★ Firestore 未反映中は「判定不能」
-  if (!doc || !doc.completion) {
-    return null;
-  }
+  if (!doc) return null;
 
   // ============================
   // 習熟度科目
   // ============================
   if (subjectMeta?.isSkillLevel) {
     const filter = String(window.currentSkillFilter || "").toUpperCase();
-
     // all 表示は「判定不能」
     if (!filter || filter === "ALL") return null;
 
@@ -122,84 +118,8 @@ window.getCurrentUIState = getCurrentUIState;
  * - 本関数は apply の役割を担い、呼び出し回数は `updateSubmitUI` が単一に管理します。
  * - Params accepted (may be unused): subject, subjectMeta, ui, completion, saveState
  */
-function applyUIState(params = {}) {
-  try {
-    const { subject, subjectMeta, ui, completion, saveState } = params || {};
-    const summary = {
-      subjectId: subject?.subjectId ?? null,
-      subjectMeta: {
-        isCommon: !!subjectMeta?.isCommon,
-        isSkillLevel: !!subjectMeta?.isSkillLevel,
-      },
-      ui: ui || null,
-      completion: completion ? {
-        requiredUnits: Array.isArray(completion.requiredUnits) ? completion.requiredUnits.slice() : null,
-        completedUnitsCount: Array.isArray(completion.completedUnits) ? completion.completedUnits.length : null,
-        isCompleted: !!completion.isCompleted,
-      } : null,
-      saveStatePresent: !!saveState,
-    };
 
-    console.log("[applyUIState] summary:", summary);
 
-    try {
-      const submitBtn = document.getElementById("submitScoresBtn");
-      const saveBtn = document.getElementById("saveBtn");
-
-      // ===== submit button & badge control =====
-      const _ui = ui || (typeof window.getCurrentUIState === 'function' ? window.getCurrentUIState() : null);
-      const periodData = window.__latestPeriodData || {};
-      const toMillis = (v) => (typeof v?.toMillis === 'function' ? v.toMillis() : Date.parse(v));
-      const submitStart = toMillis(periodData.submitStart) ?? toMillis(periodData.submitStartAt) ?? toMillis(periodData.submit_from);
-      const submitEnd = toMillis(periodData.submitEnd) ?? toMillis(periodData.submitEndAt) ?? toMillis(periodData.submit_to);
-      const now = Date.now();
-      const inSubmitPeriod = (!submitStart || now >= submitStart) && (!submitEnd || now <= submitEnd);
-
-      const rowCheck = typeof canSubmitScoresByVisibleRows === 'function'
-        ? canSubmitScoresByVisibleRows()
-        : { ok: true };
-
-      const hasUnit = !!(_ui && _ui.hasUnit);
-      const isSavedAfter = saveState?.isSavedAfterEdit ?? false;
-      const needsSaveBeforeSubmit = (!isSavedAfter && hasUnit);
-
-      let badge = document.getElementById("submitStatusBadge");
-      if (!badge && submitBtn) {
-        badge = document.createElement("span");
-        badge.id = "submitStatusBadge";
-        badge.style.marginLeft = "10px";
-        badge.style.fontSize = "12px";
-        submitBtn.insertAdjacentElement("afterend", badge);
-      }
-
-      if (!submitBtn) {
-        return;
-      } else if (!inSubmitPeriod) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "提出（期間外）";
-        if (badge) { badge.textContent = "提出期間外です"; badge.style.color = "#666"; }
-      } else if (!rowCheck.ok) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "教務へ送信";
-        if (badge) { badge.textContent = rowCheck.reason || ""; badge.style.color = "#c00"; }
-      } else if (needsSaveBeforeSubmit) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "保存してから提出";
-        if (badge) { badge.textContent = "未保存の変更があります"; badge.style.color = "#c00"; }
-      } else {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "教務へ送信";
-        if (badge) badge.textContent = "";
-      }
-    } catch (e) {
-      console.log('[applyUIState] UI update skipped:', e);
-    }
-  } catch (err) {
-    console.warn("[applyUIState] unexpected error:", err);
-  }
-}
-
-window.applyUIState = applyUIState;
 
 
 // ================================
@@ -823,21 +743,9 @@ function applySkillLevelFilter(subject, key) {
   }
 
   // ★ UI 状態の再評価は「ここで1回だけ」
-    window.updateSubmitUI?.({
-      subjectDocData: window.__latestScoresDocData
-    });
-  // ===============================
-// ★ Step A：全員表示時のロック制御（最終位置）
-// ===============================
-if (normalizedKey === "all") {
-  applyReadOnlyState("all");
-} else {
-  applyReadOnlyState(normalizedKey);
-}
+window.updateSubmitUI?.({ subjectDocData: window.__latestScoresDocData });
 
-  console.log("[UI STATE][applySkillLevelFilter]", deriveUIState());
-
-}
+  }
 
 
 
@@ -1373,9 +1281,7 @@ try {
 
 
 function buildScoresObjFromRow(tr, criteriaState) {
-  console.log("[BUILD DEBUG] criteriaState", criteriaState);
-  console.log("[BUILD DEBUG] criteriaState items", criteriaState?.items);
-  console.log("[BUILD DEBUG] criteriaState items length", criteriaState?.items?.length);
+  
   const items = (criteriaState?.items) || [];
   // criteriaState.items may be empty while criteria data is still loading or before initialization finishes,
   // so zero length can occur during initial render/subject switch before criteriaState is hydrated.
@@ -1505,15 +1411,13 @@ function restoreStashedScores(tbodyEl) {
   syncFinalScoresFromTbody(tbodyEl);
   applyRiskClassesToAllRows();
   updateAveragePointDisplay();
-  refreshSaveButtonState();
-  // ★ フィルタ再描画後に未保存状態と保存ボタンを正しく戻す
+    // ★ フィルタ再描画後に未保存状態と保存ボタンを正しく戻す
   if (stashedUnsavedChanges) {
     setUnsavedChanges(true);
   }
   // specialType 以外は DOM から保存可否を再評価（既存方針に合わせる）
   if (!(currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2)) {
-    refreshSaveButtonState();
-  }
+      }
 }
 
 async function loadSavedScoresForSubject(year, subjectId) {
@@ -1846,35 +1750,10 @@ function isCompletionOnlySubmission(subjectMeta, subjectDocData) {
 }
 
 function getActiveFilterKey() {
-  // どの科目タイプでも、表示状態の正本はこれに統一
-  //（あなたのコードでは applySkillLevelFilter が __currentFilterKey を必ず更新している）
-  return String(window.__currentFilterKey ?? "all").toLowerCase();
+  const v = window.__currentFilterKey;
+  if (v == null || v === "") return null;
+  return String(v).toLowerCase();
 }
-
-function deriveUIState() {
-  const meta = window.currentSubjectMeta || {};
-  const filterKey = getActiveFilterKey();
-  const unitKey = window.__submissionContext?.unitKey;
-
-  const subjectDocData = window.__latestScoresDocData;
-  const isSubmitted =
-    unitKey && isUnitSubmittedByUI(subjectDocData, unitKey);
-
-  const requiredUnits = window.__submissionContext?.requiredUnits;
-  const hasMultipleUnits =
-    Array.isArray(requiredUnits) && requiredUnits.length > 1;
-
-  const isAllView = filterKey === "all" && hasMultipleUnits;
-
-  return {
-    isSkill: !!meta.isSkillLevel,
-    filterKey,
-    isAllView,
-    isSubmitted: !!isSubmitted,
-    hasUnit: hasMultipleUnits,
-  };
-}
-
 
 
 // ================================
@@ -1900,74 +1779,106 @@ function removeSubmittedBanner() {
   if (old) old.remove();
 }
 
+// ================================
+// UI STATE DERIVATION (NO SIDE EFFECTS)
+// ================================
+export function deriveUIState() {
+  const subject = window.currentSubject || null;
+  const meta = window.currentSubjectMeta || {};
+  const filterKey = getActiveFilterKey?.(); // "ALL", "M", "E", ...
+  const isSkill = subject?.isSkillLevel === true;
+  const isCommon = currentSubjectMeta?.isCommon === true;
+  const isAllView = (isSkill || isCommon) && filterKey === "all";
 
-// ============================================
-// updateSubmitUI（フェーズ1：保存・送信のみ）
-// ============================================
-window.updateSubmitUI = function ({ subjectDocData, periodData } = {}) {
-  // 前提データが無ければ何もしない
-  if (!window.__latestScoresDocData) return;
-
-  // 期間チェック（送信可否にのみ影響）
-  const now = Date.now();
-  const toMillis = (v) =>
-    typeof v?.toMillis === "function" ? v.toMillis() : Date.parse(v);
-
-  const p = periodData || {};
-  const submitStart =
-    toMillis(p.submitStart) ??
-    toMillis(p.submitStartAt) ??
-    toMillis(p.submit_from);
-  const submitEnd =
-    toMillis(p.submitEnd) ??
-    toMillis(p.submitEndAt) ??
-    toMillis(p.submit_to);
-
-  const inSubmitPeriod =
-    (!submitStart || now >= submitStart) &&
-    (!submitEnd || now <= submitEnd);
-
-  // 保存状態（既存の状態管理を尊重）
-  const unitState = getCurrentUnitState?.() || {};
-  const hasUnsaved =
-    unitState.hasUnsavedChanges ??
-    (typeof hasUnsavedChanges !== "undefined" ? hasUnsavedChanges : false);
-  const isSavedAfterEdit =
-    unitState.isSavedAfterLastEdit ??
-    (typeof isSavedAfterLastEdit !== "undefined" ? isSavedAfterLastEdit : false);
-
-  // 行入力チェック（S0/S1/S2の判定に使用）
-  const rowCheck = canSubmitScoresByVisibleRows?.() || { ok: false };
-
-  // --- 保存ボタン制御 ---
-  const saveBtn = document.getElementById("saveBtn");
-  if (saveBtn) {
-    // 入力が1つでもあれば保存可（S1以降）
-    saveBtn.disabled = !hasUnsaved;
+  // 提出済み判定（tri-state）  
+  // true / false / null(未評価)
+  const unitKey = window.__submissionContext?.unitKey ?? null;
+   let isUnitSubmitted = null;
+  if (unitKey) {
+    isUnitSubmitted = isUnitSubmittedByUI(
+      window.__latestScoresDocData,
+      unitKey
+    );
   }
 
-  // --- 送信ボタン制御 ---
-  const submitBtn = document.getElementById("submitScoresBtn");
-  if (submitBtn) {
-    // 送信可の条件：
-    // 1) 全行入力OK（rowCheck.ok）
-    // 2) 保存済み（isSavedAfterEdit）
-    // 3) 送信期間内（inSubmitPeriod）
-    const canSubmit = rowCheck.ok && isSavedAfterEdit && inSubmitPeriod;
+  // completion（科目全体）
+  const completion = window.__latestScoresDocData?.completion || null;
+  const isSubjectCompleted = completion?.isCompleted === true;
 
-    submitBtn.disabled = !canSubmit;
-    submitBtn.textContent = canSubmit
-      ? "教務へ送信"
-      : !rowCheck.ok
-        ? "未入力があります"
-        : !isSavedAfterEdit
-          ? "保存してから提出"
-          : "提出期間外";
+  return {
+    subject,
+    isSkill,
+    isAllView,
+    unitKey,
+    isUnitSubmitted,        // true / false / null
+    isSubjectCompleted,     // true / false
+  };
+}
+
+// ================================
+// APPLY UI STATE (DOM SIDE EFFECTS)
+// ================================
+export function applyUIState(ui) {
+  const tbody = document.getElementById("scoreTableBody");
+  if (!tbody) return;
+
+  // --- 1) 科目全体が提出完了 → 全ロック ---
+  if (ui.isSubjectCompleted) {
+    lockScoreInputUI?.();
+    setSubmitUICompleted?.();
+    return;
   }
-};
+
+  // --- 2) 習熟度 × 全員表示 ---
+  if (ui.isSkill && ui.isAllView) {
+    unlockScoreInputUI?.();
+
+    // 習熟度以外ロック
+    tbody
+      .querySelectorAll('input:not(.skill-level-input), select, textarea')
+      .forEach(el => (el.disabled = true));
+
+    // 習熟度だけ編集可
+    tbody
+      .querySelectorAll('input.skill-level-input')
+      .forEach(el => (el.disabled = false));
+
+    
+    return;
+  }
+
+  // --- 3) 共通科目 × 全員表示（閲覧専用） ---
+  if (ui.isAllView && !ui.isSkill) {
+    lockScoreInputUI?.();
+    
+    return;
+  }
+
+  // --- 4) ユニット表示 ---
+  unlockScoreInputUI?.();
+
+  if (ui.isUnitSubmitted === true) {
+    setSubmitUICompleted?.("このユニットは提出済みです");
+  } else if (ui.isUnitSubmitted === false) {
+    ;
+  } else {
+    // null（未評価）→ 何もしない
+      }
+}
+
+window.applyUIState = applyUIState;
 
 
-
+ window.updateSubmitUI = function (_args = {}) {
+   if (window.__inUpdateSubmitUI) return;
+   window.__inUpdateSubmitUI = true;
+   try {
+     const uiState = deriveUIState();
+     applyUIState(uiState);
+   } finally {
+     window.__inUpdateSubmitUI = false;
+   }
+ };
 
 
 function setupScoresSnapshotListener(subjectId) {
@@ -2054,8 +1965,8 @@ async function handleSubjectChange(subjectId) {
 
   // ★ 表示・ロック残留の掃除（前科目DOMが残っていても解除する）
   hideAllReadOnlyNotice();
-  try { applyReadOnlyState(null); } catch (e) {}
-  try { unlockScoreInputUI(); } catch (e) {}
+  try { window.updateSubmitUI(); } catch (e) {}
+  try { window.updateSubmitUI(); } catch (e) {}
 
   lastAutoAppliedCommonFilterSubjectId = null;
 
@@ -2439,7 +2350,10 @@ studentState.lockedUnitInfo = {
 // ★ 修正③：フィルタ状態の正本を初期化
 // 科目切替時は必ず「全員表示」から開始する
 // ================================
-window.__currentFilterKey = "all";
+ window.__currentFilterKey =
+   (currentSubjectMeta.isCommon || currentSubjectMeta.isSkillLevel)
+     ? "all"
+     : null;
 
 // ★ 初回描画直後に状態を確定させる（超重要）
     requestAnimationFrame(() => {
@@ -2447,8 +2361,7 @@ window.__currentFilterKey = "all";
       syncFinalScoresFromTbody(tbody);
       applyRiskClassesToAllRows();
       updateAveragePointDisplay();
-      refreshSaveButtonState();
-    });
+        });
 
 // ================================
 // STEP1: 提出単位・完了条件の確定
@@ -3228,9 +3141,7 @@ function applyGroupOrCourseFilter(subject, filterKey) {
   // ================================
   window.__submissionContext = window.__submissionContext || {};
   const nextKey = filterKey && filterKey !== "all" ? String(filterKey) : null;
-if (nextKey) {
-  window.__submissionContext.unitKey = nextKey;
-}
+  window.__submissionContext.unitKey = nextKey; // ★ null も必ず代入
 // all のときは unitKey を上書きしない（保持する）
     
     
@@ -3260,7 +3171,7 @@ if (nextKey) {
 
 // ★ specialType（習熟度など）の場合は number input 依存の判定をスキップ
 if (!(currentSubjectMeta?.specialType === 1 || currentSubjectMeta?.specialType === 2)) {
-  refreshSaveButtonState();
+  
 }
 // ===== 特別科目は初期値が有効なので、初回から保存可能にする =====
 if (
@@ -3284,7 +3195,7 @@ if (
 
     // 再計算 + 行ハイライト適用
     applyRiskClassesToAllRows();
-    applyReadOnlyState(filterKey);
+    window.updateSubmitUI();
   });
 
 }
@@ -3380,7 +3291,7 @@ export function initScoreInput() {
 
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
-      console.log("[SAVE DEBUG] click");
+      
       if (!currentSubjectId) {
         alert("科目を選択してください。");
         return;
@@ -4016,77 +3927,18 @@ if (!submitted) return false;
   }
 }
 
-// ================================
-// 保存ボタン状態をDOMから再評価
-// ================================
-export function refreshSaveButtonState() {
-  // Button state is controlled by updateSubmitUI; skip here.
-  return;
-  const saveBtn = document.getElementById("saveBtn");
-  
-  const ui = window.getCurrentUIState?.();
-  if (!ui) {
-    if (saveBtn) saveBtn.disabled = true;
-    if (saveBtn) saveBtn.disabled = true;
-    return;
-  }
-
-  // 提出済み or 全員表示 → 常に保存不可
-  if (isCurrentUnitSubmitted() || deriveUIState()?.isAllView) {
-    if (saveBtn) saveBtn.disabled = true;
-    if (saveBtn) saveBtn.disabled = true;
-    return;
-  }
-
-  // ★唯一の判断基準
-  const canSave = ui.hasInput === true;
-
-  if (saveBtn) saveBtn.disabled = !canSave;
-  if (saveBtn) saveBtn.disabled = !canSave;
-}
-
-export function disableScoreInputs() {
-  document.querySelectorAll("#scoreTableBody input[data-index]:not(.skill-level-input)").forEach((input) => {
-    input.disabled = true;
-  });
-}
-
-export function enableScoreInputs() {
-  document.querySelectorAll("#scoreTableBody input[data-index]:not(.skill-level-input)").forEach((input) => {
-    input.disabled = false;
-  });
-}
-
-if (typeof window !== "undefined") {
-  window.enableScoreInputs = enableScoreInputs;
-}
 
 
 // ===============================
 // 成績入力UIをロックする
 // ===============================
 function lockScoreInputUI() {
-  console.log(
-    "[LOCK CALLED]",
-    {
-      stack: new Error().stack,
-      filterKey: window.__currentFilterKey,
-      unitKey: window.__submissionContext?.unitKey,
-      subjectId: window.currentSubject?.subjectId
-    }
-  );
-  // 成績入力テーブル内の入力要素をすべてロック
   const controls = document.querySelectorAll(
     "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
   );
-  controls.forEach((el) => {
+  controls.forEach(el => {
     el.disabled = true;
   });
-
-  // 提出済み時は全員閲覧の注意文を消す（提出済み専用バナーと競合しないため）
-  try {
-    hideAllReadOnlyNotice?.();
-  } catch (e) {}
 }
 
 
@@ -4094,125 +3946,17 @@ function lockScoreInputUI() {
 // 成績入力UIのロック解除
 // ===============================
 function unlockScoreInputUI() {
-  // 特殊科目（completionOnly）は subject 単位で完全ロック
-  const completionOnly = isCompletionOnlySubmission(
-    window.currentSubjectMeta,
-    window.__latestScoresDocData
-  );
-  if (completionOnly === true) return;
-
-  // 現在ユニットが提出済みなら解除しない
-  if (isCurrentUnitSubmitted() === true) return;
-
-  // 現在の表示状態に応じて readOnly 状態を再適用
-  const filterKey = getActiveFilterKey();
-  try {
-    applyReadOnlyState(filterKey);
-  } catch (e) {
-    // フォールバック：最低限すべて解除
-    const controls = document.querySelectorAll(
-      "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
-    );
-    controls.forEach((el) => {
-      el.disabled = false;
-    });
-    try {
-      hideAllReadOnlyNotice?.();
-    } catch (e2) {}
-  }
-}
-
-// ================================
-// 全員(all)表示時の閲覧専用ロック
-// ================================
-function applyReadOnlyState(filterKey) {
-  const meta = window.currentSubjectMeta || {};
-  const isCommon = !!meta.isCommon;
-  const isSkill = !!meta.isSkillLevel;
-
-    // ★ 入力単位が複数ある科目か？
-  const hasMultipleUnits =
-    Array.isArray(window.__submissionContext?.requiredUnits) &&
-    window.__submissionContext.requiredUnits.length > 1;
-
- const key = String(filterKey || "").toLowerCase();
-if (key === "submitted") {
-  // 現在のユニットが提出済みのときのみ完全ロック
-  if (isCurrentUnitSubmitted() === true) {
-    const controls = document.querySelectorAll(
-      "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
-    );
-    controls.forEach((el) => {
-      el.disabled = true;
-    });
-    return;
-  }
-
-  // submitted 表示でも未提出ユニットなら通常判定に流す
-  // （ここで return しない）
-}
-  const isAll = key === "all";
-  const isSkillUnit = ["s", "a1", "a2", "a3"].includes(key.toLowerCase());
-
+  // UI解除「だけ」を行う
   const controls = document.querySelectorAll(
     "#scoreTableBody input, #scoreTableBody select, #scoreTableBody textarea"
   );
-
-  // まず全部ロック
-  controls.forEach(el => {
-    el.disabled = true;
-  });
-
-  if (isAll && isSkill) {
-    // ================================
-    // 全員 × 習熟度科目
-    // → 習熟度だけ入力可
-    // ================================
-    document
-      .querySelectorAll("#scoreTableBody input.skill-level-input")
-      .forEach(el => {
-        el.disabled = false;
-      });
-
-    showAllReadOnlyNotice(
-      "✏️ この画面では【習熟度】のみ入力できます。"
-    );
-    return;
-  }
-
-  if (isSkillUnit) {
-    // ================================
-    // S / A1 / A2 / A3
-    // → 習熟度は入力不可、点数は入力可
-    // ================================
-    document
-      .querySelectorAll(
-        "#scoreTableBody input[data-index]:not(.skill-level-input)"
-      )
-      .forEach(el => {
-        el.disabled = false;
-      });
-
-    hideAllReadOnlyNotice();
-    return;
-  }
-  // ================================
-  // 通常科目 × 全員（all）
-  // → 数値入力はすべてロック
-  // ================================
-  if (isAll && !isSkill && hasMultipleUnits) {
-    // すでに全ロック済みなので何もしない
-    showAllReadOnlyNotice(
-      "🔒 この画面では【全員表示】のため成績は入力できません。"
-    );
-    return;
-  }
-  // その他（通常科目など）
   controls.forEach(el => {
     el.disabled = false;
   });
-  hideAllReadOnlyNotice();
 }
+
+
+
 
 
 // ================================

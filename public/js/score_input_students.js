@@ -482,7 +482,7 @@ export function populateSubjectSelect(subjectSelect, teacherSubjects, buildSubje
   // ================================
 // ★ 修正B-1：初期描画フラグ ON
 // ================================
-window.__initialRender = true;
+
 
 
 export function renderStudentRows(
@@ -495,41 +495,8 @@ export function renderStudentRows(
   completion
 )
  {
-    // =====================================================
-  // フェーズ3：表示状態の正本（最上位で一度だけ判定）
-  // =====================================================
-  const ctx = window.__submissionContext || {};
-  const scoresDoc = window.__latestScoresDocData || {};
-  const comp = completion || scoresDoc.completion || null;
-
-  const filterKey = String(window.__currentFilterKey || "");
-  const isAllView = filterKey === "all";
-
-  const isSingle =
-    Array.isArray(ctx.requiredUnits) &&
-    ctx.requiredUnits.length === 1 &&
-    ctx.requiredUnits[0] === "__SINGLE__";
-
-  // 科目提出完了（S4）
-  const isSubjectCompleted = isSingle
-    ? !!scoresDoc.submittedSnapshot
-    : !!comp?.isCompleted;
-
-  // 全員表示は共通／習熟度のみ有効
-  const isAllViewReadOnly = !isSingle && isAllView && subject?.isSkillLevel !== true;
-
-  
-  window.__switchingUnit = true;
-  // ★ 共通科目のユニット切替時、残留 input 値を完全にリセット
-  const saveBtn = document.getElementById("saveBtn");
-  const saveTempBtn = document.getElementById("saveTempBtn");
-  // Button state is now controlled centrally by updateSubmitUI
-  // ★ 未保存状態も強制クリア
-  if (typeof window.setUnsavedChanges === "function") {
-    window.setUnsavedChanges(false);
-  }
-
-
+ 
+    
   // ===== 表の総列数を動的に計算（specialType/習熟度/評価基準の違いで崩れないようにする） =====
   const getTotalColumnCount = () => {
     let count = 0;
@@ -631,9 +598,8 @@ export function renderStudentRows(
         studentState.skillLevelsMap[studentId] = saveValue;
         scheduleSkillLevelSave(subjectId, studentId, saveValue);
         // ★ UI側も未保存として扱う（必要なら）
-     if (!isAllView && typeof window.setUnsavedChanges === "function") {
-  window.setUnsavedChanges(true);
-}
+   // DOM層では未保存判定をしない。入力があった事実のみ通知する
+       window.notifyInputChanged?.();
       });
       input.addEventListener("blur", () => {
         if (!FINAL_SKILL_ALLOWED.includes(input.value)) {
@@ -726,13 +692,7 @@ selectEl2.addEventListener("input", setFilled2);
   // ★ 「行が表示された」ことを編集開始とみなす
   // ================================
   const ui = window.getCurrentUIState?.();
-  if (
-    !window.__initialRender &&
-    !ui?.isAllView &&
-    !ui?.isSubmitted
-  ) {
-    window.setUnsavedChanges?.(true);
-  }
+
 }
  else {
   criteriaItems.forEach((item, index) => {
@@ -746,13 +706,7 @@ input.addEventListener("input", () => {
   // 数字と . 以外を即座に除去（valueは破壊しない）
   input.value = input.value.replace(/[^\d.]/g, "");
   
-  // ★ 単一科目でも途中保存を可能にする
-  if (
-    !window.__initialRender &&
-    typeof window.setUnsavedChanges === "function"
-  ) {
-    window.setUnsavedChanges(true);
-  }
+ 
 });
 input.addEventListener("blur", () => {
   if (input.value === "") return;
@@ -822,7 +776,7 @@ tr.appendChild(finalTd);
 
     tbody.appendChild(tr);
   }
-  window.__initialRender = false;
+  
   
 // =====================================================
 // ★ フェーズ3：DOM生成後にロック状態を適用（正本）
@@ -831,50 +785,7 @@ tr.appendChild(finalTd);
 // ★ フェーズ3：DOM生成後にロック状態を適用（正本）
 // =====================================================
 requestAnimationFrame(() => {
-  // --- 最上位：科目提出完了（全ロック） ---
-  if (isSubjectCompleted) {
-    try { lockScoreInputUI?.(); } catch {}
-    return;
-  }
-
-  // --- 習熟度：全員表示（習熟度欄だけ編集可、成績欄はロック） ---
-  if (subject?.isSkillLevel === true && isAllView) {
-    // まず全体を「解除」してから、狙ったものだけロックする（混在事故防止）
-    try { unlockScoreInputUI?.(); } catch {}
-
-    // 成績欄（=習熟度以外）をロック
-    tbody
-      .querySelectorAll('input:not(.skill-level-input), select, textarea')
-      .forEach(el => { el.disabled = true; });
-
-    // 習熟度欄だけ編集可
-    tbody
-      .querySelectorAll('input.skill-level-input')
-      .forEach(el => { el.disabled = false; });
-
-    return;
-  }
-
-  // --- 共通科目：全員表示（全ロック） ---
-  if (isAllViewReadOnly) {
-    try { lockScoreInputUI?.(); } catch {}
-    return;
-  }
-
-  // --- 習熟度：ユニット表示（習熟度欄のみロック、成績欄は編集可） ---
-  if (subject?.isSkillLevel === true && !isAllView) {
-    try { unlockScoreInputUI?.(); } catch {}
-
-    // 習熟度欄だけロック
-    tbody
-      .querySelectorAll('input.skill-level-input')
-      .forEach(el => { el.disabled = true; });
-
-    return;
-  }
-
-  // --- 通常（全解除） ---
-  try { unlockScoreInputUI?.(); } catch {}
+  
 });
 
 
@@ -883,7 +794,7 @@ requestAnimationFrame(() => {
   // ★ 修正②：ユニット切替完了フラグOFF（1フレーム遅らせる）
   // ================================
  requestAnimationFrame(() => {
-    window.__switchingUnit = false;
+    
  });
 }
 // ===== 特別科目用：表示文字変換 =====
@@ -1087,7 +998,7 @@ export function canSubmitScoresByVisibleRows() {
 
 export function syncRowFilledState(tr) {
     // ★ 修正B-2：初期描画中は filled 判定をしない
-  if (window.__initialRender) return;
+  
   if (!tr) return;
   const inputs = Array.from(tr.querySelectorAll('input[type="text"], input[type="number"]'))
     .filter((input) => !input.disabled && !input.readOnly);

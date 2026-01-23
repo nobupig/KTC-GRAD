@@ -2,7 +2,7 @@
 // ★あなた専用・完全版：Excel貼付け最適化版★
 
 import {
-  refreshSaveButtonState,
+  
   recalcFinalScoresAfterRestore,
 } from "./score_input_loader.js";
 
@@ -110,7 +110,6 @@ export function applyPastedScores(pastedText, tbody, criteriaState) {
   }
   
   recalcFinalScoresAfterRestore(tbody);
-  refreshSaveButtonState();
-  return true;
+    return true;
 }
 
