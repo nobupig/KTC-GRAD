@@ -1816,6 +1816,36 @@ export function deriveUIState() {
   const ui = window.getCurrentUIState?.(); // ensureUIStateForUnit も内部で呼ばれる
   const hasInput = !!ui?.hasInput;
   const hasSaved = !!ui?.hasSaved;
+    // ★ Phase1: 教務送信可否判定（共通・通常）
+  let canSubmit =
+    !isAllView &&
+    isUnitSubmitted === false &&
+    hasInput === true &&
+    hasSaved === true;
+
+  // ★ 習熟度科目は「ユニット内の全員入力済み」で判定する
+  if (isSkill === true) {
+const skillMap = window.studentState?.skillLevelsMap || {};
+const unitStudents =
+  window.__submissionContext?.studentsInUnit || [];
+
+const allStudentsHaveSkill =
+  unitStudents.length > 0 &&
+  unitStudents.every(stu => {
+    const v = skillMap[stu.studentId];
+    return !!v;
+  });
+
+// ★ 追加：Firestore 反映完了判定
+  const hasNoPendingWrites =
+    window.__latestScoresSnapshot?.metadata?.hasPendingWrites === false;
+    
+    canSubmit =
+      !isAllView &&
+      isUnitSubmitted === false &&
+      allStudentsHaveSkill === true;
+  }
+
 
   return {
     subject,
@@ -1826,7 +1856,8 @@ export function deriveUIState() {
     isSubjectCompleted, // true/false
     hasInput,
     hasSaved,
-  };
+    canSubmit,
+    };
 }
 
 
@@ -1898,7 +1929,7 @@ export function deriveUIState() {
       // ① 提出済みユニット：常に無効＋文言固定
       if (ui.isUnitSubmitted === true) {
         submitBtn.disabled = true;
-        setSubmitUICompleted?.("このユニットは提出済みです");
+       
         return;
       }
 

@@ -130,19 +130,35 @@ const skillSaveTimers = new Map();
 function scheduleSkillLevelSave(subjectId, studentId, value) {
   if (!subjectId || !studentId) return;
   if (!FINAL_SKILL_ALLOWED.includes(value)) return;
+
+  // ★【追加①】入力があったことを UIState に通知
+  window.markInputChanged?.();
+  console.log("[DEBUG] markInputChanged called");
+
   const key = `${subjectId}::${studentId}`;
   const existing = skillSaveTimers.get(key);
   if (existing) {
     clearTimeout(existing);
   }
+
   const timer = setTimeout(() => {
     skillSaveTimers.delete(key);
-    performSkillLevelSave(subjectId, studentId, value).catch((err) => {
-      console.error("[skill-level save]", err);
-    });
+
+    performSkillLevelSave(subjectId, studentId, value)
+      .then(() => {
+        // ★【追加②】保存完了を UIState に通知
+        window.markSaved?.();
+        console.log("[DEBUG] markSaved called");
+      })
+      .catch((err) => {
+        console.error("[skill-level save]", err);
+      });
+
   }, SKILL_LEVEL_SAVE_DEBOUNCE_MS);
+
   skillSaveTimers.set(key, timer);
 }
+
 
 async function performSkillLevelSave(subjectId, studentId, value) {
   const db = getFirestore();
@@ -599,7 +615,8 @@ export function renderStudentRows(
         scheduleSkillLevelSave(subjectId, studentId, saveValue);
         // ★ UI側も未保存として扱う（必要なら）
    // DOM層では未保存判定をしない。入力があった事実のみ通知する
-       window.notifyInputChanged?.();
+       window.markInputChanged?.();
+       window.updateSubmitUI?.();
       });
       input.addEventListener("blur", () => {
         if (!FINAL_SKILL_ALLOWED.includes(input.value)) {
@@ -1138,6 +1155,127 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
 // ================================
 // STEP C: 成績送信（教務提出）
 // ================================
+// ================================
+// STEP UI: loader.js → student.js UI反映専用出口
+// ================================
+
+/**
+ * loader.js が計算した UI 状態を
+ * student.js 側で「表示」に反映する唯一の関数
+ *
+ * ※ Step1 では中身は空（DOM操作禁止）
+ * ※ 以降の UI 制御は必ずこの関数に集約する
+ *
+ * @param {Object} ui
+ */
+export function applyStudentUIState(ui) {
+  if (!ui) return;
+
+  const submitBtn = document.getElementById("submitScoresBtn");
+  if (!submitBtn) return;
+
+ // ================================
+// Step2: 送信ボタン制御
+// ================================
+
+// 判定不能（unitKey 未確定など）は安全側：送信不可
+if (ui.isSubmitted === null) {
+  submitBtn.disabled = true;
+  submitBtn.style.display = "";
+  submitBtn.textContent = "判定中…";
+}
+// 提出済み
+else if (ui.isSubmitted === true) {
+  submitBtn.disabled = true;
+  submitBtn.style.display = "none";
+}
+// 送信不可（未保存・未入力など）
+else if (ui.canSubmit !== true) {
+  submitBtn.disabled = true;
+  submitBtn.style.display = "";
+  submitBtn.textContent = "保存してから提出";
+}
+// 送信可能
+else {
+  submitBtn.disabled = false;
+  submitBtn.style.display = "";
+  submitBtn.textContent = "教務へ送信";
+}
+
+
+
+  // ================================
+  // Step3: 提出済み文言・バッジ表示
+  // ================================
+
+  const statusArea = document.getElementById("submissionStatusArea");
+  if (statusArea) {
+    // 初期化（毎回リセット）
+    statusArea.textContent = "";
+    statusArea.classList.remove(
+      "is-submitted",
+      "is-completed"
+    );
+
+    // 科目完了（優先）
+    if (ui.isCompleted === true) {
+      statusArea.textContent = "この科目はすべて提出済みです。";
+      statusArea.classList.add("is-completed");
+    }
+    // ユニット提出済
+    else if (ui.isSubmitted === true) {
+      statusArea.textContent = "このユニットは提出済みです。";
+      statusArea.classList.add("is-submitted");
+    }
+  }
+
+  // ================================
+  // Step4: ALL（全員）表示の閲覧専用文言
+  // ================================
+
+  const allViewNotice = document.getElementById("allViewNoticeArea");
+  if (allViewNotice) {
+    // 初期化
+    allViewNotice.textContent = "";
+    allViewNotice.style.display = "none";
+
+    if (ui.isAllView === true) {
+      allViewNotice.textContent =
+        "※ この画面は全員表示のため閲覧専用です。入力は各組・コース単位で行ってください。";
+      allViewNotice.style.display = "";
+    }
+  }
+    // ================================
+  // Step5: 提出済みユニットの入力ロック
+  // ================================
+
+  // 提出済み、または閲覧専用（ALL 表示）の場合のみロック
+const shouldLockInputs =
+  ui.isSubmitted === true ||
+  ui.isCompleted === true ||
+  ui.isAllView === true ||
+  ui.isSubmitted === null; // ★ unitKey 未確定は安全側ロック
+
+  if (shouldLockInputs) {
+    const tbody = document.getElementById("scoreTableBody");
+    if (tbody) {
+      const inputs = tbody.querySelectorAll(
+        "input, select, textarea"
+      );
+
+      inputs.forEach(el => {
+        // 表示されていない要素は除外
+        if (el.offsetParent === null) return;
+
+        // 習熟度 input も含めてすべて lock
+        el.disabled = true;
+      });
+    }
+  }
+
+}
+
+
 window.submitScoresForSubject = async function () {
   // ================================
 // ★ Auth 完了保証（teacherEmail missing 対策）
@@ -1184,6 +1322,10 @@ if (!window.currentUnitKey) {
 );
     if (master) {
       window.currentUnitKey = getUnitKeyForStudent(master, subject);
+      window.__submissionContext = {
+  ...(window.__submissionContext || {}),
+  unitKey: window.currentUnitKey
+};
     }
   }
 }
