@@ -1179,16 +1179,21 @@ export function applyStudentUIState(ui) {
 // ================================
 
 // 判定不能（unitKey 未確定など）は安全側：送信不可
-if (ui.isSubmitted === null) {
+if (ui.isUnitSubmitted === null) {
   submitBtn.disabled = true;
   submitBtn.style.display = "";
   submitBtn.textContent = "判定中…";
 }
 // 提出済み
-else if (ui.isSubmitted === true) {
+// 提出済み（ユニット or 単一科目完了）
+else if (
+  ui.isUnitSubmitted === true ||
+  (ui.unitKey === "__SINGLE__" && ui.isCompleted === true)
+) {
   submitBtn.disabled = true;
   submitBtn.style.display = "none";
 }
+
 // 送信不可（未保存・未入力など）
 else if (ui.canSubmit !== true) {
   submitBtn.disabled = true;
@@ -1223,7 +1228,7 @@ else {
       statusArea.classList.add("is-completed");
     }
     // ユニット提出済
-    else if (ui.isSubmitted === true) {
+    else if (ui.isUnitSubmitted === true) {
       statusArea.textContent = "このユニットは提出済みです。";
       statusArea.classList.add("is-submitted");
     }
@@ -1251,10 +1256,10 @@ else {
 
   // 提出済み、または閲覧専用（ALL 表示）の場合のみロック
 const shouldLockInputs =
-  ui.isSubmitted === true ||
+  ui.isUnitSubmitted === true ||
   ui.isCompleted === true ||
   ui.isAllView === true ||
-  ui.isSubmitted === null; // ★ unitKey 未確定は安全側ロック
+  ui.isUnitSubmitted === null; // ★ unitKey 未確定は安全側ロック
 
   if (shouldLockInputs) {
     const tbody = document.getElementById("scoreTableBody");
@@ -1272,6 +1277,13 @@ const shouldLockInputs =
       });
     }
   }
+console.log(
+  "[FINAL applyStudentUIState]",
+  {
+    disabled: submitBtn.disabled,
+    text: submitBtn.textContent
+  }
+);
 
 }
 
@@ -1455,6 +1467,23 @@ await updateDoc(ref, {
   updatedAt: now,
 });
 // ================================
+// ★ 単一科目：送信直後に即ロックさせる（UI用フラグ）
+// ================================
+if (
+  completion?.requiredUnits?.[0] === "__SINGLE__" &&
+  completion.isCompleted === true
+) {
+  window.__justSubmittedSingle = true;
+}
+
+// ★ 即UI再評価（Firestore snapshot を待たない）
+Promise.resolve().then(() => {
+  window.updateSubmitUI?.();
+});
+
+
+
+// ================================
 // 送信成功後: Firestore 更新のみ（UI 操作は行わない）
 // ================================
 
@@ -1479,6 +1508,7 @@ try {
   // subjectId 一致を “ログで” 必ず確認
   const hitIndex = subjects.findIndex(s => s?.subjectId === subjectId);
 console.log("[completion copy] subjectId=", subjectId, "hitIndex=", hitIndex);
+ 
 
 const completionSummary = {
   isCompleted: completion.isCompleted,
@@ -1586,4 +1616,7 @@ if (["1", "2"].includes(String(subject.grade))) {
   
 }
 
-
+// ================================
+// Export UI applier to global
+// ================================
+window.applyStudentUIState = applyStudentUIState;
