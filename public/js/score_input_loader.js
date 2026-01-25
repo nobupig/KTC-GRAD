@@ -1817,71 +1817,92 @@ export function deriveUIState() {
     filterKey === "all" &&
     (isSkill === true || (isCommon === true && !isSpecial));
 
-  const unitKey = window.__submissionContext?.unitKey ?? null;
+  const rawUnitKey = window.__submissionContext?.unitKey ?? null;
+
+// ★ 単一科目（1・2年 特別科目含む）は __SINGLE__ に正規化
+const unitKey =
+  rawUnitKey ??
+  (Number(subject?.specialType ?? 0) > 0 ? "__SINGLE__" : null);
 
   let isUnitSubmitted = false;
   let isUnitSubmissionKnown = false;
 
   if (unitKey) {
-    const d = window.__latestScoresDocData || {};
-    const units = d.submittedSnapshot?.units || {};
+  const d = window.__latestScoresDocData || {};
+  // ★ submitted 判定は isUnitSubmittedByUI に一本化
+  const submitted =
+    typeof isUnitSubmittedByUI === "function"
+      ? isUnitSubmittedByUI(d, unitKey)
+      : false;
 
-    // ★ 単一科目（__SINGLE__）も units に記録されている
-    if (unitKey === "__SINGLE__" && window.__justSubmittedSingle) {
-      // 単一科目の場合、送信後即ロック
-      isUnitSubmitted = true;
-      isUnitSubmissionKnown = true;
-    } else if (units[unitKey]) {
-      // 通常のユニットの場合
-      isUnitSubmitted = true;
-      isUnitSubmissionKnown = true;
-    } else {
-      isUnitSubmitted = false;
-      isUnitSubmissionKnown = true;
-    }
-  }
+  // ★ 特別科目の単一科目（1・2年含む）は completion を正とする
+  isUnitSubmitted = submitted;
+ isUnitSubmissionKnown = true;
+}
+// ★ 追加：特別科目・単一科目で unitKey が未確定でも completion を優先
+if (
+  !unitKey &&
+  isSpecial === true &&
+  window.__latestScoresDocData?.completion?.isCompleted === true
+) {
+  isUnitSubmitted = true;
+  isUnitSubmissionKnown = true;
+}
+
 
   const completion = window.__latestScoresDocData?.completion || null;
   const isSubjectCompleted = completion?.isCompleted === true;
 
   // ★ 正本：uiStateByUnit
-  const ui = window.getCurrentUIState?.(); // ensureUIStateForUnit も内部で呼ばれる
-  const hasInput = !!ui?.hasInput;
-  const hasSaved = !!ui?.hasSaved;
+const ui = window.getCurrentUIState?.(); // ensureUIStateForUnit も内部で呼ばれる
+const hasInput = !!ui?.hasInput;
+const hasSaved = !!ui?.hasSaved;
 
-  // ★ Phase1: 教務送信可否判定（共通・通常）
-  let canSubmit =
-    !isAllView &&
-    isUnitSubmitted === false &&
-    hasInput === true &&
-    hasSaved === true;
+// ★ 特別科目は select 初期値があるため「入力あり」として扱う
+const effectiveHasInput = isSpecial ? true : hasInput;
 
-  console.log(
-    "[deriveUIState]",
-    {
-      hasInput,
-      hasSaved,
-      isUnitSubmitted,
-      isAllView,
-      canSubmit
-    }
+const isSpecialSingle =
+  isSpecial === true &&
+  (String(subject?.grade) === "1" || String(subject?.grade) === "2");
+
+let canSubmit =
+  !isAllView &&
+  effectiveHasInput === true &&
+  hasSaved === true &&
+  (
+    isSpecialSingle || isUnitSubmitted === false
   );
 
-  return {
-    subject,
-    isSkill,
-    isAllView,
-    unitKey,
-    isUnitSubmitted,          // true / false
-    isUnitSubmissionKnown,    // ★ 追加
-    isSubjectCompleted,
+
+
+  console.log(
+  "[deriveUIState]",
+  {
     hasInput,
+    effectiveHasInput,
     hasSaved,
-    canSubmit,
-  };
+    isUnitSubmitted,
+    isAllView,
+    canSubmit
+  }
+);
+
+
+  return {
+  subject,
+  isSkill,
+  isAllView,
+  unitKey,
+  isUnitSubmitted,          // true / false
+  isUnitSubmissionKnown,    // ★ 追加
+  isCompleted: isSubjectCompleted, // ★ students.js が参照する名前
+  isSubjectCompleted,              // ★ 互換のため残す
+  hasInput,
+  hasSaved,
+  canSubmit,
+};
+
 }
-
-
 
   // ================================
   // APPLY UI STATE (DOM SIDE EFFECTS)
@@ -1891,6 +1912,9 @@ export function deriveUIState() {
   // ★ 単一科目（選択科目など）判定：学年に依らず unit なし
   function isSingleUnitSubject(meta) {
     if (!meta) return false;
+
+      // ★ 特別科目は単一扱い
+  if (Number(meta.specialType ?? 0) > 0) return true;
 
     // 1) requiredUnits がそもそも無い/空 => 単一扱い
     const ru = meta.requiredUnits;
@@ -3126,21 +3150,24 @@ function setupScoresSnapshotListener(subjectId) {
     const grade = String(subject.grade || "");
     const course = String(subject.course || "").toUpperCase();
 
-    // -----------------------------------------------
-    // 単一科目判定
-    // ・選択科目は学年に依らず単一
-    // ・共通(G/COMMON) 以外は単一として扱う
-    // -----------------------------------------------
-    const isCommon = (!course || course === "G" || course === "COMMON");
-    const isSingle = !isCommon;
+  // -----------------------------------------------
+// 単一科目判定
+// ・選択科目は学年に依らず単一
+// ・共通(G/COMMON) 以外は単一として扱う
+// ・★特別科目(specialType>0) も単一として扱う
+// -----------------------------------------------
+const isCommon = (!course || course === "G" || course === "COMMON");
+const isSpecial = Number(subject?.specialType ?? 0) > 0;
+const isSingle = !isCommon || isSpecial;
 
-    // 単一科目：フィルタUIを出さない（ここで終了）
-    if (isSingle) {
-      // 念のためフィルタ関連の状態を初期化
-      window.__currentFilterKey = null;
-      window.__submissionContext = { requiredUnits: ["__SINGLE__"], unitKey: "__SINGLE__" };
-      return;
-    }
+// 単一科目：フィルタUIを出さない（ここで終了）
+if (isSingle) {
+  // 念のためフィルタ関連の状態を初期化
+  window.__currentFilterKey = null;
+  window.__submissionContext = { requiredUnits: ["__SINGLE__"], unitKey: "__SINGLE__" };
+  return;
+}
+
 
     // -----------------------------------------------
     // 共通／習熟度科目：フィルタUIを構築
@@ -3639,20 +3666,26 @@ function setupScoresSnapshotListener(subjectId) {
   // ================================
 
   function resolveRequiredUnits({ grade, subjectMeta }) {
-    // 非共通・非共通選択・特別科目
-    if (!subjectMeta?.isCommon) {
+  // ★ 特別科目は常に単一
+  if (Number(subjectMeta?.specialType ?? 0) > 0) {
     return ["__SINGLE__"];
   }
 
-    // 共通・共通選択
-    if (Number(grade) <= 2) {
-      // 1・2年 共通
-      return ["1", "2", "3", "4", "5"];
-    }
-
-    // 3年以上 共通（C と A を分離）
-    return ["M", "E", "I", "C", "A"];
+  // 非共通・非共通選択
+  if (!subjectMeta?.isCommon) {
+    return ["__SINGLE__"];
   }
+
+  // 共通・共通選択
+  if (Number(grade) <= 2) {
+    // 1・2年 共通
+    return ["1", "2", "3", "4", "5"];
+  }
+
+  // 3年以上 共通（C と A を分離）
+  return ["M", "E", "I", "C", "A"];
+}
+
   // ⚠️ 注意
   // resolveCurrentUnitKey は「初期表示・unitKey未確定時」専用。
   // window.__submissionContext.unitKey が存在する場合は
@@ -4049,33 +4082,37 @@ function setupScoresSnapshotListener(subjectId) {
    * 科目が「全 unit 提出済」かどうかを判定する
    * ※ 文言表示・UI制御専用（ロック処理には使わない）
    */
-  function isSubjectFullySubmitted(subjectDocData) {
-    if (!subjectDocData) return false;
+function isSubjectFullySubmitted(subjectDocData) {
+  if (!subjectDocData) return false;
 
-    const completion = subjectDocData.completion;
-    if (!completion) return false;
+  const completion = subjectDocData.completion;
+  if (!completion) return false;
 
-    const required = completion.requiredUnits;
-    const completed = completion.completedUnits || [];
+  const required = completion.requiredUnits || [];
+  const completed = completion.completedUnits || [];
 
-    // ----------------------------------------
-    // 単一科目（requiredUnits が無い or 空）
-    // ----------------------------------------
-
-  if (Array.isArray(required) && required[0] === "__SINGLE__") {
-    return completion.isCompleted === true || (completed && completed.length > 0);
+  // ================================
+  // ★ 単一科目（特別科目）
+  // ================================
+  // completedUnits に "__SINGLE__" があれば完了
+  if (completed.includes("__SINGLE__")) {
+    return true;
   }
 
-    if (!Array.isArray(required) || required.length === 0) {
-      return completion.isCompleted === true;
-    }
-
-    // ----------------------------------------
-    // 共通科目（複数 unit）
-    // ----------------------------------------
-    // 全 requiredUnits が completedUnits に含まれているか
-    return required.every(unit => completed.includes(unit));
+  // ================================
+  // ★ requiredUnits が無い場合
+  // ================================
+  if (!Array.isArray(required) || required.length === 0) {
+    return completion.isCompleted === true;
   }
+
+  // ================================
+  // ★ 共通科目（複数ユニット）
+  // ================================
+  return required.every(unit => completed.includes(unit));
+}
+
+
 
 
 

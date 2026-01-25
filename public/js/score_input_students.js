@@ -4,6 +4,25 @@
  * @param {string|number} grade
  * @param {{ allStudents: any[] }} studentState
  */
+
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  setDoc,
+  serverTimestamp,
+  updateDoc,
+  query,
+  where,
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { activateQuotaErrorState } from "./quota_banner.js";
+import { CURRENT_YEAR } from "./config.js";
+import { db } from "./score_input_loader.js";
+import { getBaseColumns } from "./score_input_columns.js";
+import { updateAllFinalScores } from "./score_input_modes.js";
+
 export async function loadStudentsForGrade(db, grade, studentState) {
   if (!grade) return;
   const cacheKey = `students_cache_grade_${grade}`;
@@ -77,25 +96,6 @@ if (studentState.allStudents.length > 0) {
 }
 
 }
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  setDoc,
-  serverTimestamp,
-  updateDoc,
-  query,
-  where,
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-import { activateQuotaErrorState } from "./quota_banner.js";
-import { CURRENT_YEAR } from "./config.js";
-import { db } from "./score_input_loader.js";
-import { getBaseColumns } from "./score_input_columns.js";
-import { updateAllFinalScores } from "./score_input_modes.js";
-
-
 
 /**
  * 習熟度・コース・番号・ID順でソート
@@ -103,6 +103,7 @@ import { updateAllFinalScores } from "./score_input_modes.js";
  * @param {Object} skillLevelsMap
  * @returns {any[]}
  */
+
 export function sortStudentsBySkillLevel(students, skillLevelsMap) {
   const skillOrder = { S: 1, A1: 2, A2: 3, A3: 4, "": 5 };
   return students.slice().sort((a, b) => {
@@ -145,14 +146,19 @@ function scheduleSkillLevelSave(subjectId, studentId, value) {
     skillSaveTimers.delete(key);
 
     performSkillLevelSave(subjectId, studentId, value)
-      .then(() => {
-        // ★【追加②】保存完了を UIState に通知
-        window.markSaved?.();
-        console.log("[DEBUG] markSaved called");
-      })
-      .catch((err) => {
-        console.error("[skill-level save]", err);
-      });
+  .then(() => {
+    // ★【追加②】保存完了を UIState に通知
+    window.markSaved?.();
+    console.log("[DEBUG] markSaved called");
+
+    // ★【最終必須】UIを再評価させる
+    window.updateSubmitUI?.();
+    console.log("[DEBUG] updateSubmitUI called");
+  })
+  .catch((err) => {
+    console.error("[skill-level save]", err);
+  });
+
 
   }, SKILL_LEVEL_SAVE_DEBOUNCE_MS);
 
@@ -613,10 +619,7 @@ export function renderStudentRows(
         }
         studentState.skillLevelsMap[studentId] = saveValue;
         scheduleSkillLevelSave(subjectId, studentId, saveValue);
-        // ★ UI側も未保存として扱う（必要なら）
-   // DOM層では未保存判定をしない。入力があった事実のみ通知する
-       window.markInputChanged?.();
-       window.updateSubmitUI?.();
+
       });
       input.addEventListener("blur", () => {
         if (!FINAL_SKILL_ALLOWED.includes(input.value)) {
@@ -659,14 +662,10 @@ specialSelect.addEventListener("change", () => {
 
 td.appendChild(specialSelect);
 tr.appendChild(td);
+// ★ 初期描画時に1回だけ「入力済み・保存済み」を立てる
+
 // ★ 特別科目（合/否）は選択式：初期値あり＝入力済みにする（送信可否判定用）
 const selectEl1 = specialSelect;
-const setFilled1 = () => {
-  tr.dataset.allFilled = selectEl1.value ? "1" : "0";
-};
-
-selectEl1.addEventListener("input", setFilled1);
-
 
 // ===== specialType=2：認定(1)/(2) =====
 } else if (sp === 2) {
@@ -689,17 +688,14 @@ specialSelect.addEventListener("change", () => {
 
 td.appendChild(specialSelect);
 tr.appendChild(td);
+
 // ★ 特別科目（認定）は選択式：初期値あり＝入力済みにする（送信可否判定用）
 const selectEl2 = specialSelect;
-const setFilled2 = () => {
-  tr.dataset.allFilled = selectEl2.value ? "1" : "0";
-};
-
-selectEl2.addEventListener("input", setFilled2);
-
-
+ 
 // ===== 通常科目（評価基準なし） =====
-} else if (!criteriaItems || criteriaItems.length === 0) {
+} 
+
+else if (!criteriaItems || criteriaItems.length === 0) {
   const td = document.createElement("td");
   td.textContent = "-";
   tr.appendChild(td);
@@ -794,25 +790,7 @@ tr.appendChild(finalTd);
     tbody.appendChild(tr);
   }
   
-  
-// =====================================================
-// ★ フェーズ3：DOM生成後にロック状態を適用（正本）
-// =====================================================
-// =====================================================
-// ★ フェーズ3：DOM生成後にロック状態を適用（正本）
-// =====================================================
-requestAnimationFrame(() => {
-  
-});
 
-
-
- // ================================
-  // ★ 修正②：ユニット切替完了フラグOFF（1フレーム遅らせる）
-  // ================================
- requestAnimationFrame(() => {
-    
- });
 }
 // ===== 特別科目用：表示文字変換 =====
 function toSpecialDisplay(specialType, value) {
@@ -822,7 +800,7 @@ function toSpecialDisplay(specialType, value) {
     if (value === "pass") return "合";
     return "";
   }
-
+  
   if (specialType === 2) {
     // 認定
     if (value === "cert2") return "認定(2)";
@@ -1172,124 +1150,147 @@ export function applyStudentUIState(ui) {
   if (!ui) return;
 
   const submitBtn = document.getElementById("submitScoresBtn");
+  const saveBtn = document.getElementById("saveScoresBtn");
   if (!submitBtn) return;
 
- // ================================
-// Step2: 送信ボタン制御
-// ================================
+  const isSpecial = Number(ui.subject?.specialType ?? 0) > 0;
+const grade = String(ui.subject?.grade ?? "");
+const isLowerSpecialSingle =
+  isSpecial && (grade === "1" || grade === "2");
 
-// 判定不能（unitKey 未確定など）は安全側：送信不可
-if (ui.isUnitSubmitted === null) {
-  submitBtn.disabled = true;
-  submitBtn.style.display = "";
-  submitBtn.textContent = "判定中…";
-}
-// 提出済み
-// 提出済み（ユニット or 単一科目完了）
-else if (
-  ui.isUnitSubmitted === true ||
-  (ui.unitKey === "__SINGLE__" && ui.isCompleted === true)
-) {
-  submitBtn.disabled = true;
-  submitBtn.style.display = "none";
-}
+// =====================================================
+// 【最終確定】送信ボタン制御ロジック
+// =====================================================
 
-// 送信不可（未保存・未入力など）
-else if (ui.canSubmit !== true) {
-  submitBtn.disabled = true;
+// ★ 1・2年 特別科目は「保存済み＝即送信可」
+if (isLowerSpecialSingle) {
   submitBtn.style.display = "";
-  submitBtn.textContent = "保存してから提出";
-}
-// 送信可能
-else {
   submitBtn.disabled = false;
-  submitBtn.style.display = "";
   submitBtn.textContent = "教務へ送信";
 }
+else {
+  // 判定不能
+  if (ui.isUnitSubmitted === null) {
+    submitBtn.disabled = true;
+    submitBtn.style.display = "";
+    submitBtn.textContent = "判定中…";
+  }
+  // 提出済み
+  else if (
+    ui.isUnitSubmitted === true ||
+    (ui.unitKey === "__SINGLE__" && ui.isCompleted === true)
+  ) {
+    submitBtn.disabled = true;
+    submitBtn.style.display = "none";
+  }
+  // 未保存
+  else if (ui.canSubmit !== true) {
+    submitBtn.disabled = true;
+    submitBtn.style.display = "";
+    submitBtn.textContent = "保存してから提出";
+  }
+  // 送信可能
+  else {
+    submitBtn.disabled = false;
+    submitBtn.style.display = "";
+    submitBtn.textContent = "教務へ送信";
+  }
+}
 
-
-
-  // ================================
-  // Step3: 提出済み文言・バッジ表示
-  // ================================
-
+  // =====================================================
+  // Step3: 提出済み文言
+  // =====================================================
   const statusArea = document.getElementById("submissionStatusArea");
   if (statusArea) {
-    // 初期化（毎回リセット）
     statusArea.textContent = "";
-    statusArea.classList.remove(
-      "is-submitted",
-      "is-completed"
-    );
+    statusArea.classList.remove("is-submitted", "is-completed");
 
-    // 科目完了（優先）
     if (ui.isCompleted === true) {
       statusArea.textContent = "この科目はすべて提出済みです。";
       statusArea.classList.add("is-completed");
-    }
-    // ユニット提出済
-    else if (ui.isUnitSubmitted === true) {
+    } else if (ui.isUnitSubmitted === true) {
       statusArea.textContent = "このユニットは提出済みです。";
       statusArea.classList.add("is-submitted");
     }
   }
 
-  // ================================
-  // Step4: ALL（全員）表示の閲覧専用文言
-  // ================================
-
+  // =====================================================
+  // Step4: ALL 表示の注意文
+  // =====================================================
   const allViewNotice = document.getElementById("allViewNoticeArea");
   if (allViewNotice) {
-    // 初期化
     allViewNotice.textContent = "";
     allViewNotice.style.display = "none";
 
-    if (ui.isAllView === true) {
+    if (ui.isAllView === true && !isLowerSpecialSingle) {
+
       allViewNotice.textContent =
         "※ この画面は全員表示のため閲覧専用です。入力は各組・コース単位で行ってください。";
       allViewNotice.style.display = "";
     }
   }
-    // ================================
-  // Step5: 提出済みユニットの入力ロック
-  // ================================
 
-  // 提出済み、または閲覧専用（ALL 表示）の場合のみロック
+ // ================================
+// Step5: 提出済みユニットの入力ロック（最終版）
+// ================================
+
+// ★ ロック判定（1・2年特別科目は例外）
 const shouldLockInputs =
-  ui.isUnitSubmitted === true ||
-  ui.isCompleted === true ||
-  ui.isAllView === true ||
-  ui.isUnitSubmitted === null; // ★ unitKey 未確定は安全側ロック
+  !isLowerSpecialSingle &&
+  (
+    ui.isUnitSubmitted === true ||
+    ui.isCompleted === true ||
+    ui.isAllView === true ||
+    ui.isUnitSubmitted === null
+  );
 
-  if (shouldLockInputs) {
-    const tbody = document.getElementById("scoreTableBody");
-    if (tbody) {
-      const inputs = tbody.querySelectorAll(
-        "input, select, textarea"
-      );
-
-      inputs.forEach(el => {
-        // 表示されていない要素は除外
+if (shouldLockInputs) {
+  const tbody = document.getElementById("scoreTableBody");
+  if (tbody) {
+    tbody
+      .querySelectorAll("input, select, textarea")
+      .forEach(el => {
         if (el.offsetParent === null) return;
-
-        // 習熟度 input も含めてすべて lock
         el.disabled = true;
       });
-    }
   }
-console.log(
-  "[FINAL applyStudentUIState]",
-  {
-    disabled: submitBtn.disabled,
-    text: submitBtn.textContent
-  }
-);
-
 }
 
 
+
+  // 一時保存ボタン（送信後）を無効化しない
+  if (ui.isCompleted || ui.isUnitSubmitted) {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.style.display = "none";
+    }
+  }
+
+  // =====================================================
+  // Step6: 特別科目（1・2年）の送信後フラグ（再開時の挙動）
+  // =====================================================
+  if (isLowerSpecialSingle && ui.isCompleted) {
+    // 特別科目（1・2年）の場合、送信後は再開時にボタンを無効化
+    submitBtn.disabled = true;
+    submitBtn.style.display = "none"; // 一時保存は非表示
+  }
+
+  console.log("[FINAL applyStudentUIState]", {
+    grade,
+    isSpecial,
+    isLowerSpecialSingle,
+    disabled: submitBtn.disabled,
+    text: submitBtn.textContent
+  });
+}
+
+
+
+
 window.submitScoresForSubject = async function () {
-  // ================================
+  const subject = window.currentSubject;
+
+    // ================================
 // ★ Auth 完了保証（teacherEmail missing 対策）
 // ================================
 if (!window.currentUser || !window.currentUser.email) {
@@ -1298,12 +1299,7 @@ if (!window.currentUser || !window.currentUser.email) {
   return;
 }
 
-  // 1) 送信可否チェック（既存）
-  const check = canSubmitScoresByVisibleRows();
-  if (!check.ok) {
-    alert("未入力の学生がいます。表示中の全員分を入力してから送信してください。");
-    return;
-  }
+
 
   // 2) 成績データ確認
   if (!window.__latestScoresDocData || !window.__latestScoresDocData.students) {
@@ -1311,7 +1307,7 @@ if (!window.currentUser || !window.currentUser.email) {
     return;
   }
 
-  const subject = window.currentSubject;
+
   const subjectId = subject?.subjectId;
   if (!subjectId) {
     alert("科目情報を取得できません。画面を再読み込みしてください。");
@@ -1322,25 +1318,34 @@ if (!window.studentState || !window.studentState.allStudents) {
   alert("学生データがまだ読み込まれていません。少し待ってから再度送信してください。");
   return;
 }
-  // ★ 教務送信時：現在表示中のユニットを必ず確定させる
-if (!window.currentUnitKey) {
+// ★ 教務送信時：現在表示中のユニットを必ず確定させる
+// ★ 特別科目は常に単一提出（SINGLE）
+if (Number(subject?.specialType ?? 0) > 0) {
+  window.currentUnitKey = "SINGLE";
+  window.__submissionContext = {
+    ...(window.__submissionContext || {}),
+    unitKey: "SINGLE",
+    requiredUnits: ["SINGLE"],
+  };
+} else if (!window.currentUnitKey) {
   const firstVisibleRow = document.querySelector(
     "#scoreTableBody tr:not([style*='display: none'])"
   );
   if (firstVisibleRow) {
     const sid = String(firstVisibleRow.dataset.studentId);
-  const master = window.studentState.allStudents.find(
-  s => String(s.studentId) === sid
-);
+    const master = window.studentState.allStudents.find(
+      s => String(s.studentId) === sid
+    );
     if (master) {
       window.currentUnitKey = getUnitKeyForStudent(master, subject);
       window.__submissionContext = {
-  ...(window.__submissionContext || {}),
-  unitKey: window.currentUnitKey
-};
+        ...(window.__submissionContext || {}),
+        unitKey: window.currentUnitKey
+      };
     }
   }
 }
+
 
   // 3) 表示中データを unitKey 単位で分解
   const snapshotByUnit = buildSubmittedSnapshotByUnit({
@@ -1366,14 +1371,17 @@ if (!window.currentUnitKey) {
   return;
 }
 
-    Object.entries(snapshotByUnit.units).forEach(([unitKey, unitData]) => {
-      updatePayload[`submittedSnapshot.units.${unitKey}`] = {
-        students: unitData.students,
-        submittedAt: now,
-        submittedBy: userEmail,
-        scope: snapshotByUnit.scope
-      };
-    });
+ Object.entries(snapshotByUnit.units).forEach(([rawUnitKey, unitData]) => {
+  const unitKey =
+  rawUnitKey === "__SINGLE__" ? "SINGLE" : rawUnitKey;
+
+  updatePayload[`submittedSnapshot.units.${unitKey}`] = {
+    students: unitData.students,
+    submittedAt: now,
+    submittedBy: userEmail,
+    scope: snapshotByUnit.scope
+  };
+});
 
     if (Object.keys(updatePayload).length === 0) {
       alert("送信対象の成績データがありません。");
@@ -1384,8 +1392,13 @@ if (!window.currentUnitKey) {
 // completion 再計算（提出成功前に確定値を作って一緒に保存）
 // ================================
 
+// ================================
+// completion 再計算（提出成功前に確定値を作って一緒に保存）
+// ================================
+
 let completion;
 
+// ===== 習熟度科目 =====
 if (subject?.isSkillLevel === true) {
   const requiredUnits = ["S", "A1", "A2", "A3"];
 
@@ -1393,24 +1406,15 @@ if (subject?.isSkillLevel === true) {
     window.__latestScoresDocData?.submittedSnapshot?.units || {}
   );
   const newUnits =
-  snapshotByUnit && snapshotByUnit.units
-    ? Object.keys(snapshotByUnit.units)
-    : [];
-
-  // CA が残っている既存データに対しては C/A に展開して扱う（保存時は CA を残さない）
-  const normalize = (arr) =>
-    (arr || []).flatMap((k) => (String(k) === "CA" ? ["C", "A"] : [String(k)]));
-
-  const existingUnitsNorm = normalize(existingUnits);
-  const newUnitsNorm = normalize(newUnits);
+    snapshotByUnit && snapshotByUnit.units
+      ? Object.keys(snapshotByUnit.units)
+      : [];
 
   const completedUnits = Array.from(
-    new Set([...existingUnitsNorm, ...newUnitsNorm])
+    new Set([...existingUnits, ...newUnits])
   );
 
-  const isCompleted = requiredUnits.every(u =>
-    completedUnits.includes(u)
-  );
+  const isCompleted = requiredUnits.every(u => completedUnits.includes(u));
 
   completion = {
     requiredUnits,
@@ -1419,53 +1423,61 @@ if (subject?.isSkillLevel === true) {
     completedAt: isCompleted ? now : null,
     completedBy: isCompleted ? userEmail : null,
   };
-}
 
- else {
-  // ================================
-  // 既存：unitKey ベース completion
-  // ================================
-  const requiredUnits = resolveRequiredUnits({
-    grade: String(subject?.grade ?? ""),
-    subjectMeta: window.currentSubjectMeta
-  });
+// ===== 非・習熟度 =====
+} else {
 
-  const existingUnits = Object.keys(
-    window.__latestScoresDocData?.submittedSnapshot?.units || {}
-  );
-  const newUnits =
-  snapshotByUnit && snapshotByUnit.units
-    ? Object.keys(snapshotByUnit.units)
-    : [];
-  const submittedAny = Array.from(new Set([...existingUnits, ...newUnits]));
+  // ★ 特別科目（1〜3年含む）は必ず単一科目
+  if (Number(subject?.specialType ?? 0) > 0) {
+    completion = {
+      requiredUnits: ["SINGLE"],
+      completedUnits: ["SINGLE"],
+      isCompleted: true,
+      completedAt: now,
+      completedBy: userEmail,
+    };
 
-  let completedUnits;
-  let isCompleted;
-
-  if (requiredUnits?.[0] === "__SINGLE__") {
-    isCompleted = submittedAny.length > 0;
-    completedUnits = submittedAny;
+  // ===== 通常科目 =====
   } else {
-    completedUnits = submittedAny;
-    isCompleted =
-      requiredUnits.length > 0 &&
-      requiredUnits.every(u => completedUnits.includes(u));
-  }
+    const requiredUnits = resolveRequiredUnits({
+      grade: String(subject?.grade ?? ""),
+      subjectMeta: window.currentSubjectMeta
+    });
 
-  completion = {
-    requiredUnits,
-    completedUnits,
-    isCompleted,
-    completedAt: isCompleted ? now : null,
-    completedBy: isCompleted ? userEmail : null,
-  };
+    const existingUnits = Object.keys(
+      window.__latestScoresDocData?.submittedSnapshot?.units || {}
+    );
+    const newUnits =
+      snapshotByUnit && snapshotByUnit.units
+        ? Object.keys(snapshotByUnit.units)
+        : [];
+
+    const submittedAny = Array.from(new Set([...existingUnits, ...newUnits]));
+
+    const isCompleted =
+      requiredUnits[0] === "__SINGLE__"
+        ? submittedAny.length > 0
+        : requiredUnits.every(u => submittedAny.includes(u));
+
+    completion = {
+      requiredUnits,
+      completedUnits: submittedAny,
+      isCompleted,
+      completedAt: isCompleted ? now : null,
+      completedBy: isCompleted ? userEmail : null,
+    };
+  }
 }
+  
+
 
 await updateDoc(ref, {
   ...updatePayload,
   completion,      // ★これを追加
   updatedAt: now,
 });
+window.markSaved?.();
+window.updateSubmitUI?.();
 // ================================
 // ★ 単一科目：送信直後に即ロックさせる（UI用フラグ）
 // ================================
@@ -1475,7 +1487,10 @@ if (
 ) {
   window.__justSubmittedSingle = true;
 }
-
+// ★ 特別科目：保存＝最終提出 → 即ロック
+if (Number(window.currentSubject?.specialType ?? 0) > 0) {
+  window.__justSubmittedSingle = true;
+}
 // ★ 即UI再評価（Firestore snapshot を待たない）
 Promise.resolve().then(() => {
   window.updateSubmitUI?.();
@@ -1514,8 +1529,7 @@ const completionSummary = {
   isCompleted: completion.isCompleted,
   completedUnits: completion.completedUnits,
   requiredUnits: completion.requiredUnits,
-  completedAt: completion.isCompleted ? true : null,
-};
+  };
 // ★ ここが唯一の修正点
 const updatedSubjects =
   hitIndex >= 0
@@ -1598,6 +1612,7 @@ if (submitBtn) {
 // ★ unitKey 決定関数（確定仕様）
 function getUnitKeyForStudent(student, subject) {
   if (!student || !subject) return null;
+  if (Number(subject.specialType ?? 0) > 0) return "__SINGLE__";
 
   // 1・2年 → 組
 if (["1", "2"].includes(String(subject.grade))) {
@@ -1620,3 +1635,4 @@ if (["1", "2"].includes(String(subject.grade))) {
 // Export UI applier to global
 // ================================
 window.applyStudentUIState = applyStudentUIState;
+
