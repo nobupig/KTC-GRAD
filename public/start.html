@@ -347,25 +347,50 @@ function renderStartMenuOverview(area, subjects) {
     ul.style.fontSize = "15px";
 ul.style.lineHeight = "1.6";
 
-    items.forEach(function(it){
+items.forEach(function(it){
   const li = document.createElement("li");
+  li.style.display = "flex";
+  li.style.alignItems = "center";
+  li.style.gap = "8px";
+
+  const labelSpan = document.createElement("span");
   const label = buildSubjectLabel(it.subj);
 
+  let showEdit = false;
+
   if (type === "completed") {
-    li.textContent = "✔ " + label;
-    li.style.fontWeight = "500";   // ★ 追加
+    labelSpan.textContent = "✔ " + label;
+    labelSpan.style.fontWeight = "500";
+    showEdit = true;
   } else if (type === "partial") {
     const u = formatUnits(it.cs && it.cs.completedUnits ? it.cs.completedUnits : []);
-    li.textContent = "◐ " + label + "（" + u + " 提出済）";
-    li.style.fontWeight = "500";   // ★ 追加
+    labelSpan.textContent = "◐ " + label + "（" + u + " 提出済）";
+    labelSpan.style.fontWeight = "500";
+    showEdit = true;
   } else if (type === "not") {
-    li.textContent = "・ " + label + "（未提出）";
+    labelSpan.textContent = "・ " + label + "（未提出）";
   } else {
-    li.textContent = "・ " + label + "（状況不明）";
+    labelSpan.textContent = "・ " + label + "（状況不明）";
+  }
+
+  li.appendChild(labelSpan);
+
+  // ★ 修正リンク（提出済のみ）
+  if (showEdit) {
+    const editLink = document.createElement("a");
+    editLink.textContent = "修正";
+    editLink.href = `score_input.html?subjectId=${encodeURIComponent(it.subj.subjectId)}`;
+    editLink.style.fontSize = "12px";
+    editLink.style.color = "#2563eb";
+    editLink.style.textDecoration = "underline";
+    editLink.style.cursor = "pointer";
+
+    li.appendChild(editLink);
   }
 
   ul.appendChild(li);
 });
+
 
     area.appendChild(ul);
   }
