@@ -134,7 +134,7 @@ function scheduleSkillLevelSave(subjectId, studentId, value) {
 
   // ★【追加①】入力があったことを UIState に通知
   window.markInputChanged?.();
-  console.log("[DEBUG] markInputChanged called");
+  // debug: markInputChanged called (removed)
 
   const key = `${subjectId}::${studentId}`;
   const existing = skillSaveTimers.get(key);
@@ -146,14 +146,10 @@ function scheduleSkillLevelSave(subjectId, studentId, value) {
     skillSaveTimers.delete(key);
 
     performSkillLevelSave(subjectId, studentId, value)
-  .then(() => {
-    // ★【追加②】保存完了を UIState に通知
+    .then(() => {
+    // saved: notify UI state and re-evaluate (debug logs removed)
     window.markSaved?.();
-    console.log("[DEBUG] markSaved called");
-
-    // ★【最終必須】UIを再評価させる
     window.updateSubmitUI?.();
-    console.log("[DEBUG] updateSubmitUI called");
   })
   .catch((err) => {
     console.error("[skill-level save]", err);
@@ -1154,7 +1150,9 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
  * @param {Object} ui
  */
 export function applyStudentUIState(ui) {
-  
+
+
+    // applyStudentUIState: entry debug log removed
   if (!ui) return;
 
   const submitBtn = document.getElementById("submitScoresBtn");
@@ -1190,8 +1188,7 @@ export function applyStudentUIState(ui) {
       submitBtn.disabled = true;
       submitBtn.style.display = "none";
     }
-
-    return; // ★ ここで以降の UI 判定を止める
+   
   }
 
   const isSpecial = Number(ui.subject?.specialType ?? 0) > 0;
@@ -1202,17 +1199,7 @@ const isLowerSpecialSingle =
 // =====================================================
 // 【最終確定】送信ボタン制御ロジック
 // =====================================================
- console.log(
-  "[UI DEBUG]",
-  {
-    subjectId: ui.subject?.subjectId,
-    isLowerSpecialSingle,
-    hasUserEdited: ui.hasUserEdited,
-    canSubmit: ui.canSubmit,
-    isUnitSubmitted: ui.isUnitSubmitted,
-    isCompleted: ui.isCompleted,
-  }
-);
+// UI debug log removed
   
 // ★ 1・2年 特別科目：編集済みのときだけ送信可
 if (isLowerSpecialSingle) {
@@ -1242,12 +1229,13 @@ else {
     submitBtn.disabled = true;
     submitBtn.style.display = "none";
   }
-  // 未保存
-  else if (ui.canSubmit !== true) {
-    submitBtn.disabled = true;
-    submitBtn.style.display = "";
-    submitBtn.textContent = "保存してから提出";
-  }
+// 未保存（送信不可）
+else if (ui.canSubmit !== true) {
+  submitBtn.disabled = true;
+  submitBtn.style.display = "";
+  submitBtn.textContent = "保存してから提出";
+}
+
   // 送信可能
   else {
     submitBtn.disabled = false;
@@ -1256,23 +1244,40 @@ else {
   }
 }
 
-  // =====================================================
-  // Step3: 提出済み文言
-  // =====================================================
-  const statusArea = document.getElementById("submissionStatusArea");
-  if (statusArea) {
-    statusArea.textContent = "";
-    statusArea.classList.remove("is-submitted", "is-completed");
+// =====================================================
+// Step3: 提出状況メッセージ（完成形）
+// =====================================================
+const statusArea = document.getElementById("submissionStatusArea");
+if (statusArea) {
+  // ★ まず必ずリセット（前回表示の残骸を消す）
+  statusArea.textContent = "";
+  statusArea.classList.remove(
+    "is-completed",
+    "is-submitted",
+    "is-unsaved"
+  );
 
-    if (ui.isCompleted === true) {
-      statusArea.textContent = "この科目はすべて提出済みです。";
-      statusArea.classList.add("is-completed");
-    } else if (ui.isUnitSubmitted === true) {
-      statusArea.textContent = "このユニットは提出済みです。";
-      statusArea.classList.add("is-submitted");
-    }
+  // ★ 表示すべき message がある場合のみ描画
+  if (ui.message) {
+    statusArea.textContent = ui.message.text;
+
+    statusArea.classList.toggle(
+      "is-completed",
+      ui.message.type === "completed"
+    );
+    statusArea.classList.toggle(
+      "is-submitted",
+      ui.message.type === "submitted"
+    );
+
+ statusArea.classList.toggle(
+  "is-unsaved",
+  ui.message?.type === "unsaved"
+);
   }
+}
 
+// after status area debug log removed
   // =====================================================
   // Step4: ALL 表示の注意文
   // =====================================================
@@ -1339,13 +1344,7 @@ if (
     submitBtn.style.display = "none"; // 一時保存は非表示
   }
 
-  console.log("[FINAL applyStudentUIState]", {
-    grade,
-    isSpecial,
-    isLowerSpecialSingle,
-    disabled: submitBtn.disabled,
-    text: submitBtn.textContent
-  });
+  // final applyStudentUIState debug log removed
 }
 
 

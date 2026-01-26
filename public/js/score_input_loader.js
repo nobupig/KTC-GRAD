@@ -215,7 +215,7 @@ function markDirty(reason = "score") {
     // noop
   }
 
-  if (DEBUG) console.log('[DIRTY]', reason);
+  // debug: DIRTY logging removed in production
 }
 
 
@@ -1241,7 +1241,10 @@ function markDirty(reason = "score") {
       return;
     }
     const ui = deriveUIState(); // ★ ここで統一（all/isSubmittedが取れる）
-
+    // ★ UI文言・ボタン状態を即時反映（未保存／途中再開表示など）
+    if (typeof window.applyStudentUIState === "function") {
+      window.applyStudentUIState(ui);
+    }
     // ★ 提出済み / 全員表示では dirty を立てない（赤字も出さない）
     if (isCurrentUnitSubmitted() || ui?.isAllView) {
       hasUnsavedChanges = false;
@@ -1353,7 +1356,7 @@ function markDirty(reason = "score") {
     });
 
     if (Object.keys(scores).length === 0) {
-      console.log("[BUILD DEBUG] empty scoresObj", tr.dataset.studentId);
+      // removed debug: empty scoresObj for production
     }
     return scores;
   }
@@ -1885,18 +1888,44 @@ let canSubmit =
 
 
 
-  console.log(
-  "[deriveUIState]",
-  {
-    hasInput,
-    effectiveHasInput,
-    hasSaved,
-    isUnitSubmitted,
-    isAllView,
-    canSubmit
-  }
-);
+  // deriveUIState: verbose debug logging removed
+  // ================================
+  // UIメッセージ（statusArea用）確定
+  // ※ ここで勝者を1つに決める
+  // ================================
+  let message = null;
 
+  // ★ 提出済み（最優先）
+  if (isSubjectCompleted === true && unitKey === "__SINGLE__") {
+    message = {
+      text: "提出済みです。成績修正は別途トップ画面から行ってください。",
+      type: "completed",
+    };
+  }
+  else if (isSubjectCompleted === true) {
+    message = {
+      text: "この科目はすべて提出済みです。",
+      type: "completed",
+    };
+  }
+  else if (isUnitSubmitted === true) {
+    message = {
+      text: "このユニットは提出済みです。",
+      type: "submitted",
+    };
+  }
+  
+else if (
+  hasSaved === false &&
+  isUnitSubmitted === false &&
+  isSubjectCompleted === false
+) {
+  message = {
+    text:
+      "現在成績は未保存です。一時保存すると途中再開が可能です。※ 教務へ送信するには、全て入力済みの状態で保存が必要です。",
+    type: "unsaved",
+  };
+}
 
   return {
   subject,
@@ -1910,6 +1939,7 @@ let canSubmit =
   hasInput,
   hasSaved,
   canSubmit,
+  message, // ★ 追加
 };
 
 }
@@ -2004,8 +2034,7 @@ try {
     // ★ UI反映を必ず実行する
     applyStudentUIState(uiState);
 
-    // （任意）デバッグ用。直ったら消してOK
-    console.log("[updateSubmitUI]", uiState);
+    // updateSubmitUI: verbose uiState logging removed
   } finally {
     window.__inUpdateSubmitUI = false;
   }
@@ -2148,7 +2177,7 @@ function setupScoresSnapshotListener(subjectId) {
 
     // ▼ 同一科目の再読込防止（Reads削減の核心）
     if (subjectId === currentSubjectId) {
-    if (DEBUG) console.log("[SKIP] same subjectId, reload skipped");
+    // skip reload for same subjectId (debug log removed)
     return;
   }
     currentSubjectId = subjectId;
@@ -2218,9 +2247,9 @@ function setupScoresSnapshotListener(subjectId) {
       await ensureSkillLevelsLoaded(subject);
     }
     if (currentSubjectMeta.isSkillLevel) {
-      if (DEBUG) console.log("[SKILL LEVEL MODE] enabled");
+      // skill level mode enabled (debug logs removed)
     } else {
-      if (DEBUG) console.log("[SKILL LEVEL MODE] disabled");
+      // skill level mode disabled (debug logs removed)
       window.currentSkillFilter = null; // ★通常科目では習熟度フィルタを必ずリセット
     }
     // NOTE: call moved below to ensure students (sourceStudents) are determined first
@@ -2314,7 +2343,7 @@ function setupScoresSnapshotListener(subjectId) {
       const cachedGradeStudents = studentState.gradeStudentsCache?.get(targetGrade);
 
       if (Array.isArray(cachedGradeStudents) && cachedGradeStudents.length > 0) {
-        if (DEBUG) console.log("[CACHE HIT] gradeStudentsCache for grade=", targetGrade);
+        // cache-hit debug log removed
 
         // 参照汚染防止：必ずコピーで持つ
         studentState.allStudents = cachedGradeStudents.slice();
@@ -2407,15 +2436,14 @@ function setupScoresSnapshotListener(subjectId) {
       await openElectiveRegistrationModal(subject);
     }
 
-    if (DEBUG) console.log('[DEBUG] subject:', subject);
-    if (DEBUG) console.log('[DEBUG] displayStudents(before sort):', displayStudents);
+    // debug render logs removed
     // 習熟度ソート（isSkillLevel===true時のみ）
     if (currentSubjectMeta.isSkillLevel) {
       displayStudents = sortStudentsBySkillLevel(displayStudents, studentState.skillLevelsMap);
-      if (DEBUG) console.log('[DEBUG] displayStudents(after skill sort):', displayStudents);
+      // debug render logs removed
     }
     await loadScoreVersionBase(subjectId, displayStudents);
-    if (DEBUG) console.log('[DEBUG] renderStudentRows call:', { subject, displayStudents });
+    // debug render logs removed
 
 
   // ================================
@@ -2564,10 +2592,7 @@ function setupScoresSnapshotListener(subjectId) {
 
 
 
-  console.log(
-    "[STEP1] submissionContext",
-    window.__submissionContext
-  );
+  console.log("[STEP1] submissionContext", window.__submissionContext);
 
     } finally {
       isRenderingTable = false;
@@ -2586,7 +2611,7 @@ function setupScoresSnapshotListener(subjectId) {
         
   // ===== 途中再開：savedScores を input に反映 → 表示を再構築（Firestore reads 追加なし） =====
   if (savedScores) {
-    console.log(savedScores);
+    console.log("[SAVED SCORES] count=", savedScores ? Object.keys(savedScores).length : 0);
       // ★ Step C-②: 途中再開で取得した保存済みも「UI正本」に同期
     window.__latestSavedSnapshot = savedData; // students/excessStudents をまとめて保持
 
@@ -2943,9 +2968,7 @@ function setupScoresSnapshotListener(subjectId) {
 
     // ★途中再開直後・描画直後に一括適用（Firestore readなし）
   applyRiskClassesToAllRows();
-  console.log("FINAL META", currentSubjectMeta);
-
-  console.log("TEST: handleSubjectChange called");
+  // removed dev logs: FINAL META / test marker
   // ヘッダ側の受講者登録ボタン表示制御（科目変更時の最後に1回だけ）
     // ✅ Excelダウンロードボタン：科目が成立したら有効化（Firestore read はしない）
   const excelBtn = document.getElementById("excelDownloadBtn");
@@ -3458,7 +3481,7 @@ if (isSingle) {
 
         try {
           const rows = getSaveTargetRows(tbody);
-          console.log("[SAVE DEBUG] rows length", rows.length);
+          console.log("[SAVE] rows length", rows.length);
           if (rows.length === 0) {
             alert("保存対象の学生がありません。");
             return;
@@ -3513,7 +3536,7 @@ if (isSingle) {
             };
           }
 
-          console.log("[SAVE DEBUG] bulkScores keys", Object.keys(bulkScores));
+          console.log("[SAVE] bulkScores keys", Object.keys(bulkScores));
 
           const saveCount = Object.keys(bulkScores).length;
           if (saveCount === 0 && !excessDirty) {
@@ -3541,7 +3564,7 @@ return;
           }
 
           try {
-            console.log("[SAVE DEBUG] calling saveBulkStudentScores");
+            console.log("[SAVE] calling saveBulkStudentScores");
             await saveBulkStudentScores(bulkScores);
             
               const ui = window.getCurrentUIState?.();
@@ -3914,10 +3937,7 @@ window.updateSubmitUI?.();
   }
 
   async function confirmElectiveChange() {
-    console.log("=== confirmElectiveChange START ===");
-    console.log("currentSubject:", currentSubject);
-    console.log("CURRENT_YEAR:", CURRENT_YEAR);
-    console.log("electiveMode:", electiveMode);
+    // confirmElectiveChange: removed verbose debug logs
 
     if (!currentSubject || !currentSubject.subjectId) {
       alert("科目情報が取得できません。");
@@ -3934,7 +3954,7 @@ window.updateSubmitUI?.();
     );
     const selectedIds = checkedBoxes.map(cb => String(cb.value)).filter(Boolean);
 
-    console.log("selectedIds:", selectedIds);
+    // selectedIds debug log removed
     if (selectedIds.length === 0) {
       alert("学生が選択されていません。");
       return;
@@ -3969,7 +3989,7 @@ window.updateSubmitUI?.();
     }
 
     const regRef = doc(db, `electiveRegistrations_${year}`, subjectId);
-    console.log("Firestore path:", `electiveRegistrations_${year}/${subjectId}`);
+    // Firestore path debug log removed
 
     let nextStudents = null;
     try {

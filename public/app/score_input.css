@@ -2086,3 +2086,41 @@ input.skill-level-input {
   padding-left: 0;
   padding-right: 0;
 }
+/* ================================
+   提出状況メッセージ（固定UI）
+================================= */
+#submissionStatusArea {
+  margin: 10px 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+/* 提出完了（科目全体） */
+#submissionStatusArea.is-completed {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* ユニット提出済み */
+#submissionStatusArea.is-submitted {
+  background: #ecfdf5;
+  border-color: #86efac;
+  color: #064e3b;
+  font-weight: 600;
+}
+
+/* ================================
+   未保存（進行中）ステータス表示
+   案A：淡いブルー
+================================ */
+#submissionStatusArea.is-unsaved {
+  background: #eef6ff;      /* 薄い青 */
+  border-color: #bfdbfe;
+  color: #1e3a8a;
+}
