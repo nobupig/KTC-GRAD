@@ -2124,3 +2124,97 @@ input.skill-level-input {
   border-color: #bfdbfe;
   color: #1e3a8a;
 }
+
+/* ================================
+   教務送信 確認モーダル（強調版）
+================================ */
+#submitConfirmModal .modal-content {
+  position: relative;
+  padding: 28px 32px 24px 32px;
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* 左アクセントライン */
+#submitConfirmModal .modal-content::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    #d97706,
+    #b45309
+  ); /* 近大系ブラウン寄せ */
+  border-radius: 14px 0 0 14px;
+}
+
+/* タイトル */
+#submitConfirmModal .modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* メッセージ */
+#submitConfirmModal .modal-message {
+  line-height: 1.7;
+  color: #333;
+  margin-bottom: 24px;
+}
+
+/* フッター */
+#submitConfirmModal .modal-footer {
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+}
+
+/* キャンセル */
+#submitConfirmCancelBtn {
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+
+/* 送信する（主役） */
+#submitConfirmOkBtn {
+  background: #b45309;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-weight: 600;
+}
+
+#submitConfirmOkBtn:hover {
+  background: #92400e;
+}
+
+/* タイトル：よりくっきり */
+#submitConfirmModal .modal-title {
+  color: #1f2937;       /* 濃いグレー（真っ黒にしない） */
+  font-weight: 800;
+}
+
+/* 説明文：少し落とす */
+#submitConfirmModal .modal-message {
+  color: #4b5563;       /* ミディアムグレー */
+  font-size: 0.95rem;
+}
+
+/* 強調語（教務への正式提出） */
+#submitConfirmModal .modal-emphasis {
+  color: #111827;
+  font-weight: 700;
+}
+
+/* 警告行（ここが効く） */
+#submitConfirmModal .modal-warning {
+  display: inline-block;
+  margin-top: 6px;
+  color: #b45309;       /* ボタンと同系色 */
+  font-weight: 600;
+}

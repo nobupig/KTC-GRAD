@@ -3032,13 +3032,37 @@ function setupScoresSnapshotListener(subjectId) {
         if (hasUnsavedChanges) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          alert("未保存の変更があります。\n先に一時保存してください。");
+          
           return false;
         }
       },
       true // ★ capture=true（これが無いと意味がない）
     );
   })();
+
+// ② 教務送信 確認モーダル制御（← これを追加）
+(() => {
+  const submitBtn = document.getElementById("submitScoresBtn");
+  const modal = document.getElementById("submitConfirmModal");
+  const okBtn = document.getElementById("submitConfirmOkBtn");
+  const cancelBtn = document.getElementById("submitConfirmCancelBtn");
+
+  if (!submitBtn || !modal || !okBtn || !cancelBtn) return;
+
+  submitBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+
+  okBtn.addEventListener("click", async () => {
+    modal.classList.add("hidden");
+    await window.submitScoresForSubject();
+  });
+})();
+
 
   // ================================
   // スコア保存（楽観ロック付き・学生単位）

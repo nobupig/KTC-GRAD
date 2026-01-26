@@ -1670,14 +1670,6 @@ await updateDoc(tsRef, {
 }
 
 
-    // NOTE: UI はここでは一切操作しない（snapshot listener / updateSubmitUI に委譲）
-const goNext = window.confirm(
-  "送信しました。\n別の組・コースの入力を続けますか？"
-);
-if (!goNext) {
-  document.getElementById("backHomeBtn")?.click();
-  return;
-}
 
     // 送信完了案内は confirm 済み
 
@@ -1692,18 +1684,7 @@ if (!goNext) {
 // UI: 送信（教務提出）ボタン
 // ================================
 const submitBtn = document.getElementById("submitScoresBtn");
-if (submitBtn) {
-  submitBtn.addEventListener("click", async () => {
-    const ok = confirm(
-      "この操作は教務への正式提出です。\n" +
-      "送信後は原則として修正できません。\n\n" +
-      "本当に送信しますか？"
-    );
-    if (!ok) return;
 
-    await window.submitScoresForSubject();
-  });
-}
 
 
 

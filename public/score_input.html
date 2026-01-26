@@ -317,6 +317,31 @@
   </div>
 </div>
 <!-- ▲ Excel貼り付け：列ごと入力意味選択モーダル ▲ -->
+<!-- ================================ -->
+<!-- 教務送信 確認モーダル -->
+<!-- ================================ -->
+<div id="submitConfirmModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 class="modal-title">成績送信の確認</h2>
+
+  <p class="modal-message">
+  この操作は <strong class="modal-emphasis">教務への正式提出</strong> です。<br>
+  <span class="modal-warning">
+    送信後は原則として修正できません。
+  </span>
+</p>
+
+
+    <div class="modal-footer" style="display:flex; gap:12px; justify-content:flex-end;">
+      <button id="submitConfirmCancelBtn" class="btn btn-secondary" type="button">
+        キャンセル
+      </button>
+      <button id="submitConfirmOkBtn" class="btn btn-danger" type="button">
+        送信する
+      </button>
+    </div>
+  </div>
+</div>
 
 </body>
 
