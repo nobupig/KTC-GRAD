@@ -1941,6 +1941,25 @@ let canSubmit =
     };
   }
 
+// ================================
+// UIState: 編集フラグ（初期 false）
+// ================================
+window.__uiEditState = {
+  hasUserEdited: false,
+};
+
+// ================================
+// UIState: 編集開始通知（初回のみ）
+// ================================
+window.markInputChanged = function () {
+  if (!window.__uiEditState) return;
+
+  // ★ 初回編集のみ true にする
+  if (window.__uiEditState.hasUserEdited !== true) {
+    window.__uiEditState.hasUserEdited = true;
+  }
+};
+
 
   window.updateSubmitUI = function (_args = {}) {
   if (window.__inUpdateSubmitUI) return;
@@ -1948,6 +1967,22 @@ let canSubmit =
   try {
     const uiState = deriveUIState();
 
+     // ================================
+    // ★ 科目切替検知：編集フラグをリセット
+    // ================================
+    const prevSubjectId = window.__prevSubjectId;
+    const currentSubjectId = uiState?.subject?.subjectId || null;
+
+  if (prevSubjectId == null) {
+  // 初回は subjectId を記録するだけ（リセットしない）
+  window.__prevSubjectId = currentSubjectId;
+} else if (prevSubjectId !== currentSubjectId) {
+  // 明示的な科目切替時のみリセット
+  window.__uiEditState.hasUserEdited = false;
+  window.__prevSubjectId = currentSubjectId;
+}
+
+    uiState.hasUserEdited = !!window.__uiEditState?.hasUserEdited;
     // ★ UI反映を必ず実行する
     applyStudentUIState(uiState);
 
@@ -3467,16 +3502,24 @@ if (isSingle) {
             showSaveSuccessToast();
             setInfoMessage(`保存しました（0件）`);
             setUnsavedChanges(false);
-            isSavedAfterLastEdit = true;
-            hasSavedSnapshot = true; // ★0件でも「保存済み」状態にする
-            try {
-              const st = getCurrentUnitState();
-              if (st) {
-                st.isSavedAfterLastEdit = true;
-                st.hasUnsavedChanges = false;
-              }
-            } catch (e) {}
-            return;
+// ★ ① 0件保存でも「編集済み」扱い
+window.__uiEditState.hasUserEdited = true;
+
+// ★ ② 保存状態を更新
+isSavedAfterLastEdit = true;
+hasSavedSnapshot = true; // ★0件でも「保存済み」状態にする
+try {
+  const st = getCurrentUnitState();
+  if (st) {
+    st.isSavedAfterLastEdit = true;
+    st.hasUnsavedChanges = false;
+  }
+} catch (e) {}
+
+// ★ ③ UI を再評価してから return
+window.updateSubmitUI?.();
+return;
+
           }
 
           try {
@@ -3502,18 +3545,23 @@ if (isSingle) {
             // ===== 一時保存成功後：送信可否フラグをDOMから再構築 =====
   
 
-  // ★ 送信ボタン状態を再評価
-  window.updateSubmitUI?.();
+ // ★ ① 先に「編集済み」を立てる（特別科目対応）
+window.__uiEditState.hasUserEdited = true;
 
-            isSavedAfterLastEdit = true;   // ★これがないと再提出が壊れる
-            hasSavedSnapshot = true;      // ★提出判定用
-            try {
-              const st = getCurrentUnitState();
-              if (st) {
-                st.isSavedAfterLastEdit = true;
-                st.hasUnsavedChanges = false;
-              }
-            } catch (e) {}
+// ★ ② 保存状態を更新
+isSavedAfterLastEdit = true;   // ★これがないと再提出が壊れる
+hasSavedSnapshot = true;      // ★提出判定用
+try {
+  const st = getCurrentUnitState();
+  if (st) {
+    st.isSavedAfterLastEdit = true;
+    st.hasUnsavedChanges = false;
+  }
+} catch (e) {}
+
+// ★ ③ 最後に UI を再評価
+window.updateSubmitUI?.();
+
           } catch (err) {
             const isQuotaError =
               err?.code === "resource-exhausted" ||

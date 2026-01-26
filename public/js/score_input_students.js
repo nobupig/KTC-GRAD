@@ -1147,6 +1147,7 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
  * @param {Object} ui
  */
 export function applyStudentUIState(ui) {
+  
   if (!ui) return;
 
   const submitBtn = document.getElementById("submitScoresBtn");
@@ -1161,13 +1162,31 @@ const isLowerSpecialSingle =
 // =====================================================
 // 【最終確定】送信ボタン制御ロジック
 // =====================================================
-
-// ★ 1・2年 特別科目は「保存済み＝即送信可」
+ console.log(
+  "[UI DEBUG]",
+  {
+    subjectId: ui.subject?.subjectId,
+    isLowerSpecialSingle,
+    hasUserEdited: ui.hasUserEdited,
+    canSubmit: ui.canSubmit,
+    isUnitSubmitted: ui.isUnitSubmitted,
+    isCompleted: ui.isCompleted,
+  }
+);
+  
+// ★ 1・2年 特別科目：編集済みのときだけ送信可
 if (isLowerSpecialSingle) {
   submitBtn.style.display = "";
-  submitBtn.disabled = false;
-  submitBtn.textContent = "教務へ送信";
+
+  if (ui.hasUserEdited === true && ui.isUnitSubmitted !== true) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "教務へ送信";
+  } else {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "保存してから提出";
+  }
 }
+
 else {
   // 判定不能
   if (ui.isUnitSubmitted === null) {
