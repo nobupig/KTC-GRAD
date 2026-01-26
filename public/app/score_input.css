@@ -2218,3 +2218,12 @@ input.skill-level-input {
   color: #b45309;       /* ボタンと同系色 */
   font-weight: 600;
 }
+
+.unit-status-area {
+  margin: 12px 0 24px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 14px;
+}
