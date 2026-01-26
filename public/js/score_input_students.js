@@ -513,7 +513,7 @@ export function renderStudentRows(
   completion
 )
  {
- 
+ let specialInitialStateMarked = false;
     
   // ===== 表の総列数を動的に計算（specialType/習熟度/評価基準の違いで崩れないようにする） =====
   const getTotalColumnCount = () => {
@@ -651,6 +651,16 @@ specialSelect.innerHTML = `
   <option value="fail">否</option>
 `;
 specialSelect.value = "pass";
+// ★ 追加：特別科目（1・2年）の初期UI状態を1回だけ確定
+if (
+  !specialInitialStateMarked &&
+  (subject?.grade === "1" || subject?.grade === "2")
+) {
+  window.markInputChanged?.(); // 編集開始を通知
+  window.markSaved?.();        // 保存済み扱いにする
+  window.updateSubmitUI?.();  // UI状態を確定
+  specialInitialStateMarked = true;
+}
 
 specialSelect.addEventListener("change", () => {
   specialSelect.dispatchEvent(new Event("input", { bubbles: true }));

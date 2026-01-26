@@ -110,14 +110,35 @@ function isUnitSubmittedByUI(subjectDocData, unitKey) {
    * （存在しない場合は null）
    */
   function getCurrentUIState() {
-    const unitKey = window.__submissionContext?.unitKey;
-    if (!unitKey) return null;
+  let unitKey = window.__submissionContext?.unitKey;
 
-    // ★ 必ず state を初期化
-    ensureUIStateForUnit(unitKey);
+  // ================================
+  // ★ 単一提出科目（1・2年 特別科目）の補完
+  // ================================
+  if (!unitKey) {
+    const subject = window.currentSubject;
+    const grade = String(subject?.grade ?? "");
+    const isSpecial = Number(subject?.specialType ?? 0) === 1;
 
-    return window.uiStateByUnit[unitKey];
+    // 1・2年の特別科目は常に単一提出
+    if (isSpecial && (grade === "1" || grade === "2")) {
+      unitKey = "__SINGLE__";
+      window.__submissionContext = {
+        ...(window.__submissionContext || {}),
+        unitKey: "__SINGLE__",
+        requiredUnits: ["__SINGLE__"],
+      };
+    }
   }
+
+  if (!unitKey) return null;
+
+  // ★ 必ず state を初期化
+  ensureUIStateForUnit(unitKey);
+
+  return window.uiStateByUnit[unitKey];
+}
+
 
   // ★ グローバル公開（必須）
   window.getCurrentUIState = getCurrentUIState;
