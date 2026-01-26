@@ -197,23 +197,22 @@ function markDirty(reason = "score") {
   const map = window.__submissionFinalizedBySubject || {};
   const isFinalized = (window.__submissionFinalized === true) || (sid && map[sid] === true);
 
-  if (isFinalized || isCurrentUnitSubmitted()) {
-    return;
-  }
+// ★ 再提出対応済みガード（唯一ここだけ）
+if (isFinalized || (isCurrentUnitSubmitted() && !window.__isEditMode)) {
+  return;
+}
 
-  try {
-    // ★ ここでも二重ガード
-    if (isFinalized || isCurrentUnitSubmitted()) return;
-
-    if (typeof setUnsavedChanges === "function") {
-      setUnsavedChanges(true);
-    } else {
-      hasUnsavedChanges = true;
-      if (saveBtn) saveBtn.disabled = false;
-    }
-  } catch (e) {
-    // noop
+try {
+  if (typeof setUnsavedChanges === "function") {
+    setUnsavedChanges(true);
+  } else {
+    hasUnsavedChanges = true;
+    if (saveBtn) saveBtn.disabled = false;
   }
+} catch (e) {
+  // noop
+}
+
 
   // debug: DIRTY logging removed in production
 }
@@ -841,6 +840,12 @@ function markDirty(reason = "score") {
   // ================================
   const urlParams = new URLSearchParams(window.location.search);
   let subjectIdFromURL = urlParams.get("subjectId") || null;
+  // ★ 追加：編集モード判定（再提出・修正用）
+const modeFromURL = urlParams.get("mode") || null;
+const isEditMode = (modeFromURL === "edit");
+
+// グローバルで参照できるように保持
+window.__isEditMode = isEditMode;
 
 
   // ================================
@@ -1607,16 +1612,24 @@ function markDirty(reason = "score") {
 
     teacherSubjects = subjects;
 
-    subjects.forEach((s) => {
-      const opt = document.createElement("option");
-      opt.value = s.subjectId;
-      // ラベル：例「4年 / CC / 前期 / 材料力学Ⅰ」
-      opt.textContent = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
-      subjectSelect.appendChild(opt);
-    });
+subjects.forEach((s) => {
+  const opt = document.createElement("option");
+  opt.value = s.subjectId;
+  // ラベル：例「4年 / CC / 前期 / 材料力学Ⅰ」
+  opt.textContent = `${s.grade}年 / ${s.course} / ${s.semester} / ${s.name}`;
+  subjectSelect.appendChild(opt);
+});
 
-    subjectSelect.disabled = false;
-    return subjects;
+// ★ 修正モードでは科目切り替え禁止
+if (window.__isEditMode === true) {
+  subjectSelect.disabled = true;
+  subjectSelect.title = "修正モードでは科目の切り替えはできません";
+} else {
+  subjectSelect.disabled = false;
+}
+
+return subjects;
+
   }
 
 
@@ -1883,7 +1896,7 @@ let canSubmit =
   effectiveHasInput === true &&
   hasSaved === true &&
   (
-    isSpecialSingle || isUnitSubmitted === false
+     isSpecialSingle || isUnitSubmitted === false || window.__isEditMode === true
   );
 
 
@@ -1914,7 +1927,10 @@ let canSubmit =
       type: "submitted",
     };
   }
-  
+  // ★ 再提出（修正）モード時は文言を上書き
+if (window.__isEditMode === true && message?.type === "completed") {
+  message.text = "修正モードです。修正後、再度送信してください。";
+}
 else if (
   hasSaved === false &&
   isUnitSubmitted === false &&
@@ -2580,10 +2596,10 @@ function setupScoresSnapshotListener(subjectId) {
     const ui = window.uiStateByUnit[unitKey];
     // 🔒 提出済み unit は常に入力なし扱い
     const submitted = isUnitSubmittedByUI(window.__latestScoresDocData, unitKey);
-    if (submitted) {
-      ui.hasInput = false;
-      ui.hasSaved = false;
-    } else {
+ if (submitted && !window.__isEditMode) {
+  ui.hasInput = false;
+  ui.hasSaved = false;
+} else {
       // 🆕 未提出 unit は「未入力」から必ず始める
       ui.hasInput = false;
       ui.hasSaved = false;
@@ -2762,7 +2778,7 @@ function setupScoresSnapshotListener(subjectId) {
 
   tbody.addEventListener("input", (ev) => {
     const ui = window.getCurrentUIState?.();
-    if (isCurrentUnitSubmitted()) return;
+      if (isCurrentUnitSubmitted() && !window.__isEditMode) return;
       if (isRenderingTable) return;
       if (isProgrammaticInput) return;
 

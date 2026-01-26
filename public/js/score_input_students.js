@@ -1161,35 +1161,38 @@ export function applyStudentUIState(ui) {
   // ================================
   // ★ 提出後は完全に閲覧専用（全学年・特別科目共通）
   // ================================
- if (
-  ui.isCompleted === true ||
-  ui.isUnitSubmitted === true ||
-  ui.isSubjectCompleted === true ||
-  window.__submissionFinalized === true // ★追加
+if (
+  (
+    ui.isCompleted === true ||
+    ui.isUnitSubmitted === true ||
+    ui.isSubjectCompleted === true ||
+    window.__submissionFinalized === true
+  ) &&
+  !window.__isEditMode
 ) {
-    // 成績入力を完全ロック
-    const tbody = document.getElementById("scoreTableBody");
-    if (tbody) {
-      tbody
-        .querySelectorAll("input, select, textarea")
-        .forEach(el => {
-          el.disabled = true;
-        });
-    }
-
-    // 一時保存ボタン無効化
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.style.display = "none";
-    }
-
-    // 教務送信ボタン無効化
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.style.display = "none";
-    }
-   
+  // 成績入力を完全ロック
+  const tbody = document.getElementById("scoreTableBody");
+  if (tbody) {
+    tbody
+      .querySelectorAll("input, select, textarea")
+      .forEach(el => {
+        el.disabled = true;
+      });
   }
+
+  // 一時保存ボタン無効化
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.style.display = "none";
+  }
+
+  // 教務送信ボタン無効化
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.style.display = "none";
+  }
+}
+
 
   const isSpecial = Number(ui.subject?.specialType ?? 0) > 0;
 const grade = String(ui.subject?.grade ?? "");
@@ -1300,6 +1303,7 @@ if (statusArea) {
 
 // ★ ロック判定（1・2年特別科目は例外）
 const shouldLockInputs =
+  !window.__isEditMode && 
   !isLowerSpecialSingle &&
   (
     ui.isUnitSubmitted === true ||
@@ -1324,9 +1328,12 @@ if (shouldLockInputs) {
 
   // 一時保存ボタン（送信後）を無効化しない
 if (
-  ui.isCompleted === true ||
-  ui.isUnitSubmitted === true ||
-  window.__submissionFinalized === true // ★特別科目対策
+  !window.__isEditMode &&
+  (
+    ui.isCompleted === true ||
+    ui.isUnitSubmitted === true ||
+    window.__submissionFinalized === true
+  )
 ) {
   if (saveBtn) {
     saveBtn.disabled = true;
@@ -1335,14 +1342,15 @@ if (
 }
 
 
+
   // =====================================================
   // Step6: 特別科目（1・2年）の送信後フラグ（再開時の挙動）
   // =====================================================
-  if (isLowerSpecialSingle && ui.isCompleted) {
-    // 特別科目（1・2年）の場合、送信後は再開時にボタンを無効化
-    submitBtn.disabled = true;
-    submitBtn.style.display = "none"; // 一時保存は非表示
-  }
+ if (isLowerSpecialSingle && ui.isCompleted && !window.__isEditMode) {
+  submitBtn.disabled = true;
+  submitBtn.style.display = "none";
+}
+
 
   // final applyStudentUIState debug log removed
 }
