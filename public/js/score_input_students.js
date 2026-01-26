@@ -916,11 +916,18 @@ export function updateElectiveRegistrationButtons(subject) {
 
   // 初期状態：必ず非表示
   electiveArea.classList.remove("is-visible");
+ // ★ 選択科目 ＆ 未完了の場合のみ表示
+  const isElective = subject && subject.required === false;
 
-  // 選択科目であれば必ず表示（Gかどうかは関係なし）
-  if (subject && subject.required === false) {
+  // completion は teacherSubjects 側の正本を使用
+  const isCompleted =
+    subject?.completionSummary?.isCompleted === true ||
+    subject?.completion?.isCompleted === true;
+
+  if (isElective && !isCompleted) {
     electiveArea.classList.add("is-visible");
   }
+
 }
 
 export function canSubmitScoresByVisibleRows() {
@@ -1153,6 +1160,39 @@ export function applyStudentUIState(ui) {
   const submitBtn = document.getElementById("submitScoresBtn");
   const saveBtn = document.getElementById("saveScoresBtn");
   if (!submitBtn) return;
+  // ================================
+  // ★ 提出後は完全に閲覧専用（全学年・特別科目共通）
+  // ================================
+ if (
+  ui.isCompleted === true ||
+  ui.isUnitSubmitted === true ||
+  ui.isSubjectCompleted === true ||
+  window.__submissionFinalized === true // ★追加
+) {
+    // 成績入力を完全ロック
+    const tbody = document.getElementById("scoreTableBody");
+    if (tbody) {
+      tbody
+        .querySelectorAll("input, select, textarea")
+        .forEach(el => {
+          el.disabled = true;
+        });
+    }
+
+    // 一時保存ボタン無効化
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.style.display = "none";
+    }
+
+    // 教務送信ボタン無効化
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.style.display = "none";
+    }
+
+    return; // ★ ここで以降の UI 判定を止める
+  }
 
   const isSpecial = Number(ui.subject?.specialType ?? 0) > 0;
 const grade = String(ui.subject?.grade ?? "");
@@ -1278,12 +1318,17 @@ if (shouldLockInputs) {
 
 
   // 一時保存ボタン（送信後）を無効化しない
-  if (ui.isCompleted || ui.isUnitSubmitted) {
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.style.display = "none";
-    }
+if (
+  ui.isCompleted === true ||
+  ui.isUnitSubmitted === true ||
+  window.__submissionFinalized === true // ★特別科目対策
+) {
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.style.display = "none";
   }
+}
+
 
   // =====================================================
   // Step6: 特別科目（1・2年）の送信後フラグ（再開時の挙動）
@@ -1307,6 +1352,12 @@ if (shouldLockInputs) {
 
 
 window.submitScoresForSubject = async function () {
+    // ★ 現在のUI状態を取得（未定義エラー防止）
+  const ui = window.getCurrentUIState?.();
+  if (!ui) {
+    alert("状態取得に失敗しました。再読み込みしてください。");
+    return;
+  }
   const subject = window.currentSubject;
 
     // ================================
@@ -1496,7 +1547,36 @@ await updateDoc(ref, {
   updatedAt: now,
 });
 window.markSaved?.();
+
+
+
+// ★ UI即時反映用：現在科目を完了扱いにする
+if (window.currentSubject) {
+  window.currentSubject.completionSummary =
+    window.currentSubject.completionSummary || {};
+  window.currentSubject.completionSummary.isCompleted = true;
+}
+
+// ================================
+// ★ 提出確定フラグ（科目単位で保持）
+// ================================
+const sid =
+  ui?.subject?.subjectId ||
+  window.currentSubjectMeta?.subjectId ||
+  updatePayload?.subjectId ||
+  null;
+
+window.__submissionFinalizedBySubject = window.__submissionFinalizedBySubject || {};
+if (sid) window.__submissionFinalizedBySubject[sid] = true;
+
+// 画面内の即時ロック用（既存互換）
+window.__submissionFinalized = true;
+
 window.updateSubmitUI?.();
+
+// ★ 科目完了後：受講者登録／解除ボタンを再評価
+updateElectiveRegistrationButtons(window.currentSubject);
+
 // ================================
 // ★ 単一科目：送信直後に即ロックさせる（UI用フラグ）
 // ================================

@@ -189,26 +189,36 @@ function isUnitSubmittedByUI(subjectDocData, unitKey) {
   }
   let avgUpdateRafId = null;
   // markDirty: 保存可能フラグを立てるユーティリティ
-  function markDirty(reason = "score") {
-    // ★ 提出済み unit では一切 dirty にしない
-    const ui = window.getCurrentUIState?.();
-    if (isCurrentUnitSubmitted()) {
-      return;
-    }
-    try {
-        // ★ 提出済み unit では dirty にしない
-      if (isCurrentUnitSubmitted()) return;
-      if (typeof setUnsavedChanges === "function") {
-        setUnsavedChanges(true);
-      } else {
-        hasUnsavedChanges = true;
-        if (saveBtn) saveBtn.disabled = false;
-      }
-    } catch (e) {
-      // noop
-    }
-    if (DEBUG) console.log('[DIRTY]', reason);
+
+function markDirty(reason = "score") {
+  // ★ 提出確定後は dirty を絶対に立てない（特別科目も含む）
+  const ui = window.getCurrentUIState?.();
+  const sid = ui?.subject?.subjectId || null;
+  const map = window.__submissionFinalizedBySubject || {};
+  const isFinalized = (window.__submissionFinalized === true) || (sid && map[sid] === true);
+
+  if (isFinalized || isCurrentUnitSubmitted()) {
+    return;
   }
+
+  try {
+    // ★ ここでも二重ガード
+    if (isFinalized || isCurrentUnitSubmitted()) return;
+
+    if (typeof setUnsavedChanges === "function") {
+      setUnsavedChanges(true);
+    } else {
+      hasUnsavedChanges = true;
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  } catch (e) {
+    // noop
+  }
+
+  if (DEBUG) console.log('[DIRTY]', reason);
+}
+
+
 
   // ================================
   // 簡易エラートースト表示（入力エラー用）
@@ -1972,6 +1982,14 @@ window.markInputChanged = function () {
     // ================================
     const prevSubjectId = window.__prevSubjectId;
     const currentSubjectId = uiState?.subject?.subjectId || null;
+    // ================================
+// ★ 科目ごとの提出確定フラグを復元（科目切替/再開でも効かせる）
+// ================================
+try {
+  const map = window.__submissionFinalizedBySubject || {};
+  window.__submissionFinalized = !!(currentSubjectId && map[currentSubjectId]);
+} catch (e) {}
+
 
   if (prevSubjectId == null) {
   // 初回は subjectId を記録するだけ（リセットしない）
