@@ -379,7 +379,9 @@ items.forEach(function(it){
   if (showEdit) {
     const editLink = document.createElement("a");
     editLink.textContent = "修正";
-    editLink.href = `score_input.html?subjectId=${encodeURIComponent(it.subj.subjectId)}`;
+    editLink.href =
+  `score_input.html?subjectId=${encodeURIComponent(it.subj.subjectId)}&mode=edit`;
+
     editLink.style.fontSize = "12px";
     editLink.style.color = "#2563eb";
     editLink.style.textDecoration = "underline";
