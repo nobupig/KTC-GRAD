@@ -1201,6 +1201,7 @@ if (
     submitBtn.disabled = true;
     submitBtn.style.display = "none";
   }
+  
 }
 
 
@@ -1332,6 +1333,21 @@ if (shouldLockInputs) {
         el.disabled = true;
       });
   }
+}
+
+// ================================
+// Step5-B: 超過学生登録ボタン制御（B：非表示）
+// ================================
+const excessBtn = document.getElementById("excessStudentBtn");
+if (excessBtn) {
+  const shouldHide =
+    !window.__isEditMode &&
+    (
+      ui.isUnitSubmitted === true || // 今表示中ユニットが提出済み
+      ui.isAllView === true          // ALL表示は閲覧専用
+    );
+
+  excessBtn.style.display = shouldHide ? "none" : "";
 }
 
 
@@ -1563,16 +1579,52 @@ await updateDoc(ref, {
   completion,      // ★これを追加
   updatedAt: now,
 });
+
+
+ // ================================
+ // ★ ローカル snapshot へ即時反映（提出ユニットのみ）
+  // ================================
+  try {
+    window.__latestScoresDocData = window.__latestScoresDocData || {};
+    window.__latestScoresDocData.submittedSnapshot =
+      window.__latestScoresDocData.submittedSnapshot || { units: {} };
+    window.__latestScoresDocData.submittedSnapshot.units =
+      window.__latestScoresDocData.submittedSnapshot.units || {};
+
+    if (snapshotByUnit?.units) {
+      Object.keys(snapshotByUnit.units).forEach((rawUnitKey) => {
+        const unitKey = rawUnitKey === "__SINGLE__" ? "SINGLE" : rawUnitKey;
+        window.__latestScoresDocData.submittedSnapshot.units[unitKey] = {
+          submittedAt: now,
+          submittedBy: userEmail,
+          scope: snapshotByUnit.scope,
+        };
+      });
+    }
+
+    // completion も同期
+    window.__latestScoresDocData.completion = completion;
+  } catch (e) {
+    console.warn("[local snapshot patch] failed", e);
+  }
+
 window.markSaved?.();
 
 
 
 // ★ UI即時反映用：現在科目を完了扱いにする
-if (window.currentSubject) {
-  window.currentSubject.completionSummary =
-    window.currentSubject.completionSummary || {};
-  window.currentSubject.completionSummary.isCompleted = true;
-}
+  if (window.currentSubject) {
+    window.currentSubject.completionSummary =
+      window.currentSubject.completionSummary || {};
+
+    // ★ 全ユニット提出完了時のみ true
+    window.currentSubject.completionSummary.isCompleted =
+      completion?.isCompleted === true;
+    window.currentSubject.completionSummary.completedUnits =
+      completion?.completedUnits || [];
+    window.currentSubject.completionSummary.requiredUnits =
+      completion?.requiredUnits || [];
+  }
 
 // ================================
 // ★ 提出確定フラグ（科目単位で保持）
@@ -1583,12 +1635,21 @@ const sid =
   updatePayload?.subjectId ||
   null;
 
-window.__submissionFinalizedBySubject = window.__submissionFinalizedBySubject || {};
-if (sid) window.__submissionFinalizedBySubject[sid] = true;
+  window.__submissionFinalizedBySubject =
+    window.__submissionFinalizedBySubject || {};
 
-// 画面内の即時ロック用（既存互換）
-window.__submissionFinalized = true;
+  if (sid) {
+    // ★ 全ユニット提出完了時のみ finalized
+    if (completion?.isCompleted === true) {
+      window.__submissionFinalizedBySubject[sid] = true;
+    } else {
+      delete window.__submissionFinalizedBySubject[sid];
+    }
+  }
 
+  // 現在科目が completed の場合のみ true
+  window.__submissionFinalized =
+    !!(sid && window.__submissionFinalizedBySubject[sid]);
 window.updateSubmitUI?.();
 
 // ★ 科目完了後：受講者登録／解除ボタンを再評価
