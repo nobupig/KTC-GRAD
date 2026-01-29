@@ -8,6 +8,10 @@
     ],
     "rewrites": [
       {
+        "source": "/score_edit.html",
+        "destination": "/score_edit.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

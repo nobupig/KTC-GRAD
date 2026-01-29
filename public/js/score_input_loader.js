@@ -867,6 +867,13 @@ const isEditMode = (modeFromURL === "edit");
 
 // グローバルで参照できるように保持
 window.__isEditMode = isEditMode;
+// =====================================================
+// ⚠️ 修正モード（試作・封印中）
+// URL からの mode 判定は保持するが、
+// 現行フェーズでは修正モードを強制的に無効化する
+// =====================================================
+window.__isEditMode = false;
+
 
 
   // ================================
@@ -3484,6 +3491,13 @@ if (isSingle) {
     const finishBtn = document.getElementById("electivePostRegisterFinishBtn");
 
     if (continueBtn) {
+      // 成績入力期間外は途中再開（モーダル内の続行）を無効化
+      if (window.__isInputPeriod === false) {
+        continueBtn.disabled = true;
+        continueBtn.classList.add("is-disabled");
+        continueBtn.title = "成績入力期間外のため再開できません";
+      }
+
       continueBtn.addEventListener("click", () => {
         hideElectivePostRegisterModal();
       });

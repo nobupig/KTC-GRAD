@@ -1160,10 +1160,10 @@ function resolveRequiredUnits({ grade, subjectMeta }) {
  * @param {Object} ui
  */
 export function applyStudentUIState(ui) {
-
-
     // applyStudentUIState: entry debug log removed
   if (!ui) return;
+
+
 
   const submitBtn = document.getElementById("submitScoresBtn");
   const saveBtn = document.getElementById("saveScoresBtn");

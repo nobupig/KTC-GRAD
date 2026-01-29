@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>修正モード（読み取り専用）</title>
+  <link rel="stylesheet" href="/app/score_input.css?v=20260201" />
+  <link rel="icon" type="image/png" href="kindai.png">
+</head>
+<body class="edit-mode">
+  <header>
+    <h1>修正モード（読み取り専用）</h1>
+    <p id="notice">※ この画面ではまだ修正は行えません。</p>
+  </header>
+
+  <div class="mode-banner">
+  修正モード（読み取り専用）
+</div>
+
+  <!-- 共通科目のみ表示 -->
+  <section id="unitSelectSection" hidden>
+    <h2>ユニット選択（提出済のみ）</h2>
+    <div id="unitList"></div>
+    <button id="unitConfirmBtn" disabled>決定</button>
+  </section>
+
+  <!-- 学生一覧 -->
+  <section id="studentListSection" hidden>
+    <h2 id="subjectInfo"></h2>
+      <div style="margin: 8px 0;">
+    <button id="reselectStudentsBtn">
+      修正対象を追加・解除
+    </button>
+  </div>
+    <table>
+<thead>
+  <tr>
+    <th>学籍番号</th>
+    <th>氏名</th>
+    <th class="col-course">組・コース</th>
+    <th>番号</th>
+    <th class="col-score">点数</th>
+    <th class="col-flag">赤点</th>
+    <th class="col-flag">超過</th>
+    <th class="col-hours">超過時間</th>
+  </tr>
+</thead>
+
+      <tbody id="studentTableBody"></tbody>
+    </table>
+  </section>
+
+  <script type="module" src="./js/score_edit_loader.js"></script>
+  <!-- 修正対象選択モーダル -->
+<div id="studentSelectModal" class="edit-mode-modal hidden">
+  <div class="edit-mode-modal__content">
+    <h3>修正する学生を選択</h3>
+
+<div class="edit-mode-modal__table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>学籍番号</th>
+        <th>氏名</th>
+        <th>組・コース</th>
+        <th>番号</th>
+        <th>点数</th>
+        <th>超過</th>
+      </tr>
+    </thead>
+    <tbody id="studentSelectTableBody"></tbody>
+  </table>
+</div>
+
+
+   <div class="edit-mode-modal__actions">
+      <button id="studentSelectConfirmBtn">決定</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

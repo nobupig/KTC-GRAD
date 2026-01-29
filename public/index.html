@@ -283,152 +283,154 @@
     }
   </style>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import {
-      getAuth, GoogleAuthProvider, signInWithPopup, signOut
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import {
-      getFirestore, doc, getDoc
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import {
+    getAuth, GoogleAuthProvider, signInWithPopup, signOut
+  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc
+  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-    // --- Firebase 設定 ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
-      authDomain: "ktc-grade-system.firebaseapp.com",
-      projectId: "ktc-grade-system",
-      storageBucket: "ktc-grade-system.appspot.com",
-      messagingSenderId: "490169300362",
-      appId: "1:490169300362:web:7c6e7b47a394d68d514473"
-    };
+  // --- Firebase 設定 ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
+    authDomain: "ktc-grade-system.firebaseapp.com",
+    projectId: "ktc-grade-system",
+    storageBucket: "ktc-grade-system.appspot.com",
+    messagingSenderId: "490169300362",
+    appId: "1:490169300362:web:7c6e7b47a394d68d514473"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-    // --- Toast 表示 ---
-    function showToast(message, type = "info", duration = 3000) {
-      const container = document.getElementById("toast-container");
-      if (!container) return;
+  // =========================
+  // 成績入力期間判定（正規ロジック）
+  // =========================
+  async function checkInputPeriodForLogin() {
+    const ref = doc(db, "settings", "period");
+    const snap = await getDoc(ref);
 
-      const toast = document.createElement("div");
-      toast.className = `toast toast-${type}`;
+    if (!snap.exists()) return { mode: "none" };
 
-      const icon = document.createElement("div");
-      icon.className = "toast-icon";
+    const p = snap.data();
+    const now = new Date();
 
-      if (type === "success") {
-        icon.textContent = "✓";
-      } else if (type === "error") {
-        icon.textContent = "!";
-      } else {
-        icon.textContent = "i";
+    const firstStart  = new Date(p.firstStart);
+    const firstEnd    = new Date(p.firstEnd);
+    const secondStart = new Date(p.secondStart);
+    const secondEnd   = new Date(p.secondEnd);
+
+    if (now >= firstStart && now <= firstEnd) return { mode: "first" };
+    if (now >= secondStart && now <= secondEnd) return { mode: "second" };
+
+    return { mode: "none" };
+  }
+
+ // =========================
+// Toast 表示（index.html 用）
+// =========================
+function showToast(message, type = "info", duration = 3000) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 200);
+  }, duration);
+}
+
+// =========================
+// ローディング制御（index.html 用）
+// =========================
+function setLoading(isLoading) {
+  const btn = document.getElementById("google-login-btn");
+  const textSpan = document.getElementById("btn-text");
+  const spinner = document.getElementById("btn-spinner");
+
+  if (!btn || !textSpan || !spinner) return;
+
+  btn.disabled = isLoading;
+  if (isLoading) {
+    textSpan.textContent = "ログイン処理中...";
+    spinner.style.display = "inline-block";
+  } else {
+    textSpan.textContent = "Googleアカウントでログイン";
+    spinner.style.display = "none";
+  }
+}
+
+
+
+
+  // --- ログイン処理 ---
+  async function login() {
+    const provider = new GoogleAuthProvider();
+    setLoading(true);
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const email = result.user.email || "";
+
+      // TEST MODE
+      const TEST_ALLOWED_EMAILS = ["nobupig@gmail.com"];
+
+      if (!TEST_ALLOWED_EMAILS.includes(email) && !email.endsWith("@ktc.ac.jp")) {
+        showToast("教員アカウント（@ktc.ac.jp）のみ利用可能です。", "error", 5000);
+        await signOut(auth);
+        return;
       }
 
-      const msg = document.createElement("div");
-      msg.className = "toast-message";
-      msg.textContent = message;
-
-      toast.appendChild(icon);
-      toast.appendChild(msg);
-      container.appendChild(toast);
-
-      // 表示アニメーション
-      requestAnimationFrame(() => toast.classList.add("show"));
-
-      // 自動クローズ
-      setTimeout(() => {
-        toast.classList.remove("show");
-        setTimeout(() => {
-          toast.remove();
-        }, 200);
-      }, duration);
-    }
-
-    // --- ローディング状態制御 ---
-    function setLoading(isLoading) {
-      const btn = document.getElementById("google-login-btn");
-      const textSpan = document.getElementById("btn-text");
-      const spinner = document.getElementById("btn-spinner");
-
-      if (!btn || !textSpan || !spinner) return;
-
-      btn.disabled = isLoading;
-      if (isLoading) {
-        textSpan.textContent = "ログイン処理中...";
-        spinner.style.display = "inline-block";
-      } else {
-        textSpan.textContent = "Googleアカウントでログイン";
-        spinner.style.display = "none";
+      if (/^[gs]\d+@ktc\.ac\.jp$/.test(email)) {
+        showToast("学生アカウントではログインできません。", "error", 5000);
+        await signOut(auth);
+        return;
       }
-    }
 
-    // --- ログイン処理 ---
-    async function login() {
-      const provider = new GoogleAuthProvider();
-      setLoading(true);
+      const snap = await getDoc(doc(db, "teachers", email));
+      if (!snap.exists()) {
+        showToast("教員名簿に登録されていません。", "error", 5000);
+        await signOut(auth);
+        return;
+      }
 
+      showToast("ログインに成功しました。", "success", 2000);
+
+      // ★ 期間判定で遷移先を分岐
+      let period;
       try {
-        const result = await signInWithPopup(auth, provider);
-        const email = result.user.email || "";
-
-        // =========================
-        // ★ TEST MODE（後で削除可）
-        // テスト用 gmail アカウントを暫定的にログイン許可する
-        // 本番公開前に、この if 文ブロックを必ず削除してください
-        // =========================
-        const TEST_ALLOWED_EMAILS = [
-          "nobupig@gmail.com",   // ← テスト許可したいアカウント
-        ];
-
-        // TEST MODE: 特例許可
-        if (TEST_ALLOWED_EMAILS.includes(email)) {
-          // 通知（任意）
-          console.log("TEST MODE: gmail ログイン特例許可:", email);
-          // このまま次の教師名簿チェックへ進む
-        } else if (!email.endsWith("@ktc.ac.jp")) {
-          // 本番ルール（変更不可）
-          showToast("教員アカウント（@ktc.ac.jp）のみ利用可能です。", "error", 5000);
-          await signOut(auth);
-          return;
-        }
-
-        // 2. 学生のアドレス（g/s + 数字）は拒否
-        if (/^[gs]\d+@ktc\.ac\.jp$/.test(email)) {
-          showToast("学生アカウントではログインできません。", "error", 5000);
-          await signOut(auth);
-          return;
-        }
-
-        // 3. Firestore の teachers に登録されているか確認
-        const ref = doc(db, "teachers", email);
-        const snap = await getDoc(ref);
-
-        if (!snap.exists()) {
-          showToast("教員名簿に登録されていません。ログインできません。", "error", 5000);
-          await signOut(auth);
-          return;
-        }
-
-        // OK
-        // トーストは出すが2秒に短縮（任意）
-          showToast("ログインに成功しました。", "success", 2000);
-
-          // 即遷移
-        location.href = "start.html";
-        
+        period = await checkInputPeriodForLogin();
       } catch (e) {
-        console.error(e);
-        showToast("ログインに失敗しました。時間をおいて再度お試しください。", "error", 5000);
-      } finally {
-        // リダイレクト済みなら画面遷移でこの処理はほぼ気にならない
-        setLoading(false);
+        console.error("period check failed:", e);
+        period = { mode: "none" };
       }
-    }
 
-    // グローバル公開（onclick から呼ぶ）
-    window.login = login;
-  </script>
+      if (period.mode === "none") {
+        location.href = "view.html";
+      } else {
+        location.href = "start.html";
+      }
+
+    } catch (e) {
+      console.error(e);
+      showToast("ログインに失敗しました。時間をおいて再度お試しください。", "error", 5000);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  window.login = login;
+</script>
+
 </head>
 <body>
   <div id="toast-container"></div>

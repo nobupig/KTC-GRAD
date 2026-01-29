@@ -351,7 +351,7 @@ tr.excess-student-row.row-fail.row-excess > td {
   margin-bottom: 4px;
 }
 .grade-header-row h2 {
-  font-size: 18px;
+  font-size: 22px;
   margin: 0;
   border-left: 4px solid #004A99;
   padding-left: 10px;
@@ -530,7 +530,7 @@ header .user-area button {
 }
 
 .student-count {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
   color: #004A99;
 }
@@ -1167,7 +1167,7 @@ th {
    凡例
    ================================ */
 .risk-legend {
-  font-size: 0.85em;
+  font-size: 12pt;
   color: #555;
   margin: 6px 0 10px 0;
 }
@@ -1654,7 +1654,7 @@ tr.excess-student-row.row-fail.row-excess > td { background: transparent !import
 
 .settings-note {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 16px;
   color: #556;
 }
 /* ============================
@@ -2226,4 +2226,272 @@ input.skill-level-input {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   font-size: 14px;
+}
+/* ================================
+   提出ステータス帯（共通：安全）
+================================ */
+.submission-status-area {
+  margin: 12px 0 16px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.6;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transition: all 0.2s ease;
+}
+
+/* 情報（全員表示など） */
+.status-info {
+  background: linear-gradient(135deg, #eef5ff, #f6f9ff);
+  border-left: 6px solid #3b82f6;
+  color: #1e3a8a;
+}
+
+/* 行動促進（未提出） */
+.status-action {
+  background: linear-gradient(135deg, #ecfeff, #f0fdfa);
+  border-left: 6px solid #06b6d4;
+  color: #065f46;
+  font-weight: 600;
+}
+
+/* ロック（提出済み） */
+.status-locked {
+  background: linear-gradient(135deg, #fef2f2, #fff7ed);
+  border-left: 6px solid #ef4444;
+  color: #7f1d1d;
+  font-weight: 600;
+}
+
+
+/* =====================================================
+   修正モード専用（ここから完全に隔離）
+   ※ body に class="edit-mode" が付く画面のみ有効
+===================================================== */
+
+/* ===== 画面全体 ===== */
+.edit-mode {
+  background: #ffffff;
+  color: #222;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* 見出し */
+.edit-mode header h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.2em;
+}
+
+.edit-mode #notice {
+  color: #b00020;
+  font-weight: 600;
+  margin-bottom: 1em;
+}
+
+/* ===== 修正モード バナー ===== */
+.edit-mode .mode-banner {
+  background: #e3f2fd;
+  color: #004a99;
+  padding: 10px 14px;
+  font-weight: 600;
+  border-left: 6px solid #004a99;
+  margin-bottom: 1em;
+}
+
+/* ===== テーブル（修正モード専用） ===== */
+.edit-mode table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 1000px;
+  min-width: 720px;
+  margin-top: 12px;
+}
+
+/* ヘッダー */
+.edit-mode thead th {
+  background: #004a99;          /* 近大ブルー */
+  color: #fff;
+  font-weight: 600;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* 本文セル */
+.edit-mode tbody td {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  font-size: 0.9rem;
+  vertical-align: middle;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 行ストライプ */
+.edit-mode tbody tr:nth-child(even) {
+  background: #f7f9fc;
+}
+
+/* hover */
+.edit-mode tbody tr:hover {
+  background: #f0f6ff;
+}
+
+/* ===== 列指定 ===== */
+
+/* 点数・時間 */
+.edit-mode .col-score,
+.edit-mode .col-hours {
+  text-align: right;
+  width: 80px;
+  font-weight: bold;
+}
+
+/* フラグ列 */
+.edit-mode .col-flag {
+  text-align: center;
+  width: 60px;
+}
+
+/* 組・コース */
+.edit-mode .col-course {
+  width: 70px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ===== フラグ表示 ===== */
+.edit-mode .flag-red {
+  color: #c62828;
+  font-weight: bold;
+}
+
+.edit-mode .flag-excess {
+  color: #ef6c00;
+  font-weight: bold;
+}
+
+/* ===== ロック行（B-1） ===== */
+.edit-mode tr.locked-row {
+  background: #f5f5f5;
+  opacity: 0.75;
+}
+
+.edit-mode tr.locked-row input,
+.edit-mode tr.locked-row button,
+.edit-mode tr.locked-row select {
+  cursor: not-allowed;
+}
+
+/* ================================
+   修正モード専用：学生選択モーダル
+   scope: body.edit-mode
+================================ */
+
+/* 背景 */
+.edit-mode .edit-mode-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.edit-mode .edit-mode-modal.hidden {
+  display: none;
+}
+
+/* モーダル本体 */
+.edit-mode .edit-mode-modal__content {
+  background: #fff;
+  width: 90%;
+  max-width: 900px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+/* 見出し */
+.edit-mode .edit-mode-modal__content h3 {
+  margin: 0;
+  padding: 12px 16px;
+  background: #004a99;
+  color: #fff;
+  font-size: 16px;
+}
+
+/* テーブル */
+.edit-mode .edit-mode-modal__content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.edit-mode .edit-mode-modal__content thead {
+  background: #f0f4f8;
+}
+
+.edit-mode .edit-mode-modal__content th,
+.edit-mode .edit-mode-modal__content td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #ddd;
+  text-align: center;
+}
+
+/* ================================
+   修正モード：学生選択モーダル（table-wrap方式）
+================================ */
+
+/* テーブルを包むスクロール領域 */
+.edit-mode .edit-mode-modal__table-wrap {
+  overflow: auto;
+  max-height: calc(80vh - 150px);
+}
+
+/* tableは通常のtableとして扱う */
+.edit-mode .edit-mode-modal__content table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* フッター */
+.edit-mode .edit-mode-modal__actions {
+  padding: 10px;
+  border-top: 1px solid #ddd;
+  text-align: right;
+}
+
+/* ================================
+   修正モード：モーダル下部アクション
+================================ */
+
+.edit-mode .edit-mode-modal__actions {
+  padding: 12px 16px;
+  border-top: 1px solid #ddd;
+  background: #fafafa;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 決定ボタンを主役にする */
+.edit-mode .edit-mode-modal__actions button {
+  background: #004a99;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.edit-mode .edit-mode-modal__actions button:hover {
+  background: #003a78;
 }
