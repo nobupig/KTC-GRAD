@@ -2495,3 +2495,30 @@ input.skill-level-input {
 .edit-mode .edit-mode-modal__actions button:hover {
   background: #003a78;
 }
+
+/* 修正モード注意文言（Step1） */
+.edit-mode-notice{
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+  padding: 12px 16px;
+  margin: 12px 0;
+  border-radius: 10px;
+  color: #2b2b2b;
+}
+
+.edit-mode-notice__title{
+  font-weight: 800;
+  margin-bottom: 6px;
+  letter-spacing: .02em;
+}
+
+.edit-mode-notice__body{
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.edit-mode-notice__strong{
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

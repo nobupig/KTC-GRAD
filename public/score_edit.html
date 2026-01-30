@@ -2,82 +2,360 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>修正モード（読み取り専用）</title>
-  <link rel="stylesheet" href="/app/score_input.css?v=20260201" />
-  <link rel="icon" type="image/png" href="kindai.png">
+  <title>近大高専 成績システム｜成績入力</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <link rel="icon" type="image/png" href="/kindai.png">
+ 
+  <!-- あなたのフォルダ構造に合わせた CSS 読み込み -->
+  <link rel="stylesheet" href="/app/score_input.css">
+
 </head>
-<body class="edit-mode">
+
+<body>
+  <!-- ========================================= -->
+  <!--  共通ヘッダー（start / subjects / eval と統一） -->
+  <!-- ========================================= -->
   <header>
-    <h1>修正モード（読み取り専用）</h1>
-    <p id="notice">※ この画面ではまだ修正は行えません。</p>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <img src="kindai.png" alt="校章" style="width:32px; height:32px;">
+      <h1>近大高専 成績システム｜成績入力</h1>
+    </div>
+    <div class="user-area">
+      <div id="headerUserDisplay">ログイン中：-</div>
+      <button id="logoutBtn" type="button">ログアウト</button>
+    </div>
   </header>
 
-  <div class="mode-banner">
-  修正モード（読み取り専用）
+  <!-- ========================================= -->
+  <!-- ログインユーザ表示帯（共通 UI） -->
+  <!-- ========================================= -->
+  <div id="userInfoArea">
+    <div id="userInfoDisplay">ログイン中：-</div>
+  </div>
+
+  <!-- ========================================= -->
+  <!--  メインカード -->
+  <!-- ========================================= -->
+  <main>
+
+    <!-- 上部操作エリア：左寄せで対象科目プルダウン、右側に他ボタン -->
+    <div class="top-controls" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;">
+      <div class="subject-select-area" style="display: flex; align-items: center; gap: 8px;">
+        <label for="subjectSelect">対象科目：</label>
+        <select id="subjectSelect"></select>
+       <div class="point-pill-area evaluation-related" style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
+
+  <span id="avgPointDisplay" style="background: #f3f7fa; border-radius: 12px;">
+    平均点：—
+  </span>
+  <span id="adjustPointDisplay" style="background: #f3f7fa; border-radius: 12px;">
+    調整点：—
+  </span>
 </div>
 
-  <!-- 共通科目のみ表示 -->
-  <section id="unitSelectSection" hidden>
-    <h2>ユニット選択（提出済のみ）</h2>
-    <div id="unitList"></div>
-    <button id="unitConfirmBtn" disabled>決定</button>
-  </section>
+      </div>
+      <div class="top-btn-area" style="display: flex; align-items: center; gap: 8px;">
+        <button id="saveBtn" class="btn-primary" type="button" disabled>
+          一時保存
+        </button>
+<!-- ✅ 追加：Excelダウンロード（科目選択後にJSで有効化） -->
+        <button id="excelDownloadBtn" class="btn-secondary" type="button" disabled>
+          Excelダウンロード
+        </button>
+        <button
+  id="submitScoresBtn"
+  class="btn-danger"
+  type="button"
+  disabled
+>
+  教務へ提出
+</button>
+        <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
+          ホームへ戻る
+        </button>
+        <!-- 将来: 送信・Excel等のボタンをここに横並びで追加可能 -->
+      </div>
+    </div>
 
-  <!-- 学生一覧 -->
-  <section id="studentListSection" hidden>
-    <h2 id="subjectInfo"></h2>
-      <div style="margin: 8px 0;">
-    <button id="reselectStudentsBtn">
-      修正対象を追加・解除
+<!-- 設定ナビゲーション（ボタン化） -->
+<div class="settings-panel">
+  <div class="settings-title">⚙ 設定</div>
+
+  <div class="settings-actions">
+    <a id="toEvaluationLink" href="#" class="btn-setting" role="button">
+      評価基準を編集
+    </a>
+
+    <a id="toSubjectsLink" href="subjects.html" class="btn-setting" role="button">
+      科目情報を確認・登録
+    </a>
+  </div>
+
+  <div class="settings-note">
+    ※ 成績入力の前に、評価基準と科目情報を必ず確認してください
+  </div>
+</div>
+
+
+    <div class="grade-header-row" style="
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+  margin-bottom: 4px;
+">
+  <h2 style="margin: 0;">成績一覧</h2>
+
+  <!-- 右側ボタン群 -->
+  <div class="grade-header-actions">
+    <div id="electiveButtonArea" style="gap:8px;">
+      <button
+        id="electiveAddBtn"
+        class="btn-primary"
+        type="button"
+      >
+        受講者を追加登録
+      </button>
+
+      <button
+        id="electiveRemoveBtn"
+        class="btn-secondary"
+        type="button"
+        style="border-color:#dc2626; color:#dc2626;"
+      >
+        受講者を解除
+      </button>
+    </div>
+
+    <button
+      id="excessStudentBtn"
+      class="btn btn-secondary"
+      type="button"
+    >
+      超過学生登録
     </button>
   </div>
-    <table>
-<thead>
-  <tr>
-    <th>学籍番号</th>
-    <th>氏名</th>
-    <th class="col-course">組・コース</th>
-    <th>番号</th>
-    <th class="col-score">点数</th>
-    <th class="col-flag">赤点</th>
-    <th class="col-flag">超過</th>
-    <th class="col-hours">超過時間</th>
-  </tr>
-</thead>
+</div>
 
-      <tbody id="studentTableBody"></tbody>
-    </table>
-  </section>
 
-  <script type="module" src="./js/score_edit_loader.js"></script>
-  <!-- 修正対象選択モーダル -->
-<div id="studentSelectModal" class="edit-mode-modal hidden">
-  <div class="edit-mode-modal__content">
-    <h3>修正する学生を選択</h3>
+    <div class="risk-legend">
+      🔴 赤点　🔵 超過　🟣 赤点かつ超過（特に注意）
+    </div>
 
-<div class="edit-mode-modal__table-wrap">
-  <table>
+    <div class="subheader-row">
+      <div id="studentCountDisplay" class="student-count">受講者人数：0名</div>
+    </div>
+
+    <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
+    <div id="infoMessage" class="info-message evaluation-related">
+
+      成績を入力してください。
+    </div>
+
+    <div id="submissionStatusArea" class="submission-status-area" aria-live="polite"></div>
+    <!-- STEP C：共通科目フィルタ UI を表示するエリア -->
+<div id="groupFilterArea" style="margin: 12px 0;"></div>
+
+<div id="editUnitSelector" style="margin: 12px 0; display: none;"></div>
+
+    <!-- テーブル部分 -->
+    <div class="score-table-wrapper">
+      <table class="score-table">
+        <thead>
+          <tr id="scoreHeaderRow">
+            <th>学籍番号</th>
+            <th>学年</th>
+            <th>組・コース</th>
+            <th>番号</th>
+            <th>氏名</th>
+            <!-- 評価基準ヘッダは criteria.js が動的に追加 -->
+            <th>最終成績</th>
+          </tr>
+        </thead>
+        <tbody id="scoreTableBody">
+          <!-- 学生行は students.js で動的生成 -->
+        </tbody>
+      </table>
+    </div>
+
+
+    <button id="skillSaveBtn" style="display:none;">習熟度を保存</button>
+  </main>
+
+  <!-- ========================================= -->
+  <!-- JS 読み込み（あなたの public/js 構造に合わせたもの） -->
+  <!-- ========================================= -->
+    <!-- ✅ 追加：SheetJS（Excel生成） -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script type="module">
+  import "/js/schoolYear.js";
+  import "/js/score_edit_loader.js";
+  // ✅ ここでは何も呼ばない（loaderは読み込み時に自動起動）
+</script>
+
+</script>
+
+  <div id="electiveModal" class="ktc-modal" style="display:none;">
+    <div class="ktc-modal-content">
+   <h2 id="electiveModalTitle">受講者（選択科目）</h2>
+
+<div class="ktc-modal-actions">
+  <button id="electiveRegisterBtn" type="button" class="primary"></button>
+  <button id="electiveCancelBtn">キャンセル</button>
+</div>
+      <div class="elective-group-filter">
+  <button data-group="all" class="eg-btn active">全員</button>
+  <button data-group="1" class="eg-btn">1</button>
+  <button data-group="2" class="eg-btn">2</button>
+  <button data-group="3" class="eg-btn">3</button>
+  <button data-group="4" class="eg-btn">4</button>
+  <button data-group="5" class="eg-btn">5</button>
+</div>
+      <p id="electiveModalDescription"></p>
+
+      <table class="elective-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>学籍番号</th>
+            <th>学年</th>
+            <th>組・コース</th>
+            <th>番号</th>
+            <th>氏名</th>
+          </tr>
+        </thead>
+        <tbody id="elective-table-body"></tbody>
+      </table>
+
+
+    </div>
+  </div>
+  <div id="saveSuccessToast" class="toast hidden">
+    <span class="toast-icon">✓</span>
+    <span class="toast-text">保存しました</span>
+  </div>
+
+<!-- 超過学生登録モーダル（骨組みのみ） -->
+  <div id="excessStudentModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 class="modal-title">超過学生登録</h2>
+    <div class="excess-list-scroll" style="margin-bottom: 16px;">
+    <table class="excess-table">
+      <colgroup>
+        <col style="width:32px">
+        <col style="width:120px">
+        <col style="width:48px">
+        <col style="width:72px">
+        <col style="width:48px">
+        <col style="width:180px">
+        <col style="width:96px">
+      </colgroup>
     <thead>
       <tr>
-        <th></th>
+        <th style="width:32px;"></th>
         <th>学籍番号</th>
-        <th>氏名</th>
+        <th>学年</th>
         <th>組・コース</th>
         <th>番号</th>
-        <th>点数</th>
-        <th>超過</th>
+        <th>氏名</th>
+        <th style="width:96px;">超過時間数</th>
       </tr>
     </thead>
-    <tbody id="studentSelectTableBody"></tbody>
+    <tbody id="excessStudentListArea"></tbody>
   </table>
 </div>
 
+    <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button id="excessStudentRegisterBtn" class="btn btn-primary" type="button">登録</button>
+      <button id="excessStudentCancelBtn" class="btn btn-secondary" type="button">キャンセル</button>
+    </div>
+  </div>
+</div>
 
-   <div class="edit-mode-modal__actions">
-      <button id="studentSelectConfirmBtn">決定</button>
+  <div id="electivePostRegisterModal" class="app-modal" aria-hidden="true" style="display:none;">
+    <div class="app-modal__backdrop"></div>
+    <div class="app-modal__panel" role="dialog" aria-modal="true" aria-labelledby="electivePostRegisterTitle">
+      <h3 id="electivePostRegisterTitle">選択科目の登録が完了しました。</h3>
+      <p>続けて別の選択科目を登録しますか？<br>
+        ※ 名簿への反映は『登録を完了して名簿を反映する』を押した後に行われます。</p>
+
+      <div class="app-modal__actions">
+        <button id="electivePostRegisterContinueBtn" type="button" class="btn primary">
+          このまま続ける
+        </button>
+        <button id="electivePostRegisterFinishBtn" type="button" class="btn primary">
+          登録を完了して名簿を反映する
+        </button>
+      </div>
+    </div>
+  </div>
+<!-- ▼ Excel貼り付け：列ごと入力意味選択モーダル ▼ -->
+<div id="pasteModeModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>貼り付けた点数の扱いを選択してください</h3>
+
+    <p class="modal-desc">
+      今回貼り付けた評価項目（列）ごとに、点数の意味を選択してください。<br>
+      <strong>自動換算</strong>：100点満点の点数を入力した場合<br>
+      <strong>素点</strong>：すでに換算済みの点数（割合後）を入力した場合
+    </p>
+
+    <table class="paste-mode-table">
+      <thead>
+        <tr>
+          <th>評価項目</th>
+          <th>割合</th>
+          <th>入力の意味</th>
+        </tr>
+      </thead>
+      <tbody id="pasteModeTableBody">
+        <!-- JSで動的生成 -->
+      </tbody>
+    </table>
+
+    <div class="modal-actions">
+      <button id="pasteModeCancelBtn">キャンセル</button>
+      <button id="pasteModeApplyBtn" class="primary">この内容で貼り付け</button>
+    </div>
+  </div>
+</div>
+<!-- ▲ Excel貼り付け：列ごと入力意味選択モーダル ▲ -->
+<!-- ================================ -->
+<!-- 教務送信 確認モーダル -->
+<!-- ================================ -->
+<div id="submitConfirmModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 class="modal-title">成績送信の確認</h2>
+
+  <p class="modal-message">
+  この操作は <strong class="modal-emphasis">教務への正式提出</strong> です。<br>
+  <span class="modal-warning">
+    送信後は原則として修正できません。
+  </span>
+</p>
+
+
+    <div class="modal-footer" style="display:flex; gap:12px; justify-content:flex-end;">
+      <button id="submitConfirmCancelBtn" class="btn btn-secondary" type="button">
+        キャンセル
+      </button>
+      <button id="submitConfirmOkBtn" class="btn btn-danger" type="button">
+        送信する
+      </button>
     </div>
   </div>
 </div>
 
 </body>
+
+<div id="saveErrorModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 class="modal-title error">保存できません</h2>
+    <p class="modal-message">
+      入力エラー（赤枠）があるため、保存できません。<br>
+      赤く表示されている項目を修正してください。
+    </p>
+    <button id="saveErrorOkBtn" class="modal-ok">OK</button>
+  </div>
+</div>
 </html>

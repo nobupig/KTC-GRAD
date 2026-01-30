@@ -381,20 +381,20 @@ items.forEach(function(it){
 
   li.appendChild(labelSpan);
 
-  // ★ 修正リンク（提出済のみ）
-  if (showEdit) {
-    const editLink = document.createElement("a");
-    editLink.textContent = "修正";
-    editLink.href =
-  `score_input.html?subjectId=${encodeURIComponent(it.subj.subjectId)}&mode=edit`;
+// ★ 修正リンク（提出済のみ）
+if (showEdit) {
+  const editLink = document.createElement("a");
+  editLink.textContent = "修正";
+  editLink.href =
+    `score_edit.html?subjectId=${encodeURIComponent(it.subj.subjectId)}`;
 
-    editLink.style.fontSize = "12px";
-    editLink.style.color = "#2563eb";
-    editLink.style.textDecoration = "underline";
-    editLink.style.cursor = "pointer";
+  editLink.style.fontSize = "12px";
+  editLink.style.color = "#2563eb";
+  editLink.style.textDecoration = "underline";
+  editLink.style.cursor = "pointer";
 
-    li.appendChild(editLink);
-  }
+  li.appendChild(editLink);
+}
 
   ul.appendChild(li);
 });
