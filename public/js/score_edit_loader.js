@@ -1876,7 +1876,11 @@ let canSubmit =
   let message = null;
 
   // ★ 提出済み（最優先）
-  if (isSubjectCompleted === true && unitKey === "__SINGLE__") {
+  // ★ 修正モードでは提出済み文言を一切表示しない
+if (window.__isEditMode === true) {
+  message = null;
+}
+else if (isSubjectCompleted === true && unitKey === "__SINGLE__") {
     message = {
       text: "提出済みです。成績修正は別途トップ画面から行ってください。",
       type: "completed",
@@ -2936,6 +2940,7 @@ if (!window.__isEditMode) {
 
   ;
   if (
+  window.__isEditMode === true ||   
     isSpecial ||
     currentSubjectMeta.isSkillLevel ||
   subject?.required === false   // ★ 選択科目は単一
