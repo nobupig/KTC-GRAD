@@ -4,11 +4,10 @@
   <meta charset="UTF-8" />
   <title>近大高専 成績システム｜成績入力</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
- <link rel="icon" type="image/png" href="/kindai.png">
- 
-  <!-- あなたのフォルダ構造に合わせた CSS 読み込み -->
-  <link rel="stylesheet" href="/app/score_input.css">
+  <link rel="icon" type="image/png" href="kindai.png">
 
+  <!-- あなたのフォルダ構造に合わせた CSS 読み込み -->
+  <link rel="stylesheet" href="./app/score_input.css">
 </head>
 
 <body>
@@ -45,7 +44,12 @@
         <select id="subjectSelect"></select>
        <div class="point-pill-area evaluation-related" style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
 
-
+  <span id="avgPointDisplay" style="background: #f3f7fa; border-radius: 12px;">
+    平均点：—
+  </span>
+  <span id="adjustPointDisplay" style="background: #f3f7fa; border-radius: 12px;">
+    調整点：—
+  </span>
 </div>
 
       </div>
@@ -53,7 +57,10 @@
         <button id="saveBtn" class="btn-primary" type="button" disabled>
           一時保存
         </button>
-
+<!-- ✅ 追加：Excelダウンロード（科目選択後にJSで有効化） -->
+        <button id="excelDownloadBtn" class="btn-secondary" type="button" disabled>
+          Excelダウンロード
+        </button>
         <button
   id="submitScoresBtn"
   class="btn-danger"
@@ -118,7 +125,13 @@
       </button>
     </div>
 
-   <div id="rightActionArea"></div>
+    <button
+      id="excessStudentBtn"
+      class="btn btn-secondary"
+      type="button"
+    >
+      超過学生登録
+    </button>
   </div>
 </div>
 
@@ -134,7 +147,7 @@
     <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
     <div id="infoMessage" class="info-message evaluation-related">
 
-      成績を入力してください。
+      成績を入力してください。（モード：自動換算モードがデフォルトです）
     </div>
 
     <div id="submissionStatusArea" class="submission-status-area" aria-live="polite"></div>
@@ -174,11 +187,12 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script type="module">
-  import "/js/schoolYear.js";
-  import "/js/score_edit_loader.js";
-  // ✅ ここでは何も呼ばない（loaderは読み込み時に自動起動）
-</script>
+  import { initSchoolYear } from "../../js/schoolYear.js";
+  import { initScoreEdit } from "../../js/Js-edit_mode/score_edit_loader.js";
 
+
+  initSchoolYear();     // ← 年度はここで一度だけ確定
+  initScoreInput();
 </script>
 
   <div id="electiveModal" class="ktc-modal" style="display:none;">
@@ -327,62 +341,6 @@
       </button>
       <button id="submitConfirmOkBtn" class="btn btn-danger" type="button">
         送信する
-      </button>
-    </div>
-  </div>
-</div>
-<!-- 修正対象選択モーダル -->
-<div id="editTargetSelectModal" class="modal hidden">
-<div
-  class="modal-content"
-  style="width: 15vw; max-width: 900px; margin: 0 auto;"
->
-    <h2 class="modal-title">修正対象の学生を選択</h2>
-
-    <p class="modal-message">
-      修正したい学生にチェックを入れてください。<br>
-      ※ この時点では成績表示は変わりません。
-    </p>
-    <div id="editTargetWarning" class="edit-warning hidden">
-      ⚠ 修正対象を変更すると、現在の修正内容は破棄されます。
-    </div>
-<div style="margin: 8px 0; display: flex; align-items: center; gap: 6px;">
-  <label style="cursor: pointer; font-size: 0.9rem;">
-    <input
-      type="checkbox"
-      id="editTargetSelectAll"
-    >
-    全員を選択
-  </label>
-</div>
-
- <div
-  class="edit-target-list"
-  style="max-height: 70vh; overflow-y: auto;"
->
-  <table class="score-table">
-    <thead>
-      <tr>
-        <th></th>
-        <th>学籍番号</th>
-        
-        <th>番号</th>
-        <th>氏名</th>
-      </tr>
-    </thead>
-    <tbody id="editTargetTableBody">
-      <!-- JSで学生行を流し込む -->
-    </tbody>
-  </table>
-</div>
-
-
-    <div class="modal-footer" style="display:flex; gap:12px; justify-content:flex-end;">
-      <button id="editTargetCancelBtn" class="btn btn-secondary" type="button">
-        キャンセル
-      </button>
-      <button id="editTargetOkBtn" class="btn btn-primary" type="button">
-        この内容で進む
       </button>
     </div>
   </div>

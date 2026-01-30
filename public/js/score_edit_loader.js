@@ -2050,10 +2050,21 @@ function setupScoresSnapshotListener(subjectId) {
         window.__latestScoresDocData = data;
 
         // 初回のスナップショット受信時は何もしない（データが初期化されるタイミング）
-        if (!initialized) {
-            initialized = true;
-            return;
-        }
+      if (!initialized) {
+    initialized = true;
+    return;
+}
+
+// ★ 修正モード中で、修正対象学生が選択されている場合は
+// ★ snapshot による再描画・再読み込みを抑止
+if (
+    window.__isEditMode &&
+    window.__editTargetStudentIds &&
+    window.__editTargetStudentIds.size > 0
+) {
+    console.log("[snapshot] skipped re-render in edit mode");
+    return;
+}
 
         // データが変更された場合に UI を更新する
         updateSubmitUI({ subjectDocData: window.__latestScoresDocData });
@@ -2180,10 +2191,13 @@ function setupScoresSnapshotListener(subjectId) {
   }
 
     // ▼ 同一科目の再読込防止（Reads削減の核心）
-    if (subjectId === currentSubjectId) {
-    // skip reload for same subjectId (debug log removed)
-    return;
-  }
+ if (
+   subjectId === currentSubjectId &&
+   !(window.__isEditMode && window.__editTargetStudentIds)
+ ) {
+   return;
+ }
+ 
     currentSubjectId = subjectId;
     setupScoresSnapshotListener(subjectId);
     const grade = String(subject?.grade ?? "");
@@ -2522,10 +2536,24 @@ try {
       });
     };
     try {
+       // ★ 修正モード用：表示対象 students を決定（←ここ）
+  let renderStudents = displayStudents;
+
+  if (
+    window.__isEditMode &&
+    window.__editTargetStudentIds &&
+    window.__editTargetStudentIds.size > 0
+  ) {
+    renderStudents = displayStudents.filter(stu =>
+      window.__editTargetStudentIds.has(String(stu.studentId))
+    );
+  }
+
+
       renderStudentRows(
         tbody,
         subject,
-        displayStudents,
+        renderStudents,
         criteriaState.items,
         handleScoreInputChange,
         studentState,
@@ -2537,7 +2565,7 @@ if (window.__isEditMode && !window.__editTargetModalOpened) {
   openEditTargetSelectModal(displayStudents);
   window.__editTargetModalOpened = true;
 }
-
+      renderRightActionAreaEditMode();
       updateSubmitUI({ subjectDocData: window.__latestScoresDocData });
 
   // ================================
@@ -3366,6 +3394,18 @@ if (window.__isEditMode !== true) {
     import("./score_input_students.js").then(({ filterStudentsByGroupOrCourse }) => {
       const filtered = filterStudentsByGroupOrCourse(subject, baseList, filterKey);
 
+      // ★ 修正モード用フィルタ（ここが正解）
+let displayStudents = filtered;
+if (
+  window.__isEditMode &&
+  window.__editTargetStudentIds &&
+  window.__editTargetStudentIds.size > 0
+) {
+  displayStudents = filtered.filter(stu =>
+    window.__editTargetStudentIds.has(String(stu.studentId))
+  );
+}
+
       // tbody 再描画
       stashCurrentInputScores(tbody);
       isRenderingTable = true;
@@ -3373,7 +3413,7 @@ if (window.__isEditMode !== true) {
         renderStudentRows(
           tbody,      
           subject,    
-          filtered,   
+          displayStudents,   
           criteriaState.items,                 
           (tr) => recalcFinalScoresAfterRestore(tbody),                        
           studentState,
@@ -4277,11 +4317,12 @@ window.__currentFilterKey = "all"; // UIは常に all から
 // ================================
 // 修正対象選択モーダル（Step4-①：表示のみ）
 // ================================
-function openEditTargetSelectModal(students) {
+function openEditTargetSelectModal(students, options = {}) {
   const modal = document.getElementById("editTargetSelectModal");
   const tbody = document.getElementById("editTargetTableBody");
   const cancelBtn = document.getElementById("editTargetCancelBtn");
   const okBtn = document.getElementById("editTargetOkBtn");
+  const selectAllCheckbox =document.getElementById("editTargetSelectAll");
 
   if (!modal || !tbody) {
     console.warn("[edit-target-modal] modal elements not found");
@@ -4313,6 +4354,37 @@ function openEditTargetSelectModal(students) {
     tbody.appendChild(tr);
   });
 
+  // ================================
+// 全員選択チェックボックス
+// ================================
+if (selectAllCheckbox) {
+  // 初期状態はOFF
+  selectAllCheckbox.checked = false;
+
+  selectAllCheckbox.onchange = () => {
+    const checked = selectAllCheckbox.checked;
+
+    tbody
+      .querySelectorAll("input[type='checkbox'][data-student-id]")
+      .forEach(cb => {
+        cb.checked = checked;
+      });
+  };
+}
+tbody.onchange = () => {
+  if (!selectAllCheckbox) return;
+
+  const all = tbody.querySelectorAll(
+    "input[type='checkbox'][data-student-id]"
+  );
+  const checked = tbody.querySelectorAll(
+    "input[type='checkbox'][data-student-id]:checked"
+  );
+
+  selectAllCheckbox.checked =
+    all.length > 0 && all.length === checked.length;
+};
+
   // ボタン：今は「閉じるだけ」
   if (cancelBtn) {
     cancelBtn.onclick = () => {
@@ -4339,6 +4411,8 @@ function openEditTargetSelectModal(students) {
     );
 
     modal.classList.add("hidden");
+    renderRightActionAreaEditMode();
+    rerenderScoreTable();
   };
 }
 
@@ -4378,9 +4452,13 @@ function renderRightActionAreaEditMode() {
   document
     .getElementById("editTargetChangeBtn")
     ?.addEventListener("click", () => {
-      openEditTargetSelectModal(window.currentStudents);
+      // ★ ここが修正点
+      openEditTargetSelectModal(studentState.baseStudents, {
+        showWarning: true
+      });
     });
 }
+
 
 
 
