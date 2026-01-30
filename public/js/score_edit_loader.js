@@ -4347,6 +4347,40 @@ function openEditTargetSelectModal(students) {
   modal.classList.remove("hidden");
 }
 
+function renderRightActionAreaEditMode() {
+  const area = document.getElementById("rightActionArea");
+  if (!area) return;
+
+  // 修正モード以外では何も表示しない
+  if (!window.__isEditMode) {
+    area.innerHTML = "";
+    return;
+  }
+
+  const count =
+    window.__editTargetStudentIds?.size ?? 0;
+
+  area.innerHTML = `
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span>
+        修正対象学生：<strong>${count}</strong>名
+      </span>
+      <button
+        id="editTargetChangeBtn"
+        class="btn btn-secondary"
+        type="button"
+      >
+        修正対象を変更
+      </button>
+    </div>
+  `;
+
+  document
+    .getElementById("editTargetChangeBtn")
+    ?.addEventListener("click", () => {
+      openEditTargetSelectModal(window.currentStudents);
+    });
+}
 
 
 
