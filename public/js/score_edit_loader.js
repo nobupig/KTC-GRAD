@@ -759,6 +759,8 @@ if (!window.__isEditMode) {
 
       window.__currentFilterKey = normalizedKey;
 
+  
+
         // ★ Step C-②: 再描画後は「直近保存→listener」の順で必ず反映
       applySavedScoresToTable(submitted.snapshot.students, tbody);
     } finally {
@@ -2529,6 +2531,12 @@ try {
         studentState,
         window.__latestScoresDocData?.completion
       );
+      // ★★★★★ ここに移す ★★★★★
+if (window.__isEditMode && !window.__editTargetModalOpened) {
+  console.log("[DEBUG] about to open edit target modal (displayStudents)");
+  openEditTargetSelectModal(displayStudents);
+  window.__editTargetModalOpened = true;
+}
 
       updateSubmitUI({ subjectDocData: window.__latestScoresDocData });
 
@@ -4264,6 +4272,80 @@ window.__currentFilterKey = "all"; // UIは常に all から
   lockSubjectSelectInEditMode();
   lockUnitButtonsInEditMode();
 });
+
+
+// ================================
+// 修正対象選択モーダル（Step4-①：表示のみ）
+// ================================
+function openEditTargetSelectModal(students) {
+  const modal = document.getElementById("editTargetSelectModal");
+  const tbody = document.getElementById("editTargetTableBody");
+  const cancelBtn = document.getElementById("editTargetCancelBtn");
+  const okBtn = document.getElementById("editTargetOkBtn");
+
+  if (!modal || !tbody) {
+    console.warn("[edit-target-modal] modal elements not found");
+    return;
+  }
+
+  // 学生配列の存在チェック
+  if (!Array.isArray(students) || students.length === 0) {
+    console.warn("[edit-target-modal] students is empty");
+    return;
+  }
+
+  // 一旦クリア
+  tbody.innerHTML = "";
+
+  // 既存名簿データをそのまま表示
+  students.forEach((s) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="text-align:center;">
+        <input type="checkbox" data-student-id="${s.studentId}">
+      </td>
+      <td>${s.studentId ?? ""}</td>
+      
+      
+      <td>${s.number ?? ""}</td>
+      <td>${s.name ?? ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // ボタン：今は「閉じるだけ」
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      modal.classList.add("hidden");
+    };
+  }
+
+ if (okBtn) {
+  okBtn.onclick = () => {
+    const checkedIds = new Set();
+
+    tbody.querySelectorAll("input[type='checkbox']:checked")
+      .forEach(cb => {
+        const id = cb.dataset.studentId;
+        if (id) checkedIds.add(id);
+      });
+
+    // ★ 修正対象を保存（Step4-②）
+    window.__editTargetStudentIds = checkedIds;
+
+    console.log(
+      "[edit-target] selected students:",
+      Array.from(window.__editTargetStudentIds)
+    );
+
+    modal.classList.add("hidden");
+  };
+}
+
+
+  // 表示
+  modal.classList.remove("hidden");
+}
 
 
 

@@ -345,6 +345,50 @@
     </div>
   </div>
 </div>
+<!-- 修正対象選択モーダル -->
+<div id="editTargetSelectModal" class="modal hidden">
+<div
+  class="modal-content"
+  style="width: 15vw; max-width: 900px; margin: 0 auto;"
+>
+    <h2 class="modal-title">修正対象の学生を選択</h2>
+
+    <p class="modal-message">
+      修正したい学生にチェックを入れてください。<br>
+      ※ この時点では成績表示は変わりません。
+    </p>
+
+ <div
+  class="edit-target-list"
+  style="max-height: 70vh; overflow-y: auto;"
+>
+  <table class="score-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th>学籍番号</th>
+        
+        <th>番号</th>
+        <th>氏名</th>
+      </tr>
+    </thead>
+    <tbody id="editTargetTableBody">
+      <!-- JSで学生行を流し込む -->
+    </tbody>
+  </table>
+</div>
+
+
+    <div class="modal-footer" style="display:flex; gap:12px; justify-content:flex-end;">
+      <button id="editTargetCancelBtn" class="btn btn-secondary" type="button">
+        キャンセル
+      </button>
+      <button id="editTargetOkBtn" class="btn btn-primary" type="button">
+        この内容で進む
+      </button>
+    </div>
+  </div>
+</div>
 
 </body>
 
