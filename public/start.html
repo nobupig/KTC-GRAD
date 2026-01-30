@@ -208,6 +208,35 @@
     </div>
 
     <div id="statusMessage"></div>
+
+<!-- ================================ -->
+<!-- 共通科目 修正ユニット選択モーダル（フェーズ2） -->
+<!-- ================================ -->
+<div id="editUnitModal" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.4);
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+">
+  <div style="
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+    min-width:280px;
+  ">
+    <h3 style="margin-top:0;">修正するユニットを選択</h3>
+    <div id="editUnitButtons" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+
+    <div style="margin-top:16px; text-align:right;">
+      <button id="editUnitCancelBtn" class="btn-secondary">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+
   </main>
 
   <script type="module">
@@ -385,8 +414,11 @@ items.forEach(function(it){
 if (showEdit) {
   const editLink = document.createElement("a");
   editLink.textContent = "修正";
-  editLink.href =
-    `score_edit.html?subjectId=${encodeURIComponent(it.subj.subjectId)}`;
+  editLink.href = "#";
+editLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  startEditFlow(it.subj, it.cs);
+});
 
   editLink.style.fontSize = "12px";
   editLink.style.color = "#2563eb";
@@ -418,6 +450,86 @@ if (showEdit) {
   area.appendChild(note);
 }
 
+// ================================
+// ★ フェーズ1：修正導線の入口のみ実装
+// ・修正画面への遷移はまだ行わない
+// ・共通科目のユニット選択は次フェーズ
+// ================================
+function startEditFlow(subj, completionSummary) {
+  console.log("[EDIT FLOW START]", subj.subjectId, completionSummary);
+
+  // 単一科目 → そのまま進む（次フェーズで遷移）
+  if (isSingleSubject(completionSummary)) {
+    alert(
+      "単一科目の修正モードに進みます。\n" +
+      "（次フェーズで修正画面へ遷移します）"
+    );
+    return;
+  }
+
+  // 共通科目 → ユニット選択
+  const units = completionSummary.completedUnits || [];
+  if (units.length === 0) {
+    alert("提出済みのユニットが見つかりません。");
+    return;
+  }
+
+  openUnitSelectModal(subj, units);
+}
+
+
+function isSingleSubject(completionSummary) {
+  if (!completionSummary) return true;
+
+  const req = completionSummary.requiredUnits;
+  if (!Array.isArray(req) || req.length === 0) return true;
+
+  if (
+    req.length === 1 &&
+    (req[0] === "__SINGLE__" || req[0] === "SINGLE")
+  ) {
+    return true;
+  }
+
+  return false;
+  }
+
+  function openUnitSelectModal(subj, units) {
+  const modal = document.getElementById("editUnitModal");
+  const btnArea = document.getElementById("editUnitButtons");
+  const cancelBtn = document.getElementById("editUnitCancelBtn");
+
+  btnArea.innerHTML = "";
+
+  units.forEach(unit => {
+    const btn = document.createElement("button");
+    btn.textContent = unit + "組";
+    btn.className = "btn-primary";
+    btn.addEventListener("click", () => {
+      modal.style.display = "none";
+      onEditUnitSelected(subj, unit);
+    });
+    btnArea.appendChild(btn);
+  });
+
+  cancelBtn.onclick = () => {
+    modal.style.display = "none";
+  };
+
+  modal.style.display = "flex";
+}
+
+function onEditUnitSelected(subj, unitKey) {
+  console.log("[EDIT UNIT SELECTED]", {
+    subjectId: subj.subjectId,
+    unitKey,
+  });
+
+  alert(
+    `${unitKey}組を修正対象として選択しました。\n` +
+    "（次フェーズで修正画面へ遷移します）"
+  );
+}
 
 
     const currentYear = window.CURRENT_YEAR;
