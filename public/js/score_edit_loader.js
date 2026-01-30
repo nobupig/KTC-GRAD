@@ -631,6 +631,7 @@ try {
 
 import { renderEditModeNoticeOnce } from "./edit_mode_notice.js";
 import { lockSubjectSelectInEditMode } from "./edit_mode_subject_lock.js";
+import { lockUnitButtonsInEditMode } from "./edit_mode_unit_lock.js";
 
   // ================================
   // ★ 科目マスタ（subjects）を正本として取得
@@ -2082,6 +2083,8 @@ function setupScoresSnapshotListener(subjectId) {
   // 科目選択時の処理
   // ================================
   async function handleSubjectChange(subjectId) {
+    const submissionContext = window.__submissionContext;
+ 
     window.isSubjectChanging = true;
 
     // =====================================================
@@ -2353,18 +2356,43 @@ const isSpecial =
 
         // ★ 学年名簿は「学年で取得」する（subjectRosterで代用しない）
         // loadStudentsForGrade は studentState.allStudents に正規化済み配列を入れてくれる
-        await loadStudentsForGrade(db, targetGrade, studentState);
+await loadStudentsForGrade(db, targetGrade, studentState);
 
-          console.log(
-    "[CHECK allStudents]",
-    "grade=", studentState.allStudentsGrade,
-    "len=", studentState.allStudents.length,
-    "grades=", [...new Set(studentState.allStudents.map(s => s.grade))]
+console.log(
+  "[CHECK allStudents]",
+  "grade=", studentState.allStudentsGrade,
+  "len=", studentState.allStudents.length,
+  "grades=", [...new Set(studentState.allStudents.map(s => s.grade))]
+);
+
+// ================================
+// Step3.5（最終）：修正モードでは確定ユニットの学生だけを対象にする
+// ================================
+if (window.__isEditMode === true) {
+  const editUnitKey = submissionContext?.unitKey;
+
+if (currentSubjectMeta?.isCommon === true && editUnitKey) {
+  if (Number(currentSubjectMeta.grade) <= 2) {
+      // 共通科目（1・2年）：組で限定
+      studentState.allStudents = studentState.allStudents.filter(
+        (s) => String(s.class) === String(editUnitKey)
+      );
+    } else {
+      // 共通科目（3年以上）：コースで限定
+      studentState.allStudents = studentState.allStudents.filter(
+        (s) => String(s.course) === String(editUnitKey)
+      );
+    }
+  }
+  // 単一科目はフィルタしない
+}
+
+try {
+  studentState.gradeStudentsCache.set(
+    targetGrade,
+    studentState.allStudents.slice()
   );
-        // gradeStudentsCache には「学年名簿」だけを保存する
-        try {
-          studentState.gradeStudentsCache.set(targetGrade, studentState.allStudents.slice());
-        } catch (e) { /* noop */ }
+} catch (e) { /* noop */ }
 
             }
     } catch (e) {
@@ -4229,6 +4257,7 @@ window.__currentFilterKey = "all"; // UIは常に all から
   console.log("✅ edit initialization done");
   renderEditModeNoticeOnce();
   lockSubjectSelectInEditMode();
+  lockUnitButtonsInEditMode();
 });
 
 
