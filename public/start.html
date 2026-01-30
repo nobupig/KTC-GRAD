@@ -456,26 +456,22 @@ editLink.addEventListener("click", (e) => {
 // ・共通科目のユニット選択は次フェーズ
 // ================================
 function startEditFlow(subj, completionSummary) {
-  console.log("[EDIT FLOW START]", subj.subjectId, completionSummary);
-
-  // 単一科目 → そのまま進む（次フェーズで遷移）
   if (isSingleSubject(completionSummary)) {
-    alert(
-      "単一科目の修正モードに進みます。\n" +
-      "（次フェーズで修正画面へ遷移します）"
-    );
+    const ctx = {
+      editMode: true,
+      year: CURRENT_YEAR,
+      subjectId: subj.subjectId,
+      unitKey: "__SINGLE__",
+    };
+    sessionStorage.setItem("editContext", JSON.stringify(ctx));
+    location.href = "score_edit.html";
     return;
   }
 
-  // 共通科目 → ユニット選択
-  const units = completionSummary.completedUnits || [];
-  if (units.length === 0) {
-    alert("提出済みのユニットが見つかりません。");
-    return;
-  }
-
-  openUnitSelectModal(subj, units);
+  openUnitSelectModal(subj, completionSummary.completedUnits);
 }
+
+
 
 
 function isSingleSubject(completionSummary) {
@@ -520,16 +516,22 @@ function isSingleSubject(completionSummary) {
 }
 
 function onEditUnitSelected(subj, unitKey) {
-  console.log("[EDIT UNIT SELECTED]", {
+  const ctx = {
+    editMode: true,
+    year: CURRENT_YEAR,
     subjectId: subj.subjectId,
-    unitKey,
-  });
+    unitKey: unitKey,
+  };
 
-  alert(
-    `${unitKey}組を修正対象として選択しました。\n` +
-    "（次フェーズで修正画面へ遷移します）"
-  );
+  sessionStorage.setItem("editContext", JSON.stringify(ctx));
+
+  console.log("✅ set editContext (start.html) =", sessionStorage.getItem("editContext"));
+
+  location.href = "score_edit.html";
 }
+
+
+
 
 
     const currentYear = window.CURRENT_YEAR;

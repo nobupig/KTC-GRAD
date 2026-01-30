@@ -1,29 +1,51 @@
-  // ================================
-// 修正モード確定（EDIT ONLY）
 // ================================
+// ★ 修正モード：最優先初期化（ここから差し替え）
+// ================================
+const rawEditContext = sessionStorage.getItem("editContext");
+
+if (!rawEditContext) {
+  console.warn("[EDIT] editContext not found. redirect to start.");
+  location.href = "start.html";
+  throw new Error("editContext missing");
+}
+
+let editCtx;
+try {
+  editCtx = JSON.parse(rawEditContext);
+} catch (e) {
+  console.error("[EDIT] failed to parse editContext", e);
+  location.href = "start.html";
+  throw e;
+}
+
+// ★ 修正モード確定（ここで一度だけ）
 window.__isEditMode = true;
 
-const params = new URLSearchParams(location.search);
-
-const year = params.get("year");
-const subjectId = params.get("subjectId");
-const unitKeyFromUrl = params.get("unitKey") || null;
-
-// ================================
-// ★ submissionContext 正本の初期化（最重要）
-// ================================
+// ★ submissionContext はここでのみ確定
 window.__submissionContext = {
-  unitKey: unitKeyFromUrl,   // ← ★ ここで初めて確定させる
+  year: editCtx.year,
+  subjectId: editCtx.subjectId,
+  unitKey: editCtx.unitKey,
   requiredUnits: []
 };
 
-console.log("🧭 edit mode params", { year, subjectId, unitKeyFromUrl });
+// ★ 以降の loader が使う確定値
+const year = editCtx.year;
+const subjectId = editCtx.subjectId;
+const unitKeyFromUrl = editCtx.unitKey;
 
-if (!year || !subjectId) {
-  alert("修正対象の年度または科目が指定されていません。");
-  location.href = "start.html";
-  throw new Error("missing params");
-}
+console.log("🧭 [EDIT MODE BOOT]", {
+  year,
+  subjectId,
+  unitKeyFromUrl,
+});
+// ================================
+// ★ 修正モード：最優先初期化（ここまで差し替え）
+// ================================
+
+
+
+
   
   
   // ================================
