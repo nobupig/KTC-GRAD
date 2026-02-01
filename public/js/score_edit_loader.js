@@ -42,7 +42,34 @@ console.log("🧭 [EDIT MODE BOOT]", {
 // ================================
 // ★ 修正モード：最優先初期化（ここまで差し替え）
 // ================================
+requestAnimationFrame(() => {
+  const btn = document.getElementById("backHomeBtn");
+  if (!btn) {
+    console.warn("[backHomeBtn] not found");
+    return;
+  }
 
+  // ① pointer-events を強制復活
+  btn.style.pointerEvents = "auto";
+  btn.disabled = false;
+
+  // ② 二重登録防止
+  if (btn.__bound) return;
+  btn.__bound = true;
+
+  // ③ 確実に遷移
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    console.log("[backHomeBtn] clicked → start.html");
+
+    // 修正モードの痕跡を掃除
+    sessionStorage.removeItem("editContext");
+
+    window.location.href = "start.html";
+  });
+});
 
 
 
@@ -4231,6 +4258,10 @@ window.updateSubmitUI?.();
 
       currentUser = user;
       window.currentUser = user; // ★追加：score_input_students.js が参照する
+        // ================================
+  // ボタンイベント登録（DOM確定後）
+  // ================================
+
 
       // 教員名表示
       const teacherName = await loadTeacherName(user);
@@ -4266,20 +4297,7 @@ window.updateSubmitUI?.();
       });
     });
 
-    // ログアウト
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async () => {
-        await signOut(auth);
-        window.location.href = "index.html";
-      });
-    }
 
-    // ホームへ戻る
-    if (backHomeBtn) {
-      backHomeBtn.addEventListener("click", () => {
-        window.location.href = "start.html";
-      });
-    }
       // ✅ Excelダウンロード（Firestore read は追加しない：既存state/DOMのみ使用）
     initExcelDownloadFeature({
       getCurrentSubject: () => window.currentSubject, // handleSubjectChange 内でセット済み

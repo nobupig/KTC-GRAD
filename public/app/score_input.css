@@ -2555,3 +2555,8 @@ input.skill-level-input {
   font-size: 1.15rem;     /* 科目名は一段強調 */
   font-weight: 700;
 }
+
+#backHomeBtn {
+  pointer-events: auto !important;
+  z-index: 10000;
+}
