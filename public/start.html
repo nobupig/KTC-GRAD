@@ -456,17 +456,31 @@ editLink.addEventListener("click", (e) => {
 // ・共通科目のユニット選択は次フェーズ
 // ================================
 function startEditFlow(subj, completionSummary) {
-  if (isSingleSubject(completionSummary)) {
-    const ctx = {
-      editMode: true,
-      year: CURRENT_YEAR,
-      subjectId: subj.subjectId,
-      unitKey: "__SINGLE__",
-    };
-    sessionStorage.setItem("editContext", JSON.stringify(ctx));
-    location.href = "score_edit.html";
-    return;
-  }
+ if (isSingleSubject(completionSummary)) {
+  // ★ Firestore に units がある場合はそのキーを使う
+  const units =
+    Array.isArray(completionSummary.completedUnits) &&
+    completionSummary.completedUnits.length > 0
+      ? completionSummary.completedUnits
+      : [];
+
+  const fixedUnitKey =
+    units.length === 1
+      ? String(units[0])   // ← "C" が入る
+      : "__SINGLE__";      // 本当に単一のときだけ
+
+  const ctx = {
+    editMode: true,
+    year: CURRENT_YEAR,
+    subjectId: subj.subjectId,
+    unitKey: fixedUnitKey,
+  };
+
+  sessionStorage.setItem("editContext", JSON.stringify(ctx));
+  location.href = "score_edit.html";
+  return;
+}
+
 
   openUnitSelectModal(subj, completionSummary.completedUnits);
 }
