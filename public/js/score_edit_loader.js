@@ -2808,26 +2808,27 @@ const unitsMap =
   // ★ 修正モード用：表示対象 students を決定（←ここ）
   let renderStudents = displayStudents;
 
-  // __editTargetStudentIds は「配列」でも「Set」でも受けられるようにする
-  const _sel = window.__editTargetStudentIds;
-  const selectedIdSet =
-    _sel instanceof Set
-      ? _sel
-      : Array.isArray(_sel)
-        ? new Set(_sel.map((v) => String(v)))
-        : null;
+// __editTargetStudentIds は「配列」でも「Set」でも受ける
+const _sel = window.__editTargetStudentIds;
+const selectedIdSet =
+  _sel instanceof Set
+    ? new Set([..._sel].map(v => String(v)))
+    : Array.isArray(_sel)
+      ? new Set(_sel.map(v => String(v)))
+      : null;
 
-  // ★ 修正モード × 選択科目では edit-target を使わない
-if (
-  window.__isEditMode === true &&
-  subject.required !== false &&   // ← ★これが肝
-  selectedIdSet &&
-  selectedIdSet.size > 0
-) {
+// ✅ 修正モードでは、科目種別に関係なく「選択があれば必ず絞り込む」
+if (window.__isEditMode === true && selectedIdSet && selectedIdSet.size > 0) {
   renderStudents = displayStudents.filter(stu =>
     selectedIdSet.has(String(stu.studentId))
   );
+
+  console.log(
+    "[EDIT MODE] renderStudents filtered by edit-target:",
+    [...selectedIdSet]
+  );
 }
+
 
 
       renderStudentRows(
