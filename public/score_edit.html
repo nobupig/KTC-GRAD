@@ -40,15 +40,25 @@
 
     <!-- 上部操作エリア：左寄せで対象科目プルダウン、右側に他ボタン -->
     <div class="top-controls" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;">
-      <div class="subject-select-area" style="display: flex; align-items: center; gap: 8px;">
-        <label for="subjectSelect">対象科目：</label>
-        <select id="subjectSelect"></select>
-       <div class="point-pill-area evaluation-related" style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
+<div class="subject-select-area normal-only" style="display: flex; align-items: center; gap: 8px;">
+  <label for="subjectSelect">対象科目：</label>
+  <select id="subjectSelect"></select>
 
-
+  <div class="point-pill-area evaluation-related"
+       style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
+  </div>
 </div>
 
       </div>
+<div class="subject-fixed-area edit-only" style="display: none;">
+  <span class="edit-mode-badge">🛠 成績修正モード</span>
+  <span id="editSubjectDisplay" class="edit-subject-text">
+    対象科目：-
+  </span>
+</div>
+
+
+
       <div class="top-btn-area" style="display: flex; align-items: center; gap: 8px;">
         <button id="saveBtn" class="btn-primary" type="button" disabled>
           一時保存

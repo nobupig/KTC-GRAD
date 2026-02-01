@@ -4426,7 +4426,7 @@ window.updateSubmitUI?.();
 
   // getStudentsForSubject: 超過学生登録等と共通の名簿取得ラッパー
   function getStudentsForSubject() {
-    const subject = findSubjectById(currentSubjectId);
+    const subject = findSubjectById(subjectId);
     if (!subject) return [];
     return filterAndSortStudentsForSubject(subject, studentState) || [];
   }
@@ -4755,30 +4755,50 @@ onAuthStateChanged(auth, async (user) => {
 
   // ★ ① URL由来 unitKey を最初に確定
   const fixedUnitKey = String(unitKeyFromUrl);
-
   window.__editTargetUnitKey = fixedUnitKey;
 
- window.__editTargetUnitKey = fixedUnitKey;
+  window.__submissionContext = window.__submissionContext || {};
+  window.__submissionContext.unitKey = fixedUnitKey;
+  window.__currentFilterKey = "all";
 
-// ★ submissionContext が未初期化なら最低限だけ補う
-window.__submissionContext = window.__submissionContext || {};
-window.__submissionContext.unitKey = fixedUnitKey;
-
-// requiredUnits はここでは触らない（STEP1で確定させる）
-window.__currentFilterKey = "all"; // UIは常に all から
-
-
-  // ★ ② その状態で科目ロード
+  // ★ ② 科目ロード
   await loadTeacherSubjects(user);
 
-  // ★ ③ unitKey が確定した状態で handleSubjectChange
+  // ★ ③ 科目確定＆描画
   await handleSubjectChange(subjectId);
 
+  // ================================
+// 修正モード用：科目表示UI切替
+// ================================
+if (window.__isEditMode === true) {
+  // 通常モード用UIを非表示
+  document.querySelectorAll(".normal-only").forEach(el => {
+    el.style.display = "none";
+  });
+
+  // 修正モード用UIを表示
+  document.querySelectorAll(".edit-only").forEach(el => {
+    el.style.display = "block";
+  });
+
+  // 修正対象科目表示
+  const subject = findSubjectById(subjectId);
+  const displayEl = document.getElementById("editSubjectDisplay");
+
+  if (subject && displayEl) {
+    const grade = subject.grade ?? "";
+    const term = subject.term ?? "";
+    const name = subject.name ?? "";
+
+    displayEl.textContent = `対象科目：${grade}年 / ${term} / ${name}`;
+  }
+}
   console.log("✅ edit initialization done");
   renderEditModeNoticeOnce();
   lockSubjectSelectInEditMode();
   lockUnitButtonsInEditMode();
 });
+
 
 
 // ================================

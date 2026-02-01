@@ -2522,3 +2522,36 @@ input.skill-level-input {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* ================================
+   修正モード：対象科目表示（1行・強調）
+================================ */
+
+.subject-fixed-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  font-size: 1.1rem;      /* 全体をやや大きく */
+  font-weight: 600;
+  color: #92400e;         /* 落ち着いた注意色 */
+}
+
+.edit-mode-badge {
+  display: inline-flex;
+  align-items: center;
+
+  background: #fde68a;
+  color: #92400e;
+
+  padding: 4px 10px;
+  border-radius: 999px;
+
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.edit-subject-text {
+  font-size: 1.15rem;     /* 科目名は一段強調 */
+  font-weight: 700;
+}
