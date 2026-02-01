@@ -2640,9 +2640,33 @@ try {
  if (!Array.isArray(rosterIds) || rosterIds.length === 0) {
   const isSpecialType = Number(currentSubjectMeta?.specialType ?? 0) > 0;
 
-  // ★ 特別科目は subjectRoster が無くても「学年名簿」で成立させる
+ // ★ 特別科目：まず submittedSnapshot を正本として使う
   if (isSpecialType) {
-    rosterIds = (studentState.allStudents || []).map(s => String(s.studentId));
+    const doc = window.__latestScoresDocData;
+    const unitKeyForSnap =
+      window.__submissionContext?.unitKey ?? window.currentUnitKey;
+
+    const submittedStudents = getSubmittedStudents(
+      doc,
+      currentSubjectMeta,
+      unitKeyForSnap
+    );
+
+    if (submittedStudents && Object.keys(submittedStudents).length > 0) {
+      rosterIds = Object.keys(submittedStudents).map(String);
+      console.log(
+        "[SPECIAL] rosterIds from submittedSnapshot:",
+        rosterIds
+      );
+    } else {
+      // submittedSnapshot すら無い場合のみ学年名簿フォールバック
+      rosterIds = (studentState.allStudents || []).map(s =>
+        String(s.studentId)
+      );
+      console.warn(
+        "[SPECIAL] fallback to allStudents (no snapshot)"
+      );
+    }
   } else {
     alert("名簿データが未生成です。教務に連絡してください。");
     throw new Error("subjectRoster missing");
@@ -2708,7 +2732,37 @@ if (subject.required === false && window.__isEditMode !== true) {
     }
     await loadScoreVersionBase(subjectId, displayStudents);
     // debug render logs removed
+// ================================
+// ★ 修正モード：提出済みスナップショットの学生のみに絞る（最終確定）
+// 単一科目 / 選択科目 / 共通科目 共通ロジック
+// ================================
+if (window.__isEditMode === true) {
+  const doc = window.__latestScoresDocData;
+  const unitKeyForSnap =
+    window.__submissionContext?.unitKey ?? window.currentUnitKey;
 
+  const submittedStudents = getSubmittedStudents(
+    doc,
+    currentSubjectMeta,
+    unitKeyForSnap
+  );
+
+  if (submittedStudents) {
+    const idSet = new Set(Object.keys(submittedStudents).map(String));
+    displayStudents = displayStudents.filter(stu =>
+      idSet.has(String(stu.studentId))
+    );
+
+    // 修正モードでは base / current も必ず同期
+    studentState.baseStudents = displayStudents.slice();
+    studentState.currentStudents = displayStudents.slice();
+
+    console.log(
+      "[EDIT MODE] displayStudents fixed by submittedSnapshot:",
+      displayStudents.map(s => s.studentId)
+    );
+  }
+}
 
   // ================================
   // 提出済ユニット判定（UI用）
@@ -2754,19 +2808,24 @@ const unitsMap =
       });
     };
     try {
-       // ★ 修正モード用：表示対象 students を決定（←ここ）
+
+  // ★ 修正モード用：表示対象 students を決定（←ここ）
   let renderStudents = displayStudents;
 
-  if (
-    window.__isEditMode &&
-    window.__editTargetStudentIds &&
-    window.__editTargetStudentIds.size > 0
-  ) {
-    renderStudents = displayStudents.filter(stu =>
-      window.__editTargetStudentIds.has(String(stu.studentId))
+  // __editTargetStudentIds は「配列」でも「Set」でも受けられるようにする
+  const _sel = window.__editTargetStudentIds;
+  const selectedIdSet =
+    _sel instanceof Set
+      ? _sel
+      : Array.isArray(_sel)
+        ? new Set(_sel.map((v) => String(v)))
+        : null;
+
+  if (window.__isEditMode === true && selectedIdSet && selectedIdSet.size > 0) {
+    renderStudents = displayStudents.filter((stu) =>
+      selectedIdSet.has(String(stu.studentId))
     );
   }
-
 
       renderStudentRows(
         tbody,
@@ -3677,13 +3736,14 @@ if (window.__isEditMode !== true) {
 let displayStudents = filtered;
 if (
   window.__isEditMode &&
-  window.__editTargetStudentIds &&
-  window.__editTargetStudentIds.size > 0
+  Array.isArray(window.__editTargetStudentIds) &&
+  window.__editTargetStudentIds.length > 0
 ) {
-  displayStudents = filtered.filter(stu =>
-    window.__editTargetStudentIds.has(String(stu.studentId))
+  renderStudents = displayStudents.filter(stu =>
+    window.__editTargetStudentIds.includes(String(stu.studentId))
   );
 }
+
 
       // tbody 再描画
       stashCurrentInputScores(tbody);
@@ -4779,23 +4839,21 @@ tbody.onchange = () => {
     };
   }
 
- if (okBtn) {
+if (okBtn) {
   okBtn.onclick = () => {
     const checkedIds = new Set();
 
-    tbody.querySelectorAll("input[type='checkbox']:checked")
-      .forEach(cb => {
+    tbody
+      .querySelectorAll("input[type='checkbox']:checked")
+      .forEach((cb) => {
         const id = cb.dataset.studentId;
-        if (id) checkedIds.add(id);
+        if (id) checkedIds.add(String(id));
       });
 
-    // ★ 修正対象を保存（Step4-②）
-    window.__editTargetStudentIds = checkedIds;
+    // ★ 修正モード：選択された学生IDを保持（配列で保持）
+    window.__editTargetStudentIds = Array.from(checkedIds);
 
-    console.log(
-      "[edit-target] selected students:",
-      Array.from(window.__editTargetStudentIds)
-    );
+    console.log("[edit-target] selected students:", window.__editTargetStudentIds);
 
     modal.classList.add("hidden");
     renderRightActionAreaEditMode();
@@ -4818,8 +4876,8 @@ function renderRightActionAreaEditMode() {
     return;
   }
 
-  const count =
-    window.__editTargetStudentIds?.size ?? 0;
+  const _sel = window.__editTargetStudentIds;
+  const count = _sel instanceof Set ? _sel.size : Array.isArray(_sel) ? _sel.length : 0;
 
   area.innerHTML = `
     <div style="display:flex; align-items:center; gap:8px;">
