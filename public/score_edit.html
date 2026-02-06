@@ -72,6 +72,15 @@
 >
   教務へ提出
 </button>
+  <!-- 修正モード専用：修正内容を送信 -->
+ <button
+  id="editSubmitBtn"
+  class="btn-danger"
+  type="button"
+  style="display: none;"
+>
+  修正内容を教務へ送信
+</button>
         <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
           ホームへ戻る
         </button>
@@ -141,6 +150,33 @@
       <div id="studentCountDisplay" class="student-count">受講者人数：0名</div>
     </div>
 
+    <!-- ================================ -->
+<!-- 修正モード専用：軽量成績テーブル -->
+<!-- ================================ -->
+<div id="editSimpleTableWrapper" class="edit-only" style="display:none; margin-top:16px;">
+  <table class="score-table">
+    <thead>
+      <tr>
+        <th>学籍番号</th>
+        <th>成績データ（JSON）</th>
+      </tr>
+    </thead>
+    <tbody id="editScoreTableBody">
+      <!-- 修正モードJSが直接描画 -->
+    </tbody>
+  </table>
+
+  <div style="margin-top:12px;">
+    <button id="editSimpleSaveBtn" class="btn-danger" type="button">
+      修正内容を保存
+    </button>
+  </div>
+
+  <p style="margin-top:8px; font-size:0.85rem; color:#b45309;">
+    ※ 超過登録の追加・解除・時間数変更は、Slack にて教務部へ連絡してください。
+  </p>
+</div>
+
     <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
     <div id="infoMessage" class="info-message evaluation-related">
 
@@ -177,19 +213,20 @@
     <button id="skillSaveBtn" style="display:none;">習熟度を保存</button>
   </main>
 
-  <!-- ========================================= -->
-  <!-- JS 読み込み（あなたの public/js 構造に合わせたもの） -->
-  <!-- ========================================= -->
-    <!-- ✅ 追加：SheetJS（Excel生成） -->
+<!-- ========================================= -->
+<!-- JS / Firebase Auth -->
+<!-- ========================================= -->
+
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script type="module">
-  import "/js/schoolYear.js";
-  import "/js/score_edit_loader.js";
-  // ✅ ここでは何も呼ばない（loaderは読み込み時に自動起動）
+  import "/js/schoolYear.js";               // 必須（年度）
+  import "/js/score_input_students.js";     // ★ renderStudentRows の定義元
+  import "/js/score_edit_loader.js";        // 修正モード起点
+  import "/js/score_edit_patch.js";         // パッチ（最後）
 </script>
 
-</script>
+
 
   <div id="electiveModal" class="ktc-modal" style="display:none;">
     <div class="ktc-modal-content">

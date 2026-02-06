@@ -23,7 +23,7 @@ const ADMIN_EMAILS = [
 
 const firebaseConfig = {
   apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
-  authDomain: "ktc-grade-system.firebaseapp.com",
+  authDomain: "ktc-grade-system.web.app",
   projectId: "ktc-grade-system",
   storageBucket: "ktc-grade-system.appspot.com",
   messagingSenderId: "490169300362",

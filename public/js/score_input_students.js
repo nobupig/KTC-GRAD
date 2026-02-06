@@ -1794,3 +1794,4 @@ if (["1", "2"].includes(String(subject.grade))) {
 // ================================
 window.applyStudentUIState = applyStudentUIState;
 
+window.renderStudentRows = renderStudentRows;

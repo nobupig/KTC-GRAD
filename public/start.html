@@ -245,31 +245,12 @@
   // 年度を最初に確定（全ページ共通）
   initSchoolYear();
 
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import {
-      getAuth,
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import {
-      getFirestore,
-      doc,
-      getDoc,
-         } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-    // Firebase 設定
-    const firebaseConfig = {
-      apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
-      authDomain: "ktc-grade-system.firebaseapp.com",
-      projectId: "ktc-grade-system",
-      storageBucket: "ktc-grade-system.appspot.com",
-      messagingSenderId: "490169300362",
-      appId: "1:490169300362:web:7c6e7b47a394d68d514473"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+import { auth, db } from "/js/firebase_init.js";
+import {
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
     const headerUserDisplay = document.getElementById("headerUserDisplay");
     const userInfoDisplay = document.getElementById("userInfoDisplay");
@@ -315,6 +296,22 @@ function isSingleLikeCompletion(cs) {
   if (!Array.isArray(req) || req.length === 0) return true;
   if (req.length === 1 && (req[0] === "__SINGLE__" || req[0] === "SINGLE")) return true;
   return false;
+}
+
+function goEditMode(subj, unitKey, completionSummary) {
+  const ctx = {
+    editMode: true,
+    year: CURRENT_YEAR,
+    subjectId: subj.subjectId,
+    unitKey: String(unitKey),
+    requiredUnits: completionSummary?.requiredUnits ?? [],
+  };
+
+  sessionStorage.setItem("editContext", JSON.stringify(ctx));
+  console.log("🛠 set editContext =", ctx);
+
+  // ★ 修正モードでは URL は汚さない
+  location.href = "score_edit.html";
 }
 
 // subjects（teacherSubjects）から提出状況を分類して描画
@@ -417,7 +414,7 @@ if (showEdit) {
   editLink.href = "#";
 editLink.addEventListener("click", (e) => {
   e.preventDefault();
-  startEditFlow(it.subj, it.cs);
+  startEditMode(it.subj, it.cs);
 });
 
   editLink.style.fontSize = "12px";
@@ -474,11 +471,14 @@ function startEditFlow(subj, completionSummary) {
     year: CURRENT_YEAR,
     subjectId: subj.subjectId,
     unitKey: fixedUnitKey,
+    requiredUnits: completionSummary?.requiredUnits ?? [],
   };
 
-  sessionStorage.setItem("editContext", JSON.stringify(ctx));
-  location.href = "score_edit.html";
-  return;
+sessionStorage.setItem("editContext", JSON.stringify(ctx));
+
+// ★ 修正モードでは URL に subjectId を付けない
+location.href = "score_edit.html";
+return;
 }
 
 
@@ -530,21 +530,9 @@ function isSingleSubject(completionSummary) {
 }
 
 function onEditUnitSelected(subj, unitKey) {
-  const ctx = {
-    editMode: true,
-    year: CURRENT_YEAR,
-    subjectId: subj.subjectId,
-    unitKey: unitKey,
-  };
-
-  sessionStorage.setItem("editContext", JSON.stringify(ctx));
-
-  console.log("✅ set editContext (start.html) =", sessionStorage.getItem("editContext"));
-
-  location.href = "score_edit.html";
+  // ★ 共通関数に委譲
+  goEditMode(subj, unitKey, completionSummary);
 }
-
-
 
 
 
@@ -671,47 +659,85 @@ if (!cs) {
       window.location.href = "index.html";
     });
 
-    // 認証監視
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        window.location.href = "index.html";
-        return;
-      }
+// ===============================
+// 認証監視（確定版）
+// ===============================
+let authChecked = false;
 
-      currentUser = user;
-      await loadTeacherName();
-
-      const displayName = currentTeacherName || user.email;
-
-      // ★ null 安全対策を追加
-      if (headerUserDisplay) {
-        headerUserDisplay.textContent = `ログイン中：${displayName}`;
-      }
-      if (userInfoDisplay) {
-        userInfoDisplay.textContent =
-          `ログイン中：${displayName}（${user.email}）`;
-      }
-// ================================
-// Step.0: トップ画面サマリー描画（teacherSubjects を1回読む）
-// ================================
-try {
-  const tsRef = doc(db, teacherSubjectsCol, user.email);
-  const tsSnap = await getDoc(tsRef);
-
-  const area = document.getElementById("unitStatusArea");
-  if (!tsSnap.exists()) {
-    // 未登録
-    renderStartMenuOverview(area, []);
-  } else {
-    const subjects = tsSnap.data()?.subjects || [];
-    renderStartMenuOverview(area, subjects);
+onAuthStateChanged(auth, async (user) => {
+  // 初回は必ず通す（復元待ち）
+  if (!user && !authChecked) {
+    authChecked = true;
+    console.log("[START] auth restoring... wait");
+    return;
   }
-} catch (e) {
-  console.error("[Start] failed to load teacherSubjects for overview:", e);
-}
 
+  // 復元後も user がいなければ本当に未ログイン
+  if (!user) {
+    console.warn("[START] auth missing → redirect");
+    window.location.href = "index.html";
+    return;
+  }
 
-    });
+  console.log("[START] auth ready:", user.email);
+
+  currentUser = user;
+  await loadTeacherName();
+
+  const displayName = currentTeacherName || user.email;
+
+  if (headerUserDisplay) {
+    headerUserDisplay.textContent = `ログイン中：${displayName}`;
+  }
+  if (userInfoDisplay) {
+    userInfoDisplay.textContent =
+      `ログイン中：${displayName}（${user.email}）`;
+  }
+
+  // ===== トップ画面サマリー描画 =====
+  try {
+    const tsRef = doc(db, teacherSubjectsCol, user.email);
+    const tsSnap = await getDoc(tsRef);
+
+    const area = document.getElementById("unitStatusArea");
+    if (!tsSnap.exists()) {
+      renderStartMenuOverview(area, []);
+    } else {
+      const subjects = tsSnap.data()?.subjects || [];
+      renderStartMenuOverview(area, subjects);
+    }
+  } catch (e) {
+    console.error("[Start] failed to load teacherSubjects:", e);
+  }
+});
+
+    // ===============================
+// 修正モード開始（start.html）
+// ===============================
+window.startEditMode = function (subj, completionSummary) {
+  const units = Array.isArray(completionSummary?.completedUnits)
+    ? completionSummary.completedUnits
+    : [];
+
+  const unitKey =
+    units.length === 1
+      ? String(units[0])
+      : "__SINGLE__";
+
+  const ctx = {
+    editMode: true,
+    year: CURRENT_YEAR,
+    subjectId: subj.subjectId,
+    unitKey,
+    requiredUnits: completionSummary?.requiredUnits ?? [],
+  };
+
+  sessionStorage.setItem("editContext", JSON.stringify(ctx));
+
+  console.log("✅ set editContext =", ctx);
+
+  location.href = "./score_edit.html";
+};
   </script>
 </body>
 </html>

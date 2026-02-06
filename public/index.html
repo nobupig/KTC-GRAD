@@ -284,54 +284,41 @@
   </style>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import {
-    getAuth, GoogleAuthProvider, signInWithPopup, signOut
-  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-  import {
-    getFirestore, doc, getDoc
-  } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { auth, db } from "/js/firebase_init.js";
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-  // --- Firebase 設定 ---
-  const firebaseConfig = {
-    apiKey: "AIzaSyB-ykIzRvYbc5osV6WATu6BSOJt_zlHkgM",
-    authDomain: "ktc-grade-system.firebaseapp.com",
-    projectId: "ktc-grade-system",
-    storageBucket: "ktc-grade-system.appspot.com",
-    messagingSenderId: "490169300362",
-    appId: "1:490169300362:web:7c6e7b47a394d68d514473"
-  };
+/* =========================
+ * 成績入力期間判定
+ * ========================= */
+async function checkInputPeriodForLogin() {
+  const ref = doc(db, "settings", "period");
+  const snap = await getDoc(ref);
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+  if (!snap.exists()) return { mode: "none" };
 
-  // =========================
-  // 成績入力期間判定（正規ロジック）
-  // =========================
-  async function checkInputPeriodForLogin() {
-    const ref = doc(db, "settings", "period");
-    const snap = await getDoc(ref);
+  const p = snap.data();
+  const now = new Date();
 
-    if (!snap.exists()) return { mode: "none" };
+  const firstStart  = new Date(p.firstStart);
+  const firstEnd    = new Date(p.firstEnd);
+  const secondStart = new Date(p.secondStart);
+  const secondEnd   = new Date(p.secondEnd);
 
-    const p = snap.data();
-    const now = new Date();
+  if (now >= firstStart && now <= firstEnd) return { mode: "first" };
+  if (now >= secondStart && now <= secondEnd) return { mode: "second" };
 
-    const firstStart  = new Date(p.firstStart);
-    const firstEnd    = new Date(p.firstEnd);
-    const secondStart = new Date(p.secondStart);
-    const secondEnd   = new Date(p.secondEnd);
+  return { mode: "none" };
+}
 
-    if (now >= firstStart && now <= firstEnd) return { mode: "first" };
-    if (now >= secondStart && now <= secondEnd) return { mode: "second" };
-
-    return { mode: "none" };
-  }
-
- // =========================
-// Toast 表示（index.html 用）
-// =========================
+/* =========================
+ * Toast
+ * ========================= */
 function showToast(message, type = "info", duration = 3000) {
   const container = document.getElementById("toast-container");
   if (!container) return;
@@ -349,9 +336,9 @@ function showToast(message, type = "info", duration = 3000) {
   }, duration);
 }
 
-// =========================
-// ローディング制御（index.html 用）
-// =========================
+/* =========================
+ * ローディング制御
+ * ========================= */
 function setLoading(isLoading) {
   const btn = document.getElementById("google-login-btn");
   const textSpan = document.getElementById("btn-text");
@@ -369,66 +356,73 @@ function setLoading(isLoading) {
   }
 }
 
+/* =========================
+ * 🔑 ログイン処理（確定版）
+ * ========================= */
+async function login() {
+  const provider = new GoogleAuthProvider();
+  setLoading(true);
 
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const email = result.user?.email || "";
 
-
-  // --- ログイン処理 ---
-  async function login() {
-    const provider = new GoogleAuthProvider();
-    setLoading(true);
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const email = result.user.email || "";
-
-      // TEST MODE
-      const TEST_ALLOWED_EMAILS = ["nobupig@gmail.com"];
-
-      if (!TEST_ALLOWED_EMAILS.includes(email) && !email.endsWith("@ktc.ac.jp")) {
-        showToast("教員アカウント（@ktc.ac.jp）のみ利用可能です。", "error", 5000);
-        await signOut(auth);
-        return;
-      }
-
-      if (/^[gs]\d+@ktc\.ac\.jp$/.test(email)) {
-        showToast("学生アカウントではログインできません。", "error", 5000);
-        await signOut(auth);
-        return;
-      }
-
-      const snap = await getDoc(doc(db, "teachers", email));
-      if (!snap.exists()) {
-        showToast("教員名簿に登録されていません。", "error", 5000);
-        await signOut(auth);
-        return;
-      }
-
-      showToast("ログインに成功しました。", "success", 2000);
-
-      // ★ 期間判定で遷移先を分岐
-      let period;
-      try {
-        period = await checkInputPeriodForLogin();
-      } catch (e) {
-        console.error("period check failed:", e);
-        period = { mode: "none" };
-      }
-
-      if (period.mode === "none") {
-        location.href = "view.html";
-      } else {
-        location.href = "start.html";
-      }
-
-    } catch (e) {
-      console.error(e);
-      showToast("ログインに失敗しました。時間をおいて再度お試しください。", "error", 5000);
-    } finally {
-      setLoading(false);
+    // テスト許可
+    const TEST_ALLOWED_EMAILS = ["nobupig@gmail.com"];
+    if (!TEST_ALLOWED_EMAILS.includes(email) && !email.endsWith("@ktc.ac.jp")) {
+      showToast("教員アカウント（@ktc.ac.jp）のみ利用可能です。", "error", 5000);
+      await signOut(auth);
+      return;
     }
-  }
 
-  window.login = login;
+    if (/^[gs]\d+@ktc\.ac\.jp$/.test(email)) {
+      showToast("学生アカウントではログインできません。", "error", 5000);
+      await signOut(auth);
+      return;
+    }
+
+    const snap = await getDoc(doc(db, "teachers", email));
+    if (!snap.exists()) {
+      showToast("教員名簿に登録されていません。", "error", 5000);
+      await signOut(auth);
+      return;
+    }
+
+    showToast("ログインに成功しました。", "success", 1500);
+
+    /* ===== ここが最重要 ===== */
+    // Auth 復元を待つ
+    await new Promise((resolve) => {
+      const unsub = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          console.log("[INDEX] auth ready:", user.email);
+          unsub();
+          resolve();
+        }
+      });
+    });
+
+    // 期間判定
+    let period = { mode: "none" };
+    try {
+      period = await checkInputPeriodForLogin();
+    } catch (e) {
+      console.error("period check failed:", e);
+    }
+
+    location.href = (period.mode === "none")
+      ? "view.html"
+      : "start.html";
+
+  } catch (e) {
+    console.error(e);
+    showToast("ログインに失敗しました。", "error", 5000);
+  } finally {
+    setLoading(false);
+  }
+}
+
+window.login = login;
 </script>
 
 </head>
