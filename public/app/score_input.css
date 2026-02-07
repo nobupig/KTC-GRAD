@@ -828,7 +828,7 @@ th {
   color: #fff;
   border-radius: 999px;
   border: none;
-  padding: 8px 20px;
+  padding: 8px 10px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -2547,7 +2547,7 @@ input.skill-level-input {
   padding: 4px 10px;
   border-radius: 999px;
 
-  font-size: 0.9rem;
+  font-size: 1.2rem;
   font-weight: 700;
 }
 
@@ -2559,4 +2559,520 @@ input.skill-level-input {
 #backHomeBtn {
   pointer-events: auto !important;
   z-index: 10000;
+}
+
+/* ================================
+   修正モード UI（Step3-A）
+================================ */
+
+.edit-main-wrapper {
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fffbeb;
+}
+
+.edit-score-json {
+  width: 100%;
+  min-height: 96px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.edit-score-json:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.edit-warning-text {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #fff7ed;
+  border-left: 4px solid #f97316;
+  font-size: 0.85rem;
+}
+
+.info-message.edit-info {
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  font-weight: 600;
+}
+
+/* 修正モード：上部注意メッセージ */
+.edit-notice {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: #fff7ed;
+  border-left: 6px solid #f97316;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* 修正モード上部バー */
+.edit-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  background: #fffbeb;
+}
+
+/* 左・中央・右 */
+.edit-header-left,
+.edit-header-center,
+.edit-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 科目表示 */
+.edit-subject-text {
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+/* ===== ボタン格上げ ===== */
+
+/* 保存（主） */
+.btn-edit-primary {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-edit-primary:hover {
+  background: #1d4ed8;
+}
+
+/* 教務送信（最重要） */
+.btn-edit-danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-edit-danger:hover {
+  background: #b91c1c;
+}
+
+/* ホームへ戻る（副） */
+.btn-edit-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.btn-edit-secondary:hover {
+  background: #f9fafb;
+}
+
+/* 修正モード注意文：超過に関する補足 */
+.edit-notice-warning {
+  color: #ff0000;          /* 落ち着いた注意色（オレンジ系） */
+  font-weight: 600;
+}
+
+/* ===== 修正モード 成績カードUI ===== */
+
+.student-cell {
+  vertical-align: top;
+  padding: 16px;
+  min-width: 220px;
+}
+
+.student-id {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.student-name {
+  margin-top: 4px;
+  font-size: 1rem;
+}
+
+.student-meta {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.score-cell.compact {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.final-score-box {
+  margin-bottom: 12px;
+}
+
+.final-score-box label {
+  display: block;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.auto-label {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.edit-finalScore {
+  width: 120px;
+  background: #f3f4f6;
+  font-weight: bold;
+  text-align: center;
+}
+
+.score-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+
+.score-item-label {
+  min-width: 180px;
+}
+
+
+.score-item-meta {
+  font-size: 0.75rem;
+  color: #777;
+}
+
+.edit-score-input {
+  width: 120px;
+  font-size: 1rem;
+}
+
+/* ===== 修正モード ヘッダー ===== */
+
+.edit-header-main {
+  background: #fff7e6;
+  border: 2px solid #f59e0b;
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.edit-header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.edit-mode-badge {
+  font-weight: 700;
+  color: #b45309;
+  background: #fde68a;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.edit-subject {
+  font-weight: 600;
+}
+
+.edit-guide {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+/* 修正モード：全体背景を白に */
+.edit-main-wrapper {
+  background: #ffffff;
+  padding: 24px;
+}
+
+/* 外側の枠線を無効化 */
+.edit-header-bar {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+
+
+/* 点数入力欄 */
+.edit-score-input {
+  width: 100% !important;
+  text-align: right;
+}
+
+/* ================================
+   修正モード：見栄え改善パック
+   ================================ */
+
+/* 1) 画面全体のベージュ感を減らす（白ベースへ） */
+.edit-main-wrapper {
+  background: #ffffff;
+  padding: 18px;
+}
+
+
+
+
+/* 3) ヘッダー行（学籍番号/成績データ(JSON)）の野暮ったさを抑える */
+.score-table thead th {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+/* 4) 修正モード：1学生＝カード（案A・横圧縮） */
+.score-table tbody tr {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+
+  width: fit-content;          /* ★右余白対策の本体 */
+
+  background: #fffdf7;
+  border: 1px solid #f3d08a;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+
+
+/* 5) 学生情報の視認性UP */
+.student-id {
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.student-name {
+  margin-top: 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.student-meta {
+  margin-top: 4px;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+/* 6) 右側（成績側）の並びを整える */
+.score-cell {
+  padding-left: 24px;
+}
+
+
+
+.auto-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* 7) 最終成績を“右側上部”に固定して見やすく */
+.edit-finalScore {
+  width: 120px;
+  text-align: center;
+  font-weight: 800;
+  background: #f3f4f6;
+}
+
+/* 8) 評価項目：ラベルと入力を縦一直線に揃える（ズレ解消） */
+.score-item-row.compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.score-item-name {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.score-item-meta {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.edit-score-input {
+  width: 100%;
+  text-align: right;
+  font-size: 1rem;
+  padding: 8px 10px;
+}
+
+/* 9) 画面が狭い時は1列に落とす（ズレ崩壊防止） */
+@media (max-width: 900px) {
+
+  .edit-finalScore {
+    width: 100%;
+  }
+  .final-score-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* 修正モードヘッダー：枠を軽く */
+.edit-header-main {
+  border: 1px solid #f3d08a;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+/* ================================
+   修正モード：案A（横一列・圧縮）
+   ================================ */
+
+.student-cell.compact {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  white-space: nowrap;
+}
+
+.student-meta-inline {
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.score-items.compact {
+  display: flex;
+  gap: 20px;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;   /* ← これが重要 */
+}
+
+.score-item-name {
+  font-weight: 700;
+}
+
+.score-item-meta {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.edit-score-input {
+  width: 96px;
+  height: 36px;
+  text-align: right;
+  font-size: 1rem;
+}
+
+.final-score-box {
+  display: flex;
+  flex-direction: column;   /* ← 縦並びの決定打 */
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.final-score-box label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #374151;
+  margin: 0;
+}
+
+/* 行全体を1ブロック化（右余白完全消滅） */
+.edit-row.compact {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  width: fit-content;
+}
+
+/* score-cell の余計な余白を殺す */
+.score-cell {
+  padding-left: 0 !important;
+}
+
+.edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.edit-row.compact {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  width: fit-content;
+  background: #fffdf7;
+  border: 1px solid #f3d08a;
+  padding: 16px 20px;
+}
+
+.score-cell {
+  padding-left: 0 !important;
+}
+
+/* 修正モード：カード群を内容幅にする */
+#editScoreTableBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;   /* ← これが超重要 */
+  gap: 18px;
+}
+
+.edit-row.compact {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  width: fit-content;        /* ← 効かせるのはここ */
+}
+
+.edit-main-wrapper {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* 修正モードでは横幅を内容サイズに縛る */
+#editSimpleTableWrapper {
+  width: fit-content;
+  max-width: none;
+}
+
+/* 親コンテナの padding を相殺 */
+#editSimpleTableWrapper {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+#editSimpleTableWrapper {
+  display: inline-block;
+}
+
+/* ================================
+   修正モード専用：main の制約解除
+   ================================ */
+body.edit-mode main {
+  max-width: 800px;
+  
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
 }

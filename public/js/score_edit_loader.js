@@ -35,6 +35,12 @@ function getEditContext() {
   }
 }
 
+function getSchoolYearFromDate(date = new Date()) {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1; // 1-12
+  return m >= 4 ? y : y - 1;
+}
+
 /* ========= unitKey 正規化 ========= */
 function normalizeUnitKey(k) {
   if (k == null) return "";
@@ -55,26 +61,60 @@ function toFirestoreUnitKey(unitKey) {
     .replace(/__$/, "");
 }
 async function initEditMode() {
+  document.body.classList.add("edit-mode");
   const ctx = getEditContext();
+
   if (!ctx) {
     console.warn("[EDIT] editContext not found");
     safeRedirect("start.html");
     return;
   }
-
+  // ★ 年度（4/1〜3/31）に正規化
+ctx.year = Number(ctx.year) || getSchoolYearFromDate();
   console.log("🛠 [EDIT MODE] context =", ctx);
 
   window.__isEditMode = true;
   window.__submissionContext = ctx;
 
-  document.querySelectorAll(".normal-only").forEach(el => el.style.display = "none");
-  document.querySelectorAll(".edit-only").forEach(el => el.style.display = "block");
+
+  document.querySelectorAll(".edit-only").forEach(el => {
+  el.style.display = "";
+});
 
   const title = document.getElementById("editSubjectDisplay");
   if (title) title.textContent = `対象科目：${ctx.subjectId}`;
 
-  startSnapshot(ctx);
-  bindSaveButton();
+const crit = await fetchEvaluationCriteria(ctx);
+window.__editCriteria = crit; // { raw, items } を保持
+startSnapshot(ctx);
+bindSaveButton();
+bindEditScoreInputHandler();
+}
+
+
+/* ========= evaluationCriteria ========= */
+async function fetchEvaluationCriteria(ctx) {
+  const ref = doc(db, `evaluationCriteria_${ctx.year}`, ctx.subjectId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    throw new Error(`evaluationCriteria_${ctx.year} に科目 ${ctx.subjectId} が存在しません`);
+  }
+  const data = snap.data() || {};
+  const items = Array.isArray(data.items) ? data.items : [];
+  return { raw: data, items };
+}
+
+function getConvertedMax(item) {
+  const rawMax = Number(item?.maxScore ?? 100);
+  const percent = Number(item?.percent ?? 0);
+  return Math.floor(rawMax * (percent / 100));
+}
+
+function recalcFinalScoreFromConvertedScores(scoresObj) {
+  const sum = Object.values(scoresObj || {})
+    .filter((v) => typeof v === "number" && !Number.isNaN(v))
+    .reduce((a, b) => a + b, 0);
+  return Math.floor(sum);
 }
 
 /* ========= Firestore snapshot ========= */
@@ -91,18 +131,46 @@ function startSnapshot(ctx) {
 }
 
 /* ========= studentSnapshots JOIN ========= */
-async function fetchStudentSnapshots(studentIds) {
+async function fetchStudentSnapshots(studentIds, year) {
   const results = {};
   for (const sid of studentIds) {
     try {
-      const ref = doc(db, "studentSnapshots_2025", String(sid));
+      const ref = doc(db, `studentSnapshots_${year}`, String(sid));
       const snap = await getDoc(ref);
       if (snap.exists()) results[sid] = snap.data();
     } catch {}
   }
   return results;
 }
+/* ========= edit input handler ========= */
+function bindEditScoreInputHandler() {
+  const tbody = document.getElementById("editScoreTableBody");
+  if (!tbody) return;
+  if (tbody.__editInputBound) return; // 二重防止
 
+  tbody.__editInputBound = true;
+
+  tbody.addEventListener("input", (e) => {
+    const t = e.target;
+    if (!t || !t.classList) return;
+    if (!t.classList.contains("edit-score-input")) return;
+
+    const sid = t.dataset.sid;
+    const panel = tbody.querySelector(`.edit-student-panel[data-sid="${sid}"]`);
+    if (!panel) return;
+
+    const scores = {};
+    panel.querySelectorAll(`.edit-score-input[data-sid="${sid}"]`).forEach((inp) => {
+      const key = inp.dataset.item;
+      const v = Number(inp.value);
+      scores[key] = Number.isFinite(v) ? v : 0;
+    });
+
+    const finalVal = recalcFinalScoreFromConvertedScores(scores);
+    const finalEl = panel.querySelector(`.edit-finalScore[data-sid="${sid}"]`);
+    if (finalEl) finalEl.value = String(finalVal);
+  });
+}
 /* ========= snapshot → DOM ========= */
 async function renderEditFromSnapshot(data, ctx) {
   const tbody = document.getElementById("editScoreTableBody");
@@ -125,7 +193,9 @@ async function renderEditFromSnapshot(data, ctx) {
   }
 
   const sids = Object.keys(mergedStudents);
-  const profiles = await fetchStudentSnapshots(sids);
+  
+  window.__editOriginalStudents = mergedStudents; // 元の学生データ（version等を継承）
+  const profiles = await fetchStudentSnapshots(sids, ctx.year);
 
   tbody.innerHTML = "";
 
@@ -140,40 +210,118 @@ async function renderEditFromSnapshot(data, ctx) {
     const scoreObj = mergedStudents[sid] ?? {};
     const p = profiles[sid] || {};
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <div style="font-weight:600;">${sid}</div>
-        <div style="font-size:0.85rem; color:#555;">
-          ${(p.name || "氏名不明")}
-          ${p.grade ? ` / ${p.grade}年` : ""}
-          ${p.courseClass ? ` ${p.courseClass}` : ""}
-        </div>
-      </td>
-      <td>
-        <textarea
-          data-sid="${sid}"
-          style="width:100%; min-height:80px; font-family:monospace;"
-        >${JSON.stringify(scoreObj, null, 2)}</textarea>
-      </td>
-    `;
-    tbody.appendChild(tr);
+   
+   const critItems = window.__editCriteria?.items || [];
+const scoreMap = scoreObj?.scores || {};
+const isOver = !!scoreObj?.isOver;
+const isRed = !!scoreObj?.isRed;
+
+// scores は「換算後点数」を編集する前提
+// finalScore は自動再計算（小数切り捨て）
+let convertedScores = {};
+for (const item of critItems) {
+  const name = String(item?.name ?? "").trim();
+  if (!name) continue;
+  const v = scoreMap[name];
+  convertedScores[name] = (typeof v === "number" && !Number.isNaN(v)) ? v : 0;
+}
+const autoFinal = recalcFinalScoreFromConvertedScores(convertedScores);
+
+const row = document.createElement("div");
+row.className = "edit-row compact";
+
+row.innerHTML = `
+  <div class="student-cell compact">
+    <span class="student-id">${sid}</span>
+    <span class="student-meta-inline">
+      ${p.grade ? `${p.grade}年` : ""}${p.courseClass ? ` ${p.courseClass}` : ""}
+    </span>
+    <span class="student-name">${p.name || "氏名不明"}</span>
+  </div>
+
+  <div class="score-cell compact">
+    <div class="final-score-box">
+      <label>
+        最終成績 <span class="auto-label">（自動計算）</span>
+      </label>
+      <input
+        type="number"
+        class="edit-finalScore"
+        data-sid="${sid}"
+        value="${autoFinal}"
+        readonly
+      />
+    </div>
+
+    <div class="score-items compact">
+      ${critItems.map((item) => {
+        const name = String(item?.name ?? "").trim();
+        if (!name) return "";
+        const percent = Number(item?.percent ?? 0);
+        const convMax = getConvertedMax(item);
+        const val = convertedScores[name] ?? 0;
+        return `
+          <div class="score-item-row compact">
+            <span class="score-item-name">${name}</span>
+            <span class="score-item-meta">${percent}%｜最大${convMax}点</span>
+            <input
+              type="number"
+              class="edit-score-input"
+              data-sid="${sid}"
+              data-item="${name}"
+              min="0"
+              max="${convMax}"
+              value="${val}"
+            />
+          </div>
+        `;
+      }).join("")}
+    </div>
+  </div>
+`;
+    document
+  .getElementById("editScoreTableBody")
+  .appendChild(row);
   }
+   
+
+  // --- 入力変更イベント（scores変更 → finalScore再計算） ---
+  // 既にバインド済みなら多重登録しない
+
 }
 
 /* ========= textarea → students ========= */
 function collectEditedStudents() {
   const result = {};
-  document.querySelectorAll("textarea[data-sid]").forEach((ta) => {
-    const sid = ta.dataset.sid;
-    const raw = ta.value.trim();
-    if (!raw) return;
-    try {
-      result[sid] = JSON.parse(raw);
-    } catch {
-      throw new Error(`JSON形式エラー：学籍番号 ${sid}`);
-    }
+
+  document.querySelectorAll(".edit-student-panel[data-sid]").forEach((panel) => {
+    const sid = panel.dataset.sid;
+
+    // scores（換算後点数）
+    const scores = {};
+    panel.querySelectorAll(`.edit-score-input[data-sid="${sid}"]`).forEach((inp) => {
+      const key = inp.dataset.item;
+      const v = Number(inp.value);
+      scores[key] = Number.isFinite(v) ? v : 0;
+    });
+
+    const finalEl = panel.querySelector(`.edit-finalScore[data-sid="${sid}"]`);
+    const finalScore = finalEl ? Number(finalEl.value) : recalcFinalScoreFromConvertedScores(scores);
+
+    
+    // snapshot の学生オブジェクト構造に合わせて構築
+    result[sid] = {
+      ...(window.__editOriginalStudents?.[sid] || {}),
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.email || "",
+      
+      scores,
+      version: Number((window.__editOriginalStudents?.[sid]?.version ?? 0)) + 1,
+      finalScore: Math.floor(Number.isFinite(finalScore) ? finalScore : 0),
+      
+    };
   });
+
   return result;
 }
 
@@ -272,4 +420,21 @@ function waitForAuthUserStable(timeoutMs = 5000) {
   }
   console.log("🔐 auth ready:", user.email);
   initEditMode();
+  // --- UI 表示制御（Step3-A） ---
+
+const editWrapper = document.getElementById("editSimpleTableWrapper");
+if (editWrapper) editWrapper.style.display = "block";
+
+const editSaveBtn = document.getElementById("editSaveBtn");
+if (editSaveBtn) editSaveBtn.style.display = "inline-block";
+
+const editSubmitBtn = document.getElementById("editSubmitBtn");
+if (editSubmitBtn) editSubmitBtn.style.display = "inline-block";
+
+// 修正モード注意文（上部）を表示
+const notice = document.getElementById("editNoticeArea");
+if (notice) {
+  notice.style.display = "block";
+}
+
 })();

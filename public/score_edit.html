@@ -38,150 +38,81 @@
   <!-- ========================================= -->
   <main>
 
-    <!-- 上部操作エリア：左寄せで対象科目プルダウン、右側に他ボタン -->
-    <div class="top-controls" style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;">
-<div class="subject-select-area normal-only" style="display: flex; align-items: center; gap: 8px;">
-  <label for="subjectSelect">対象科目：</label>
-  <select id="subjectSelect"></select>
+      
+<!-- 修正モード：上部操作バー -->
+<div class="edit-header-bar edit-only" style="display:none;">
 
-  <div class="point-pill-area evaluation-related"
-       style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
-  </div>
-</div>
+  <div class="edit-header-main">
 
-      </div>
-<div class="subject-fixed-area edit-only" style="display: none;">
-  <span class="edit-mode-badge">🛠 成績修正モード</span>
-  <span id="editSubjectDisplay" class="edit-subject-text">
-    対象科目：-
-  </span>
-</div>
-
-
-
-      <div class="top-btn-area" style="display: flex; align-items: center; gap: 8px;">
-        <button id="saveBtn" class="btn-primary" type="button" disabled>
-          一時保存
-        </button>
-
-        <button
-  id="submitScoresBtn"
-  class="btn-danger"
-  type="button"
-  disabled
->
-  教務へ提出
-</button>
-  <!-- 修正モード専用：修正内容を送信 -->
- <button
-  id="editSubmitBtn"
-  class="btn-danger"
-  type="button"
-  style="display: none;"
->
-  修正内容を教務へ送信
-</button>
-        <button id="backHomeBtn" type="button" class="btn-primary top-home-btn">
-          ホームへ戻る
-        </button>
-        <!-- 将来: 送信・Excel等のボタンをここに横並びで追加可能 -->
-      </div>
+    <!-- 上段：モード＋科目 -->
+    <div class="edit-header-top">
+      <span class="edit-mode-badge">🛠 成績修正モード</span>
+      <span id="editSubjectDisplay" class="edit-subject-text">
+        対象科目：-
+      </span>
     </div>
 
-<!-- 設定ナビゲーション（ボタン化） -->
-<div class="settings-panel">
-  <div class="settings-title">⚙ 設定</div>
+    <!-- 中段：操作説明 -->
+    <div class="edit-header-guide">
+      提出済みの成績を表示しています。必要な箇所のみ修正し、
+      <b>「修正内容を保存」→「修正内容を教務へ送信」</b>
+      の順で操作してください。
+      <br>
+      <span class="edit-header-warning">
+        ※ 超過登録の追加・解除・時間数変更は、Slack にて教務部へ連絡してください。
+      </span>
+    </div>
 
-  <div class="settings-actions">
-    <a id="toEvaluationLink" href="#" class="btn-setting" role="button">
-      評価基準を編集
-    </a>
+    <!-- 下段：操作ボタン -->
+    <div class="edit-header-actions">
 
-    <a id="toSubjectsLink" href="subjects.html" class="btn-setting" role="button">
-      科目情報を確認・登録
-    </a>
-  </div>
-
-  <div class="settings-note">
-    ※ 成績入力の前に、評価基準と科目情報を必ず確認してください
-  </div>
-</div>
-
-
-    <div class="grade-header-row" style="
-  display: flex;
-  align-items: center;
-  margin-top: 16px;
-  margin-bottom: 4px;
-">
-  <h2 style="margin: 0;">成績一覧</h2>
-
-  <!-- 右側ボタン群 -->
-  <div class="grade-header-actions">
-    <div id="electiveButtonArea" style="gap:8px;">
       <button
-        id="electiveAddBtn"
-        class="btn-primary"
+        id="editSaveBtn"
+        class="btn-edit-primary"
         type="button"
       >
-        受講者を追加登録
+        修正内容を保存
       </button>
 
       <button
-        id="electiveRemoveBtn"
-        class="btn-secondary"
+        id="editSubmitBtn"
+        class="btn-edit-danger"
         type="button"
-        style="border-color:#dc2626; color:#dc2626;"
       >
-        受講者を解除
+        修正内容を教務へ送信
       </button>
-    </div>
 
-   <div id="rightActionArea"></div>
+      <button
+        id="backHomeBtn"
+        type="button"
+        class="btn-edit-secondary"
+      >
+        ホームへ戻る
+      </button>
+
+    </div>
   </div>
 </div>
 
-
-    <div class="risk-legend">
-      🔴 赤点　🔵 超過　🟣 赤点かつ超過（特に注意）
-    </div>
-
-    <div class="subheader-row">
-      <div id="studentCountDisplay" class="student-count">受講者人数：0名</div>
-    </div>
-
-    <!-- ================================ -->
+<!-- ================================ -->
 <!-- 修正モード専用：軽量成績テーブル -->
 <!-- ================================ -->
-<div id="editSimpleTableWrapper" class="edit-only" style="display:none; margin-top:16px;">
-  <table class="score-table">
-    <thead>
-      <tr>
-        <th>学籍番号</th>
-        <th>成績データ（JSON）</th>
-      </tr>
-    </thead>
-    <tbody id="editScoreTableBody">
-      <!-- 修正モードJSが直接描画 -->
-    </tbody>
-  </table>
+<div
+  id="editSimpleTableWrapper"
+  class="edit-only edit-main-wrapper"
+  style="display:none; margin-top:24px;"
+>
+ <table class="score-table">
+  <tbody id="editScoreTableBody"></tbody>
+</table>
 
-  <div style="margin-top:12px;">
-    <button id="editSaveBtn" class="btn-danger" type="button">
-      修正内容を保存
-    </button>
-  </div>
-
-  <p style="margin-top:8px; font-size:0.85rem; color:#b45309;">
-    ※ 超過登録の追加・解除・時間数変更は、Slack にて教務部へ連絡してください。
-  </p>
 </div>
 
     <!-- メッセージ（JS の initModeTabs がここにタブを差し込む） -->
-    <div id="infoMessage" class="info-message evaluation-related">
-
-      成績を入力してください。
-    </div>
+<!-- 修正モード用メッセージ（画面上部固定） -->
+<div id="infoMessage" class="info-message edit-info" style="display:none;">
+  修正モードです。
+</div>
 
     <div id="submissionStatusArea" class="submission-status-area" aria-live="polite"></div>
     <!-- STEP C：共通科目フィルタ UI を表示するエリア -->
@@ -189,25 +120,7 @@
 
 <div id="editUnitSelector" style="margin: 12px 0; display: none;"></div>
 
-    <!-- テーブル部分 -->
-    <div class="score-table-wrapper">
-      <table class="score-table">
-        <thead>
-          <tr id="scoreHeaderRow">
-            <th>学籍番号</th>
-            <th>学年</th>
-            <th>組・コース</th>
-            <th>番号</th>
-            <th>氏名</th>
-            <!-- 評価基準ヘッダは criteria.js が動的に追加 -->
-            <th>最終成績</th>
-          </tr>
-        </thead>
-        <tbody id="scoreTableBody">
-          <!-- 学生行は students.js で動的生成 -->
-        </tbody>
-      </table>
-    </div>
+
 
 
     <button id="skillSaveBtn" style="display:none;">習熟度を保存</button>
