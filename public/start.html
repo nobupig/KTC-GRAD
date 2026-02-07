@@ -22,11 +22,11 @@
       justify-content: space-between;
     }
     header h1 {
-      font-size: 24px;
+      font-size: 28px;
       margin: 0;
     }
     header .user-info {
-      font-size: 12px;
+      font-size: 22px;
       text-align: right;
       display: flex;
       align-items: center;
@@ -74,8 +74,8 @@
     }
 
     p.description {
-      font-size: 18px;
-      color: #4b5563;
+      font-size: 22px;
+      color: #000000;
       margin-top: 0;
       margin-bottom: 16px;
     }
@@ -84,7 +84,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 16px;
-      margin-top: 12px;
+      margin-top: 20px;
     }
 
     .card {
@@ -99,7 +99,7 @@
 
     .card h3 {
       margin: 0 0 8px;
-      font-size: 18px;
+      font-size: 24px;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -164,7 +164,7 @@
       評価基準が未入力の科目がある場合は、途中再開から評価基準入力画面に遷移します。
     </p>
 
-    <h3 style="margin-top:20px; font-size:18px;">
+    <h3 style="margin-top:20px; font-size:20px;">
   📊 提出状況サマリー
 </h3>
 
@@ -322,8 +322,8 @@ function renderStartMenuOverview(area, subjects) {
   if (!Array.isArray(subjects) || subjects.length === 0) {
     const p = document.createElement("div");
     p.textContent = "担当科目がまだ登録されていません。";
-    p.style.fontSize = "13px";
-    p.style.color = "#6b7280";
+    p.style.fontSize = "20px";
+    p.style.color = "#b22222";
     area.appendChild(p);
     return;
   }

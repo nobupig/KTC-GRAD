@@ -37,7 +37,7 @@
       box-shadow: 0 10px 25px rgba(0,0,0,0.06);
     }
     h2 {
-      font-size: 20px;
+      font-size: 24px;
       border-left: 4px solid #004A99;
       padding-left: 10px;
       margin-top: 0;
@@ -49,13 +49,13 @@
       gap: 12px; margin-bottom: 16px;
     }
     .field label {
-      font-size: 12px; color: #4b5563;
-      margin-bottom: 4px; display: block;
+      font-size: 22px; color: #000000;
+      margin-bottom: 8px; display: block;
     }
     select, input, textarea {
-      width: 100%; padding: 6px 8px;
+      width: 100%; padding: 6px 10px;
       border-radius: 8px; border: 1px solid #d1d5db;
-      font-size: 18px;
+      font-size: 24px;
       box-sizing: border-box;
     }
 
@@ -64,10 +64,10 @@
       border-radius: 999px;
       border: none;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 18px;
     }
     .btn-primary { background: #004A99; color: white; }
-    .btn-secondary { background: #e5e7eb; color: #111; }
+    .btn-secondary { background: #dcdcdc; color: #111; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* ===== 削除モーダル ===== */
@@ -142,11 +142,11 @@
       border-radius: 999px;
       border: none;
       padding: 4px 10px;
-      font-size: 12px;
+      font-size: 18px;
       cursor: pointer;
     }
 
-    .status { font-size: 16px; color: #6b7280; margin: 4px 0 10px; }
+    .status { font-size: 20px; color: #0c0c0c; margin: 4px 0 30px; }
     .error { color: #b91c1c; font-size: 16px; margin-top: 4px; }
 
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 16px; }
@@ -156,7 +156,7 @@ th, td {
   padding: 12px 16px;        /* ← 左右を広げる */
   white-space: nowrap;
   vertical-align: middle;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 th:first-child,
@@ -179,7 +179,7 @@ thead th {
       display: inline-block;
       padding: 2px 6px;
       border-radius: 999px;
-      font-size: 16px;
+      font-size: 20px;
       background: #eff6ff;
       color: #1d4ed8;
     }
@@ -224,8 +224,8 @@ thead th {
 
  /* 登録済み科目一覧 */
 .registered-subject-row {
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 22px;
+  line-height: 2;
 }
  
 #tableContainer {
@@ -255,7 +255,7 @@ td input[type="checkbox"] {
 </header>
 
 <div style="max-width:1100px; margin:10px auto; padding:0 20px;">
-  <button class="btn btn-secondary" style="font-size:16px;" onclick="location.href='start.html'">
+  <button class="btn btn-secondary" style="font-size:18px;" onclick="location.href='start.html'">
     🏠 ホームへ戻る
   </button>
 </div>
@@ -275,7 +275,7 @@ td input[type="checkbox"] {
  <!-- ★ ログイン中の表示（evaluation.html と同形式） -->
 <div id="userInfoArea" style="max-width:1100px; margin:4px auto 0; padding:0 20px;">
    <div id="userInfoDisplay"
-        style="font-size:14px; font-weight:600; color:#1e3a8a; text-align:right;">
+        style="font-size:20px; font-weight:600; color:#1e3a8a; text-align:right;">
    </div>
  </div>
 
@@ -348,7 +348,7 @@ td input[type="checkbox"] {
     <div id="loadError" class="error"></div>
       <!-- ▼登録済み科目一覧（後で動的に描画） -->
       <div id="registeredSubjectsArea" style="display:none; margin-top:20px;">
-        <h3 style="font-size:20px; margin-bottom:10px;">📘 登録済み科目一覧</h3>
+        <h3 style="font-size:24px; margin-bottom:10px;">📘 登録済み科目一覧</h3>
         <div id="registeredSubjectsList"></div>
       </div>
       <!-- ▲登録済み科目一覧 -->
@@ -384,7 +384,7 @@ td input[type="checkbox"] {
 
     <!-- 自分が担当するはずの科目が一覧に無いとき用の連絡ボタン -->
     <div id="contactOfficeAnytimeArea"
-         style="margin:12px 0 0; font-size:14px; color:#374151;">
+         style="margin:12px 0 0; font-size:18px; color:#374151;">
       担当しているはずの科目が一覧にない場合は、教務へ連絡してください。
       <button id="contactOfficeAnytimeBtn"
               class="btn btn-secondary"
