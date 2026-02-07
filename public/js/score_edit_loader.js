@@ -1,7 +1,6 @@
 /*************************************************
  * 修正モード専用・最小JS（保存処理 完全統合版）
  *************************************************/
-
 import { auth, db } from "/js/firebase_init.js";
 import {
   doc,
@@ -61,34 +60,39 @@ function toFirestoreUnitKey(unitKey) {
     .replace(/__$/, "");
 }
 async function initEditMode() {
-  document.body.classList.add("edit-mode");
   const ctx = getEditContext();
 
-  if (!ctx) {
-    console.warn("[EDIT] editContext not found");
-    safeRedirect("start.html");
+  // ★ 修正モードでなければ何もしない（最重要）
+   if (!ctx || ctx.editMode !== true) {
+    console.log("[EDIT MODE] skip init (normal view)");
     return;
   }
-  // ★ 年度（4/1〜3/31）に正規化
-ctx.year = Number(ctx.year) || getSchoolYearFromDate();
+
+  // ★ ここから先は「修正モード確定」
+  document.body.classList.add("edit-mode");
+
+  // 年度（4/1〜3/31）に正規化
+  ctx.year = Number(ctx.year) || getSchoolYearFromDate();
   console.log("🛠 [EDIT MODE] context =", ctx);
 
   window.__isEditMode = true;
   window.__submissionContext = ctx;
 
-
+  // 修正モード専用UIを表示
   document.querySelectorAll(".edit-only").forEach(el => {
-  el.style.display = "";
-});
+    el.style.display = "";
+  });
 
   const title = document.getElementById("editSubjectDisplay");
   if (title) title.textContent = `対象科目：${ctx.subjectId}`;
 
-const crit = await fetchEvaluationCriteria(ctx);
-window.__editCriteria = crit; // { raw, items } を保持
-startSnapshot(ctx);
-bindSaveButton();
-bindEditScoreInputHandler();
+  const crit = await fetchEvaluationCriteria(ctx);
+  window.__editCriteria = crit;
+
+  // ★ 修正モードでのみ実行
+  startSnapshot(ctx);
+  bindSaveButton();
+  bindEditScoreInputHandler();
 }
 
 
@@ -104,21 +108,32 @@ async function fetchEvaluationCriteria(ctx) {
   return { raw: data, items };
 }
 
-function getConvertedMax(item) {
-  const rawMax = Number(item?.maxScore ?? 100);
-  const percent = Number(item?.percent ?? 0);
-  return Math.floor(rawMax * (percent / 100));
-}
+ function recalcFinalScoreFromRawScores(rawScores, criteriaItems) {
+   let total = 0;
 
-function recalcFinalScoreFromConvertedScores(scoresObj) {
-  const sum = Object.values(scoresObj || {})
-    .filter((v) => typeof v === "number" && !Number.isNaN(v))
-    .reduce((a, b) => a + b, 0);
-  return Math.floor(sum);
-}
+   for (const item of criteriaItems || []) {
+     const name = String(item?.name ?? "").trim();
+     if (!name) continue;
+
+     const raw = Number(rawScores?.[name]);
+     if (!Number.isFinite(raw)) continue;
+
+     const max = Number(item?.maxScore ?? 100);
+     const percent = Number(item?.percent ?? 0);
+
+     total += (raw / max) * percent;
+   }
+
+   return Math.floor(total);
+ }
+
 
 /* ========= Firestore snapshot ========= */
 function startSnapshot(ctx) {
+   if (!ctx || ctx.editMode !== true) {
+    console.warn("[EDIT MODE] snapshot skipped (normal view)");
+    return;
+  }
   const ref = doc(db, `scores_${ctx.year}`, ctx.subjectId);
   console.log("📡 [EDIT MODE] snapshot listen:", ref.path);
 
@@ -166,13 +181,20 @@ function bindEditScoreInputHandler() {
       scores[key] = Number.isFinite(v) ? v : 0;
     });
 
-    const finalVal = recalcFinalScoreFromConvertedScores(scores);
+    const finalVal = recalcFinalScoreFromRawScores(
+  scores,
+  window.__editCriteria.items
+);
     const finalEl = panel.querySelector(`.edit-finalScore[data-sid="${sid}"]`);
     if (finalEl) finalEl.value = String(finalVal);
   });
 }
 /* ========= snapshot → DOM ========= */
 async function renderEditFromSnapshot(data, ctx) {
+    if (!ctx || ctx.editMode !== true) {
+    console.warn("[EDIT MODE] render skipped (normal view)");
+    return;
+  }
   const tbody = document.getElementById("editScoreTableBody");
   if (!tbody) return;
 
@@ -213,19 +235,21 @@ async function renderEditFromSnapshot(data, ctx) {
    
    const critItems = window.__editCriteria?.items || [];
 const scoreMap = scoreObj?.scores || {};
-const isOver = !!scoreObj?.isOver;
-const isRed = !!scoreObj?.isRed;
 
-// scores は「換算後点数」を編集する前提
-// finalScore は自動再計算（小数切り捨て）
-let convertedScores = {};
+// ★ ここで rawScores を定義（←今回の修正点）
+const rawScores = {};
 for (const item of critItems) {
   const name = String(item?.name ?? "").trim();
   if (!name) continue;
+
   const v = scoreMap[name];
-  convertedScores[name] = (typeof v === "number" && !Number.isNaN(v)) ? v : 0;
+  rawScores[name] = (typeof v === "number" && !Number.isNaN(v)) ? v : 0;
 }
-const autoFinal = recalcFinalScoreFromConvertedScores(convertedScores);
+
+const autoFinal = recalcFinalScoreFromRawScores(
+  rawScores,
+  critItems
+);
 
 const row = document.createElement("div");
 row.className = "edit-row compact";
@@ -258,21 +282,21 @@ row.innerHTML = `
         const name = String(item?.name ?? "").trim();
         if (!name) return "";
         const percent = Number(item?.percent ?? 0);
-        const convMax = getConvertedMax(item);
-        const val = convertedScores[name] ?? 0;
+        const rawMax = Number(item?.maxScore ?? 100);
+        const val = rawScores[name] ?? 0;
         return `
           <div class="score-item-row compact">
             <span class="score-item-name">${name}</span>
-            <span class="score-item-meta">${percent}%｜最大${convMax}点</span>
-            <input
-              type="number"
-              class="edit-score-input"
-              data-sid="${sid}"
-              data-item="${name}"
-              min="0"
-              max="${convMax}"
-              value="${val}"
-            />
+          <span class="score-item-meta">${percent}%｜最大${rawMax}点</span>
+          <input
+            type="number"
+            class="edit-score-input"
+            data-sid="${sid}"
+            data-item="${name}"
+            min="0"
+            max="${rawMax}"
+            value="${val}"
+          />
           </div>
         `;
       }).join("")}
@@ -301,12 +325,22 @@ function collectEditedStudents() {
     const scores = {};
     panel.querySelectorAll(`.edit-score-input[data-sid="${sid}"]`).forEach((inp) => {
       const key = inp.dataset.item;
-      const v = Number(inp.value);
-      scores[key] = Number.isFinite(v) ? v : 0;
+ const rawMax = Number(inp.max || 0);
+let v = Number(inp.value);
+
+if (!Number.isFinite(v)) v = 0;
+if (v < 0) v = 0;
+if (rawMax > 0 && v > rawMax) v = rawMax;
+
+inp.value = String(v);   // ← 強制的に戻す
+scores[key] = v;
     });
 
     const finalEl = panel.querySelector(`.edit-finalScore[data-sid="${sid}"]`);
-    const finalScore = finalEl ? Number(finalEl.value) : recalcFinalScoreFromConvertedScores(scores);
+    const finalScore = recalcFinalScoreFromRawScores(
+  scores,
+  window.__editCriteria.items
+);
 
     
     // snapshot の学生オブジェクト構造に合わせて構築
@@ -419,22 +453,26 @@ function waitForAuthUserStable(timeoutMs = 5000) {
     return;
   }
   console.log("🔐 auth ready:", user.email);
-  initEditMode();
-  // --- UI 表示制御（Step3-A） ---
 
-const editWrapper = document.getElementById("editSimpleTableWrapper");
-if (editWrapper) editWrapper.style.display = "block";
+  const ctx = getEditContext();
+  const isEditMode = !!(ctx && ctx.editMode === true);
 
-const editSaveBtn = document.getElementById("editSaveBtn");
-if (editSaveBtn) editSaveBtn.style.display = "inline-block";
+  if (isEditMode) {
+    await initEditMode();
 
-const editSubmitBtn = document.getElementById("editSubmitBtn");
-if (editSubmitBtn) editSubmitBtn.style.display = "inline-block";
+    // --- UI 表示制御（Step3-A） ---（修正モード時だけ）
+    const editWrapper = document.getElementById("editSimpleTableWrapper");
+    if (editWrapper) editWrapper.style.display = "block";
 
-// 修正モード注意文（上部）を表示
-const notice = document.getElementById("editNoticeArea");
-if (notice) {
-  notice.style.display = "block";
-}
+    const editSaveBtn = document.getElementById("editSaveBtn");
+    if (editSaveBtn) editSaveBtn.style.display = "inline-block";
 
+    const editSubmitBtn = document.getElementById("editSubmitBtn");
+    if (editSubmitBtn) editSubmitBtn.style.display = "inline-block";
+
+    const notice = document.getElementById("editNoticeArea");
+    if (notice) notice.style.display = "block";
+  } else {
+    console.log("[EDIT MODE] normal view - do nothing");
+  }
 })();

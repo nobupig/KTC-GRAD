@@ -1,0 +1,250 @@
+/* =====================================================
+   修正モード専用CSS（完全隔離版）
+   有効条件：body.edit-mode が付与された画面のみ
+===================================================== */
+
+body.edit-mode {
+
+  background: #ffffff;
+  color: #222;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ===== 見出し ===== */
+  header h1 {
+    font-size: 1.6rem;
+    margin-bottom: 0.2em;
+  }
+
+  #notice {
+    color: #b00020;
+    font-weight: 600;
+    margin-bottom: 1em;
+  }
+
+  /* ===== モードバナー ===== */
+  .mode-banner {
+    background: #e3f2fd;
+    color: #004a99;
+    padding: 10px 14px;
+    font-weight: 600;
+    border-left: 6px solid #004a99;
+    margin-bottom: 1em;
+  }
+
+  /* ===== テーブル ===== */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 1000px;
+    min-width: 720px;
+    margin-top: 12px;
+  }
+
+  thead th {
+    background: #004a99;
+    color: #fff;
+    font-weight: 600;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    text-align: center;
+    font-size: 0.9rem;
+  }
+
+  tbody td {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+    vertical-align: middle;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f7f9fc;
+  }
+
+  tbody tr:hover {
+    background: #f0f6ff;
+  }
+
+  /* ===== フラグ ===== */
+  .flag-red {
+    color: #c62828;
+    font-weight: bold;
+  }
+
+  .flag-excess {
+    color: #ef6c00;
+    font-weight: bold;
+  }
+
+  tr.locked-row {
+    background: #f5f5f5;
+    opacity: 0.75;
+  }
+
+  tr.locked-row input,
+  tr.locked-row button,
+  tr.locked-row select {
+    cursor: not-allowed;
+  }
+
+  /* ===== 修正モード モーダル ===== */
+  .edit-mode-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+
+  .edit-mode-modal.hidden {
+    display: none;
+  }
+
+  .edit-mode-modal__content {
+    background: #fff;
+    width: 90%;
+    max-width: 900px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+
+  .edit-mode-modal__content h3 {
+    margin: 0;
+    padding: 12px 16px;
+    background: #004a99;
+    color: #fff;
+    font-size: 16px;
+  }
+
+  .edit-mode-modal__content table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+  }
+
+  .edit-mode-modal__table-wrap {
+    overflow: auto;
+    max-height: calc(80vh - 150px);
+  }
+
+  .edit-mode-modal__actions {
+    padding: 12px 16px;
+    border-top: 1px solid #ddd;
+    background: #fafafa;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .edit-mode-modal__actions button {
+    background: #004a99;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  /* ===== 修正モード UI ===== */
+
+  .edit-main-wrapper {
+    background: #ffffff;
+    padding: 24px;
+  }
+
+  .edit-row.compact {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    width: fit-content;
+    background: #fffdf7;
+    border: 1px solid #f3d08a;
+    padding: 16px 20px;
+  }
+
+  #editScoreTableBody {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  .student-cell.compact {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    white-space: nowrap;
+  }
+
+  .student-id {
+    font-weight: 800;
+    font-size: 1.15rem;
+  }
+
+  .student-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .student-meta-inline {
+    font-size: 0.95rem;
+    color: #374151;
+  }
+
+  .score-cell.compact {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .final-score-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .edit-finalScore {
+    width: 120px;
+    text-align: center;
+    font-weight: 800;
+    background: #f3f4f6;
+  }
+
+  .score-items.compact {
+    display: flex;
+    gap: 20px;
+    flex-wrap: nowrap;
+  }
+
+  .score-item-row.compact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  .edit-score-input {
+    width: 96px;
+    height: 36px;
+    text-align: right;
+    font-size: 1rem;
+  }
+
+  /* ===== main 制約解除 ===== */
+  main {
+    max-width: 800px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+}
