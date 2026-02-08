@@ -214,44 +214,68 @@ async function renderEditFromSnapshot(data, ctx) {
     mergedStudents = data.students || {};
   }
 
-  const sids = Object.keys(mergedStudents);
-  // --- 修正モード：初回のみ学生選択モーダル ---
-if (
-  window.__isEditMode &&
-  !window.__editTargetModalOpened &&
-  !window.__editTargetStudentIds
-) {
+ const sids = Object.keys(mergedStudents);
+
 // --- 修正モード：初回のみ学生選択モーダル ---
 if (
   window.__isEditMode &&
   !window.__editTargetModalOpened &&
   !window.__editTargetStudentIds
 ) {
-  // ★ プロフィール取得（氏名・組・番号用）
+  // ★ ローディング表示
+  showLoadingToast("学生情報を読み込んでいます…");
+
+  // ★ プロフィール取得
   const profiles = await fetchStudentSnapshots(sids, ctx.year);
 
   const modalStudents = sids.map(sid => {
     const p = profiles[sid] || {};
     return {
       sid,
-      groupCourse: p.grade && p.courseClass
-        ? `${p.grade}${p.courseClass}`
-        : "",
-      number: p.number ?? "",
+
+      // ★ 学年は含めない（表示用）
+      groupCourse: p.courseClass ?? p.course ?? "",
+
+      number: Number(p.number ?? 0),
       name: p.name ?? ""
     };
   });
 
-  console.log("[EDIT MODAL] students =", modalStudents);
+  // ===============================
+  // 並び順制御（完成版）
+  // 優先順：組(1-5) → コース(M,E,I,C,A) → 番号
+  // ===============================
+  const GROUP_ORDER = ["1", "2", "3", "4", "5"];
+  const COURSE_ORDER = ["M", "E", "I", "C", "A"];
+
+  modalStudents.sort((a, b) => {
+    const ga = String(a.groupCourse ?? "");
+    const gb = String(b.groupCourse ?? "");
+
+    // ① 組（1〜5）
+    const gi = GROUP_ORDER.indexOf(ga);
+    const gj = GROUP_ORDER.indexOf(gb);
+    if (gi !== gj) {
+      return (gi === -1 ? 999 : gi) - (gj === -1 ? 999 : gj);
+    }
+
+    // ② コース（M/E/I/C/A）
+    const ci = COURSE_ORDER.indexOf(ga);
+    const cj = COURSE_ORDER.indexOf(gb);
+    if (ci !== cj) {
+      return (ci === -1 ? 999 : ci) - (cj === -1 ? 999 : cj);
+    }
+
+    // ③ 番号順
+    return Number(a.number ?? 0) - Number(b.number ?? 0);
+  });
+
+  // ★ ローディング解除 → モーダル表示
+  hideLoadingToast();
 
   openEditTargetSelectModal(modalStudents);
   window.__editTargetModalOpened = true;
-  return; // ← 選択が終わるまで描画しない
-}
-
-  openEditTargetSelectModal(modalStudents);
-  window.__editTargetModalOpened = true;
-  return; // ← 選択が終わるまで描画しない
+  return; // ← ここ超重要（以降の描画を止める）
 }
 
 // --- 選択された学生だけに絞る ---
@@ -521,7 +545,39 @@ function waitForAuthUserStable(timeoutMs = 5000) {
   } else {
     console.log("[EDIT MODE] normal view - do nothing");
   }
+  bindBackHomeButton();
 })();
+
+// ===============================
+// 修正モード：ホームへ戻る（確定版）
+// ===============================
+function bindBackHomeButton() {
+  const backBtn = document.getElementById("backHomeBtn");
+  if (!backBtn) return;
+
+  backBtn.addEventListener("click", () => {
+    // ★ URL パラメータで修正モード戻りを明示
+    location.href = "start.html?fromEdit=1";
+  });
+}
+
+
+// ================================
+// 修正モード：ローディングトースト（中央）
+// ================================
+function showLoadingToast(message = "読み込み中です…") {
+  const toast = document.getElementById("loadingToast");
+  if (!toast) return;
+  const textEl = toast.querySelector(".text");
+  if (textEl) textEl.textContent = message;
+  toast.classList.remove("hidden");
+}
+
+function hideLoadingToast() {
+  const toast = document.getElementById("loadingToast");
+  if (!toast) return;
+  toast.classList.add("hidden");
+}
 
 // ================================
 // 修正モード：学生選択モーダル

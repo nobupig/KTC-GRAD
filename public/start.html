@@ -252,6 +252,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+    const params = new URLSearchParams(window.location.search);
+    const fromEdit = params.get("fromEdit") === "1";
     const headerUserDisplay = document.getElementById("headerUserDisplay");
     const userInfoDisplay = document.getElementById("userInfoDisplay");
 
@@ -665,10 +667,20 @@ if (!cs) {
 let authChecked = false;
 
 onAuthStateChanged(auth, async (user) => {
+  // ★ 修正モードから戻ったかどうか
+  const fromEdit = sessionStorage.getItem("fromEditMode");
+
   // 初回は必ず通す（復元待ち）
   if (!user && !authChecked) {
     authChecked = true;
     console.log("[START] auth restoring... wait");
+    return;
+  }
+
+  // ★ 追加：修正モードから戻った直後は redirect しない
+  if (!user && fromEdit) {
+    console.log("[START] return from edit mode, wait auth");
+    sessionStorage.removeItem("fromEditMode");
     return;
   }
 
@@ -710,7 +722,6 @@ onAuthStateChanged(auth, async (user) => {
     console.error("[Start] failed to load teacherSubjects:", e);
   }
 });
-
     // ===============================
 // 修正モード開始（start.html）
 // ===============================

@@ -2756,3 +2756,47 @@ body.edit-mode #editTargetOkBtn:hover {
 body.edit-mode .modal-box table {
   min-width: auto;
 }
+
+/* ================================
+   修正モード：ローディングトースト（中央）
+================================ */
+body.edit-mode .loading-toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+
+  z-index: 10000;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  background: rgba(0, 0, 0, 0.86);
+  color: #fff;
+  padding: 14px 18px;
+  border-radius: 999px;
+
+  font-size: 0.95rem;
+  font-weight: 700;
+
+  box-shadow: 0 14px 36px rgba(0,0,0,0.35);
+}
+
+body.edit-mode .loading-toast.hidden {
+  display: none;
+}
+
+/* スピナー */
+body.edit-mode .loading-toast .spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: loadingToastSpin 0.8s linear infinite;
+}
+
+@keyframes loadingToastSpin {
+  to { transform: rotate(360deg); }
+}
