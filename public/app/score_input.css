@@ -2587,3 +2587,172 @@ body.edit-mode .btn-edit-secondary {
   padding: 8px 14px;
   border-radius: 999px;
 }
+
+/* =====================================================
+   修正モード：学生選択モーダル（完成形）
+===================================================== */
+
+/* オーバーレイ */
+body.edit-mode .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* モーダル本体 */
+body.edit-mode .modal-box {
+  background: #ffffff;
+  width: 560px;
+  max-width: 92vw;
+  max-height: 80vh;
+
+  display: flex;
+  flex-direction: column;
+
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+
+/* タイトル */
+body.edit-mode .modal-box h3 {
+  margin: 0;
+  padding: 14px 18px;
+
+  background: #004a99;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* テーブル領域 */
+body.edit-mode .modal-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+/* テーブル */
+body.edit-mode table.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.9rem;
+}
+
+/* ヘッダー */
+body.edit-mode table.modal-table th {
+  position: sticky;
+  top: 0;
+
+  background: #004a99;
+  color: #ffffff;
+  font-weight: 600;
+
+  padding: 8px 6px;
+  text-align: center;
+  border-bottom: 1px solid #0b3c78;
+}
+
+/* セル */
+body.edit-mode table.modal-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 行 */
+body.edit-mode table.modal-table tr:nth-child(even) {
+  background: #f7f9fc;
+}
+
+body.edit-mode table.modal-table tr:hover {
+  background: #eef4ff;
+}
+
+/* 列幅制御 */
+/* チェック */
+body.edit-mode table.modal-table th:first-child,
+body.edit-mode table.modal-table td:first-child {
+  width: 48px;
+}
+
+/* 組・コース */
+body.edit-mode table.modal-table th:nth-child(2),
+body.edit-mode table.modal-table td:nth-child(2) {
+  width: 90px;
+}
+
+/* 番号 */
+body.edit-mode table.modal-table th:nth-child(3),
+body.edit-mode table.modal-table td:nth-child(3) {
+  width: 70px;
+}
+
+/* 氏名 */
+body.edit-mode table.modal-table th:nth-child(4),
+body.edit-mode table.modal-table td:nth-child(4) {
+  width: 160px;
+  text-align: left;
+  padding-left: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* フッター */
+body.edit-mode .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+
+  padding: 12px 16px;
+  background: #fafafa;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* ボタン */
+body.edit-mode .modal-actions button {
+  min-width: 96px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* キャンセル */
+body.edit-mode #editTargetCancelBtn {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+body.edit-mode #editTargetCancelBtn:hover {
+  background: #f3f4f6;
+}
+
+/* 決定（主） */
+body.edit-mode #editTargetOkBtn {
+  background: #004a99;
+  color: #ffffff;
+  border: 1px solid #004a99;
+}
+
+body.edit-mode #editTargetOkBtn:hover {
+  background: #003b7a;
+}
+
+/* ================================
+   学生選択モーダル専用：テーブル最小幅解除
+================================ */
+body.edit-mode .modal-box table {
+  min-width: auto;
+}

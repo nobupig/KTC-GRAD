@@ -125,7 +125,33 @@
 
     <button id="skillSaveBtn" style="display:none;">習熟度を保存</button>
   </main>
+<!-- 修正モード：学生選択モーダル -->
+<div id="editTargetSelectModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3>修正対象の学生を選択してください</h3>
 
+    <!-- ★ テーブルは wrapper の中 -->
+    <div class="modal-table-wrapper">
+      <table class="modal-table">
+      <thead>
+  <tr>
+    <th>選択</th>
+    <th>組・コース</th>
+    <th>番号</th>
+    <th>氏名</th>
+  </tr>
+</thead>
+        <tbody id="editTargetTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- ★ ボタンも modal-box の中 -->
+    <div class="modal-actions">
+      <button id="editTargetCancelBtn">キャンセル</button>
+      <button id="editTargetOkBtn">決定</button>
+    </div>
+  </div>
+</div>
 <!-- ========================================= -->
 <!-- JS / Firebase Auth -->
 <!-- ========================================= -->

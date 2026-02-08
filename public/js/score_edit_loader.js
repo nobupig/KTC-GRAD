@@ -215,7 +215,53 @@ async function renderEditFromSnapshot(data, ctx) {
   }
 
   const sids = Object.keys(mergedStudents);
-  
+  // --- 修正モード：初回のみ学生選択モーダル ---
+if (
+  window.__isEditMode &&
+  !window.__editTargetModalOpened &&
+  !window.__editTargetStudentIds
+) {
+// --- 修正モード：初回のみ学生選択モーダル ---
+if (
+  window.__isEditMode &&
+  !window.__editTargetModalOpened &&
+  !window.__editTargetStudentIds
+) {
+  // ★ プロフィール取得（氏名・組・番号用）
+  const profiles = await fetchStudentSnapshots(sids, ctx.year);
+
+  const modalStudents = sids.map(sid => {
+    const p = profiles[sid] || {};
+    return {
+      sid,
+      groupCourse: p.grade && p.courseClass
+        ? `${p.grade}${p.courseClass}`
+        : "",
+      number: p.number ?? "",
+      name: p.name ?? ""
+    };
+  });
+
+  console.log("[EDIT MODAL] students =", modalStudents);
+
+  openEditTargetSelectModal(modalStudents);
+  window.__editTargetModalOpened = true;
+  return; // ← 選択が終わるまで描画しない
+}
+
+  openEditTargetSelectModal(modalStudents);
+  window.__editTargetModalOpened = true;
+  return; // ← 選択が終わるまで描画しない
+}
+
+// --- 選択された学生だけに絞る ---
+let displaySids = sids;
+if (Array.isArray(window.__editTargetStudentIds)) {
+  displaySids = sids.filter(sid =>
+    window.__editTargetStudentIds.includes(String(sid))
+  );
+}
+
   window.__editOriginalStudents = mergedStudents; // 元の学生データ（version等を継承）
   const profiles = await fetchStudentSnapshots(sids, ctx.year);
 
@@ -228,7 +274,7 @@ async function renderEditFromSnapshot(data, ctx) {
 
   sids.sort((a, b) => Number(a) - Number(b));
 
-  for (const sid of sids) {
+  for (const sid of displaySids) {
     const scoreObj = mergedStudents[sid] ?? {};
     const p = profiles[sid] || {};
 
@@ -476,3 +522,61 @@ function waitForAuthUserStable(timeoutMs = 5000) {
     console.log("[EDIT MODE] normal view - do nothing");
   }
 })();
+
+// ================================
+// 修正モード：学生選択モーダル
+// ================================
+window.__editTargetModalOpened = false;
+window.__editTargetStudentIds = null;
+
+function openEditTargetSelectModal(students) {
+  const modal = document.getElementById("editTargetSelectModal");
+  const tbody = document.getElementById("editTargetTableBody");
+  const okBtn = document.getElementById("editTargetOkBtn");
+  const cancelBtn = document.getElementById("editTargetCancelBtn");
+
+  tbody.innerHTML = "";
+
+  students.forEach(student => {
+    const {
+      sid,
+      groupCourse,
+      number,
+      name
+    } = student;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" data-sid="${sid}" checked>
+      </td>
+      <td>${groupCourse ?? ""}</td>
+      <td>${number ?? ""}</td>
+      <td>${name ?? ""}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  okBtn.onclick = () => {
+    const selected = [];
+    tbody.querySelectorAll("input[type=checkbox]:checked").forEach(cb => {
+      selected.push(String(cb.dataset.sid));
+    });
+
+    if (!selected.length) {
+      alert("少なくとも1名は選択してください");
+      return;
+    }
+
+    window.__editTargetStudentIds = selected;
+    console.log("修正対象学生ID:", selected);
+
+    modal.style.display = "none";
+  };
+
+  cancelBtn.onclick = () => {
+    modal.style.display = "none";
+  };
+
+  modal.style.display = "flex";
+}
