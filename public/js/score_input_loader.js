@@ -3728,15 +3728,7 @@ window.updateSubmitUI?.();
       // 科目一覧ロード
       const subjects = await loadTeacherSubjects(user);
 
-        // ★★★ ここに追加 ★★★
-  const editCtxRaw = sessionStorage.getItem("editContext");
-  if (editCtxRaw) {
-    const editCtx = JSON.parse(editCtxRaw);
-    const editSubjectId = editCtx.subjectId;
-    console.log("[EDIT MODE] trigger initial render:", editSubjectId);
-    await handleSubjectChange(editSubjectId);
-    return;
-  }
+
 
       // URLで科目指定があれば自動選択
       if (subjectIdFromURL && subjects.length) {
