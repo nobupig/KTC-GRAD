@@ -158,13 +158,9 @@
   </header>
 
   <main>
-    <h2>作業メニュー</h2>
-    <p class="description">
-      前回の続きから再開するか、新しい年度・科目の入力を開始してください。<br>
-      評価基準が未入力の科目がある場合は、途中再開から評価基準入力画面に遷移します。
-    </p>
+    
 
-    <h3 style="margin-top:20px; font-size:20px;">
+    <h3 style="margin-top:20px; font-size:24px;">
   📊 提出状況サマリー
 </h3>
 
@@ -177,9 +173,11 @@
       <div class="card">
         <h3>🔵 途中再開</h3>
         <p>
-          前回の続きから再開します。<br>
-          評価基準が未入力の科目がある場合は、評価基準入力画面から再開します。<br>
-          すべての科目の評価基準が確定済みの場合は、成績入力画面に遷移します。
+          一時保存の途中から再開します。<br>
+          成績入力後　⇒　一時保存　⇒　教務へ送信してください。
+          送信後は提出状況より修正可能です。（締め切り後は修正不可）
+          <br>
+          
         </p>
 
   
@@ -198,7 +196,7 @@
 
       <!-- 閲覧モード -->
       <div class="card">
-        <h3>📄 閲覧モード</h3>
+        <h3>📄 閲覧モード（現在構築中）</h3>
         <p>
           登録済みの評価基準や成績を確認するモードです。<br>
           入力操作は行わず、閲覧のみを行いたい場合に利用します。
@@ -324,7 +322,7 @@ function renderStartMenuOverview(area, subjects) {
   if (!Array.isArray(subjects) || subjects.length === 0) {
     const p = document.createElement("div");
     p.textContent = "担当科目がまだ登録されていません。";
-    p.style.fontSize = "20px";
+    p.style.fontSize = "24px";
     p.style.color = "#b22222";
     area.appendChild(p);
     return;
@@ -369,7 +367,7 @@ function renderStartMenuOverview(area, subjects) {
 
     const h = document.createElement("div");
     h.textContent = title;
-    h.style.fontSize = "13px";
+    h.style.fontSize = "22px";
     h.style.fontWeight = "700";
     h.style.margin = "10px 0 6px";
     h.style.color = "#111827";
@@ -378,7 +376,7 @@ function renderStartMenuOverview(area, subjects) {
     const ul = document.createElement("ul");
     ul.style.margin = "0";
     ul.style.paddingLeft = "18px";
-    ul.style.fontSize = "15px";
+    ul.style.fontSize = "22px";
 ul.style.lineHeight = "1.6";
 
 items.forEach(function(it){
@@ -404,7 +402,7 @@ items.forEach(function(it){
   } else if (type === "not") {
     labelSpan.textContent = "・ " + label + "（未提出）";
   } else {
-    labelSpan.textContent = "・ " + label + "（状況不明）";
+    labelSpan.textContent = "・ " + label + "";
   }
 
   li.appendChild(labelSpan);
@@ -419,7 +417,7 @@ editLink.addEventListener("click", (e) => {
   startEditMode(it.subj, it.cs);
 });
 
-  editLink.style.fontSize = "12px";
+  editLink.style.fontSize = "22px";
   editLink.style.color = "#2563eb";
   editLink.style.textDecoration = "underline";
   editLink.style.cursor = "pointer";
@@ -437,12 +435,12 @@ editLink.addEventListener("click", (e) => {
   addSection("提出済み", completed, "completed");
   addSection("一部提出（共通科目）", partial, "partial");
   addSection("未提出", notSubmitted, "not");
-  addSection("状況不明（旧データ等）", unknown, "unknown");
+  addSection("作業中", unknown, "unknown");
 
   // 補足
   const note = document.createElement("div");
   note.style.marginTop = "10px";
-  note.style.fontSize = "14px";
+  note.style.fontSize = "18px";
   note.style.color = "#00008B";
   note.textContent =
     "※担当しているすべての科目の提出状況を表示しています";
@@ -667,30 +665,34 @@ if (!cs) {
 let authChecked = false;
 
 onAuthStateChanged(auth, async (user) => {
-  // ★ 修正モードから戻ったかどうか
-  const fromEdit = sessionStorage.getItem("fromEditMode");
-
-  // 初回は必ず通す（復元待ち）
+  // ===============================
+  // 認証復元待ち（初回のみ）
+  // ===============================
   if (!user && !authChecked) {
     authChecked = true;
     console.log("[START] auth restoring... wait");
     return;
   }
 
-  // ★ 追加：修正モードから戻った直後は redirect しない
-  if (!user && fromEdit) {
-    console.log("[START] return from edit mode, wait auth");
-    sessionStorage.removeItem("fromEditMode");
-    return;
-  }
-
-  // 復元後も user がいなければ本当に未ログイン
-  if (!user) {
+  // ===============================
+  // 未ログイン判定
+  // ===============================
+  // 通常アクセス → ログイン画面へ
+  if (!user && !fromEdit) {
     console.warn("[START] auth missing → redirect");
     window.location.href = "index.html";
     return;
   }
 
+  // 修正モードから戻った場合 → auth復元を待つ
+  if (!user && fromEdit) {
+    console.log("[START] wait auth restore (from edit)");
+    return;
+  }
+
+  // ===============================
+  // ここからログイン済み確定
+  // ===============================
   console.log("[START] auth ready:", user.email);
 
   currentUser = user;
@@ -706,7 +708,9 @@ onAuthStateChanged(auth, async (user) => {
       `ログイン中：${displayName}（${user.email}）`;
   }
 
-  // ===== トップ画面サマリー描画 =====
+  // ===============================
+  // トップ画面サマリー描画
+  // ===============================
   try {
     const tsRef = doc(db, teacherSubjectsCol, user.email);
     const tsSnap = await getDoc(tsRef);
@@ -721,8 +725,9 @@ onAuthStateChanged(auth, async (user) => {
   } catch (e) {
     console.error("[Start] failed to load teacherSubjects:", e);
   }
-});
-    // ===============================
+});   
+
+// ===============================
 // 修正モード開始（start.html）
 // ===============================
 window.startEditMode = function (subj, completionSummary) {

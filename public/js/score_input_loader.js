@@ -1214,11 +1214,9 @@ window.__isEditMode = false;
       // 99%対策：浮動小数の誤差で 99.xx → 99 に落ちる/満点が 99 になる事故を救済
       if (allPerfect) {
         finalScoreFloat = 100;
-      } else if (finalScoreFloat >= 99.5) {
-        finalScoreFloat = 100;
       }
 
-      const finalScore = Math.round(finalScoreFloat);
+      const finalScore = Math.floor(finalScoreFloat);
 
       finalCell.textContent = String(finalScore);
       try { studentState.finalScores.set(studentId, finalScore); } catch (e) {}

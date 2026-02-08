@@ -55,8 +55,8 @@
     <!-- 中段：操作説明 -->
     <div class="edit-header-guide">
       提出済みの成績を表示しています。必要な箇所のみ修正し、
-      <b>「修正内容を保存」→「修正内容を教務へ送信」</b>
-      の順で操作してください。
+      <b>「修正内容を教務へ送信」</b>
+      操作してください。
       <br>
       <span class="edit-header-warning">
         ※ 超過登録の追加・解除・時間数変更は、Slack にて教務部へ連絡してください。
@@ -65,24 +65,18 @@
 
     <!-- 下段：操作ボタン -->
     <div class="edit-header-actions">
-
+<button id="editSelectStudentsBtn" class="secondary">
+   👥 学生の追加・解除
+</button>
       <button
         id="editSaveBtn"
-        class="btn-edit-primary"
-        type="button"
-      >
-        修正内容を保存
-      </button>
-
-      <button
-        id="editSubmitBtn"
         class="btn-edit-danger"
         type="button"
       >
         修正内容を教務へ送信
       </button>
 
-      <button
+           <button
         id="backHomeBtn"
         type="button"
         class="btn-edit-secondary"
@@ -114,7 +108,7 @@
   修正モードです。
 </div>
 
-    <div id="submissionStatusArea" class="submission-status-area" aria-live="polite"></div>
+   
     <!-- STEP C：共通科目フィルタ UI を表示するエリア -->
 <div id="groupFilterArea" style="margin: 12px 0;"></div>
 

@@ -2800,3 +2800,34 @@ body.edit-mode .loading-toast .spinner {
 @keyframes loadingToastSpin {
   to { transform: rotate(360deg); }
 }
+
+/* ===============================
+   修正モード：学生の追加・解除（サブ操作）
+=============================== */
+#editSelectStudentsBtn.secondary {
+  background-color: #eef5ff;      /* 薄いブルー */
+  color: #0b5ed7;                 /* 落ち着いた青 */
+  border: 1px solid #b6d4fe;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  transition: background-color 0.15s ease,
+              border-color 0.15s ease,
+              transform 0.05s ease;
+}
+
+#editSelectStudentsBtn.secondary:hover {
+  background-color: #e0edff;
+  border-color: #9ec5fe;
+}
+
+#editSelectStudentsBtn.secondary:active {
+  transform: translateY(1px);
+}

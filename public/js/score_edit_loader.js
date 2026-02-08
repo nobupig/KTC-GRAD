@@ -109,23 +109,35 @@ async function fetchEvaluationCriteria(ctx) {
 }
 
  function recalcFinalScoreFromRawScores(rawScores, criteriaItems) {
-   let total = 0;
+  let sumWeighted = 0;
 
-   for (const item of criteriaItems || []) {
-     const name = String(item?.name ?? "").trim();
-     if (!name) continue;
+  // --- ① percent 合計を算出 ---
+  let totalPercent = 0;
+  for (const item of criteriaItems || []) {
+    const p = Number(item?.percent ?? 0);
+    if (Number.isFinite(p)) totalPercent += p;
+  }
 
-     const raw = Number(rawScores?.[name]);
-     if (!Number.isFinite(raw)) continue;
+  // --- ② 正規化係数（100%に補正） ---
+  const factor = totalPercent > 0 ? 100 / totalPercent : 0;
 
-     const max = Number(item?.maxScore ?? 100);
-     const percent = Number(item?.percent ?? 0);
+  // --- ③ 正規化後 percent で比率計算 ---
+  for (const item of criteriaItems || []) {
+    const name = String(item?.name ?? "").trim();
+    if (!name) continue;
 
-     total += (raw / max) * percent;
-   }
+    const raw = Number(rawScores?.[name]);
+    if (!Number.isFinite(raw)) continue;
 
-   return Math.floor(total);
- }
+    const max = Number(item?.maxScore ?? 100);
+    const percent = Number(item?.percent ?? 0) * factor;
+
+    sumWeighted += (raw / max) * percent;
+  }
+
+  // --- ④ 最終成績：切り捨て ---
+  return Math.floor(sumWeighted);
+}
 
 
 /* ========= Firestore snapshot ========= */
@@ -175,11 +187,43 @@ function bindEditScoreInputHandler() {
     if (!panel) return;
 
     const scores = {};
-    panel.querySelectorAll(`.edit-score-input[data-sid="${sid}"]`).forEach((inp) => {
-      const key = inp.dataset.item;
-      const v = Number(inp.value);
-      scores[key] = Number.isFinite(v) ? v : 0;
-    });
+panel.querySelectorAll(`.edit-score-input[data-sid="${sid}"]`).forEach((inp) => {
+  const key = inp.dataset.item;
+
+  // ===============================
+  // ① 数字と小数点以外を除去（途中入力も許可）
+  // ===============================
+  let raw = String(inp.value ?? "");
+  raw = raw.replace(/[^0-9.]/g, "");
+
+  // 小数点は1つまで
+  const parts = raw.split(".");
+  if (parts.length > 2) {
+    raw = parts[0] + "." + parts.slice(1).join("");
+  }
+
+  // ★ 途中状態は value を上書きしない（ここが肝）
+  // 例: "", ".", "20." は入力継続のため許可
+  if (raw === "" || raw === "." || raw.endsWith(".")) {
+    inp.value = raw;
+    scores[key] = 0; // 計算に入れない（※必要なら前回値保持でもOK）
+    return;
+  }
+
+  // ===============================
+  // ② ここから先は確定数値のみ
+  // ===============================
+  let v = Number(raw);
+  const max = Number(inp.dataset.max);
+
+  if (!Number.isFinite(v)) v = 0;
+  if (v < 0) v = 0;
+  if (Number.isFinite(max) && max > 0 && v > max) v = max;
+
+  // ★ 確定値のときだけ同期
+  inp.value = String(v);
+  scores[key] = v;
+});
 
     const finalVal = recalcFinalScoreFromRawScores(
   scores,
@@ -297,7 +341,8 @@ if (Array.isArray(window.__editTargetStudentIds)) {
   }
 
    displaySids.sort((a, b) => Number(a) - Number(b));
-
+ // ★ 現在表示中の学生を記録
+ window.__currentDisplayStudentIds = [...displaySids];
 
   for (const sid of displaySids) {
     const scoreObj = mergedStudents[sid] ?? {};
@@ -323,7 +368,8 @@ const autoFinal = recalcFinalScoreFromRawScores(
 );
 
 const row = document.createElement("div");
-row.className = "edit-row compact";
+row.className = "edit-row compact edit-student-panel";
+row.dataset.sid = sid;
 
 row.innerHTML = `
   <div class="student-cell compact">
@@ -360,14 +406,14 @@ row.innerHTML = `
             <span class="score-item-name">${name}</span>
           <span class="score-item-meta">${percent}%｜最大${rawMax}点</span>
           <input
-            type="number"
-            class="edit-score-input"
-            data-sid="${sid}"
-            data-item="${name}"
-            min="0"
-            max="${rawMax}"
-            value="${val}"
-          />
+  type="text"
+  class="edit-score-input"
+  inputmode="decimal"
+  data-sid="${sid}"
+  data-item="${name}"
+  data-max="${rawMax}"
+  value="${val}"
+/>
           </div>
         `;
       }).join("")}
@@ -395,15 +441,29 @@ function collectEditedStudents() {
     // scores（換算後点数）
     const scores = {};
     panel.querySelectorAll(`.edit-score-input[data-sid="${sid}"]`).forEach((inp) => {
-      const key = inp.dataset.item;
- const rawMax = Number(inp.max || 0);
-let v = Number(inp.value);
+const key = inp.dataset.item;
+
+// ① 文字列の正規化（数字と小数点のみ）
+let raw = String(inp.value ?? "");
+raw = raw.replace(/[^0-9.]/g, "");
+const parts = raw.split(".");
+if (parts.length > 2) raw = parts[0] + "." + parts.slice(1).join("");
+
+// ② 途中状態は保存時に未入力扱い（0にする）
+if (raw === "" || raw === "." || raw.endsWith(".")) {
+  inp.value = "";       // 保存時は確定させない
+  scores[key] = 0;
+  return;
+}
+
+let v = Number(raw);
+const max = Number(inp.dataset.max);
 
 if (!Number.isFinite(v)) v = 0;
 if (v < 0) v = 0;
-if (rawMax > 0 && v > rawMax) v = rawMax;
+if (Number.isFinite(max) && max > 0 && v > max) v = max;
 
-inp.value = String(v);   // ← 強制的に戻す
+inp.value = String(v);
 scores[key] = v;
     });
 
@@ -448,31 +508,41 @@ async function saveEditedScores() {
   const units = current.submittedSnapshot?.units || {};
 
   const unitKeyForFs = toFirestoreUnitKey(ctx.unitKey);
+  const prevUnitStudents =
+    units?.[unitKeyForFs]?.students || {};
 
-  await updateDoc(ref, {
-    // ① 修正履歴（スナップショット）
-    submittedSnapshot: {
-      units: {
-        ...units,
-        [unitKeyForFs]: {
-          students,
-          savedAt: serverTimestamp(),
-          savedBy: auth.currentUser.email,
-          isEdit: true,
-        },
-      },
-    },
-
-    // ② ★最終確定成績（ここが重要）
+  const updatePayload = {
+    // --- 確定成績（students）
     students: {
       ...(current.students || {}),
-      ...students, // ← 修正した学生だけ上書き
+      ...students,
     },
-
     updatedAt: serverTimestamp(),
-  });
+  };
 
-  alert("修正内容を保存しました（最終成績も更新済み）");
+  // --- submittedSnapshot（安全なマージ）
+  updatePayload[
+    `submittedSnapshot.units.${unitKeyForFs}.students`
+  ] = {
+    ...prevUnitStudents,
+    ...students,
+  };
+
+  updatePayload[
+    `submittedSnapshot.units.${unitKeyForFs}.savedAt`
+  ] = serverTimestamp();
+
+  updatePayload[
+    `submittedSnapshot.units.${unitKeyForFs}.savedBy`
+  ] = auth.currentUser.email;
+
+  updatePayload[
+    `submittedSnapshot.units.${unitKeyForFs}.isEdit`
+  ] = true;
+
+  await updateDoc(ref, updatePayload);
+
+  alert("修正内容を保存しました（最終成績・スナップショット更新済み）");
 }
 
 /* ========= 保存ボタン結線 ========= */
@@ -487,6 +557,51 @@ function bindSaveButton() {
       console.error("[EDIT SAVE] failed", e);
       alert(e.message || "保存に失敗しました");
     }
+  });
+}
+
+function bindEditSelectStudentsButton() {
+  const btn = document.getElementById("editSelectStudentsBtn");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const data = window.__latestScoresDocData;
+    const ctx = window.__submissionContext;
+    if (!data || !ctx) return;
+
+    const units = data?.submittedSnapshot?.units || {};
+    let mergedStudents = {};
+
+    const ctxUnit = normalizeUnitKey(ctx.unitKey);
+    if (units[ctxUnit]?.students) {
+      mergedStudents = units[ctxUnit].students;
+    } else {
+      for (const u of Object.values(units)) {
+        Object.assign(mergedStudents, u.students || {});
+      }
+    }
+
+    if (Object.keys(mergedStudents).length === 0) {
+      mergedStudents = data.students || {};
+    }
+
+    const sids = Object.keys(mergedStudents);
+
+    showLoadingToast("学生情報を読み込んでいます…");
+    const profiles = await fetchStudentSnapshots(sids, ctx.year);
+    hideLoadingToast();
+
+    const modalStudents = sids.map(sid => {
+      const p = profiles[sid] || {};
+      return {
+        sid,
+        groupCourse: p.courseClass ?? p.course ?? "",
+        number: Number(p.number ?? 0),
+        name: p.name ?? ""
+      };
+    });
+
+    openEditTargetSelectModal(modalStudents);
   });
 }
 
@@ -530,6 +645,9 @@ function waitForAuthUserStable(timeoutMs = 5000) {
 
   if (isEditMode) {
     await initEditMode();
+
+      // ★ 学生の追加・解除ボタンを有効化
+     bindEditSelectStudentsButton();
 
     // --- UI 表示制御（Step3-A） ---（修正モード時だけ）
     const editWrapper = document.getElementById("editSimpleTableWrapper");
@@ -605,7 +723,11 @@ function openEditTargetSelectModal(students) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        <input type="checkbox" data-sid="${sid}" checked>
+        <input
+   type="checkbox"
+   data-sid="${sid}"
+   ${window.__currentDisplayStudentIds?.includes(String(sid)) ? "checked" : ""}
+   >
       </td>
       <td>${groupCourse ?? ""}</td>
       <td>${number ?? ""}</td>
