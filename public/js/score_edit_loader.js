@@ -287,16 +287,17 @@ if (Array.isArray(window.__editTargetStudentIds)) {
 }
 
   window.__editOriginalStudents = mergedStudents; // 元の学生データ（version等を継承）
-  const profiles = await fetchStudentSnapshots(sids, ctx.year);
+  const profiles = await fetchStudentSnapshots(displaySids, ctx.year);
 
   tbody.innerHTML = "";
 
-  if (sids.length === 0) {
+  if (displaySids.length === 0) {
     tbody.innerHTML = `<tr><td colspan="2">学生データがありません</td></tr>`;
     return;
   }
 
-  sids.sort((a, b) => Number(a) - Number(b));
+   displaySids.sort((a, b) => Number(a) - Number(b));
+
 
   for (const sid of displaySids) {
     const scoreObj = mergedStudents[sid] ?? {};
@@ -628,7 +629,14 @@ function openEditTargetSelectModal(students) {
     console.log("修正対象学生ID:", selected);
 
     modal.style.display = "none";
-  };
+ // ★ ここが本丸：選択後に即再描画
+  if (window.__latestScoresDocData && window.__submissionContext) {
+    renderEditFromSnapshot(
+      window.__latestScoresDocData,
+      window.__submissionContext
+    );
+  }
+};
 
   cancelBtn.onclick = () => {
     modal.style.display = "none";
