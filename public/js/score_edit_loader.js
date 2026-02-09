@@ -340,7 +340,30 @@ if (Array.isArray(window.__editTargetStudentIds)) {
     return;
   }
 
-   displaySids.sort((a, b) => Number(a) - Number(b));
+  // ★ 表示順を「組・コース → 番号順」に統一
+const GROUP_ORDER = ["1", "2", "3", "4", "5"];
+const COURSE_ORDER = ["M", "E", "I", "C", "A"];
+
+displaySids.sort((a, b) => {
+  const pa = profiles[a] || {};
+  const pb = profiles[b] || {};
+
+  const ga = String(pa.courseClass ?? pa.course ?? "");
+  const gb = String(pb.courseClass ?? pb.course ?? "");
+
+  // ① 組
+  const gi = GROUP_ORDER.indexOf(ga);
+  const gj = GROUP_ORDER.indexOf(gb);
+  if (gi !== gj) return (gi === -1 ? 999 : gi) - (gj === -1 ? 999 : gj);
+
+  // ② コース
+  const ci = COURSE_ORDER.indexOf(ga);
+  const cj = COURSE_ORDER.indexOf(gb);
+  if (ci !== cj) return (ci === -1 ? 999 : ci) - (cj === -1 ? 999 : cj);
+
+  // ③ 番号
+  return Number(pa.number ?? 0) - Number(pb.number ?? 0);
+});
  // ★ 現在表示中の学生を記録
  window.__currentDisplayStudentIds = [...displaySids];
 
