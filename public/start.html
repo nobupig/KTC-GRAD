@@ -143,6 +143,32 @@
     #statusMessage strong {
       color: #111827;
     }
+
+/* ============================= */
+/* テスト運用アナウンス表示用 */
+/* ============================= */
+.test-notice {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: #fff7ed;            /* 薄いオレンジ */
+  border: 2px solid #f97316;      /* 目立つ枠線 */
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+.test-notice-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #c2410c;
+  margin-bottom: 8px;
+}
+
+.test-notice-body {
+  font-size: 20px;
+  line-height: 1.7;
+  color: #7c2d12;
+}
+
   </style>
 </head>
 <body>
@@ -158,8 +184,7 @@
   </header>
 
   <main>
-    
-
+  
     <h3 style="margin-top:20px; font-size:24px;">
   📊 提出状況サマリー
 </h3>
@@ -274,6 +299,28 @@ import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-
 // ================================
 // Step.0: トップ画面に提出状況サマリーを表示
 // ================================
+/* =========================
+ * 成績入力期間判定（start.html用ガード）
+ * ========================= */
+async function checkInputPeriodForLogin() {
+  const ref = doc(db, "settings", "period");
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { mode: "none" };
+
+  const p = snap.data();
+  const now = new Date();
+
+  const firstStart  = new Date(p.firstStart);
+  const firstEnd    = new Date(p.firstEnd);
+  const secondStart = new Date(p.secondStart);
+  const secondEnd   = new Date(p.secondEnd);
+
+  if (now >= firstStart && now <= firstEnd) return { mode: "first" };
+  if (now >= secondStart && now <= secondEnd) return { mode: "second" };
+
+  return { mode: "none" };
+}
+
 
 // 表示ラベル生成（例：1年 / G / 後期 / 基礎物理b）
 function buildSubjectLabel(subj) {
@@ -696,6 +743,22 @@ onAuthStateChanged(auth, async (user) => {
   console.log("[START] auth ready:", user.email);
 
   currentUser = user;
+
+  // ★ 期間外ガード：start.html 直アクセスを禁止
+  try {
+    const period = await checkInputPeriodForLogin();
+    if (period.mode === "none") {
+      console.warn("[START] period none → redirect to view.html");
+      location.href = "view.html";
+      return;
+    }
+  } catch (e) {
+    console.error("[START] period check failed:", e);
+    // 期間判定に失敗した場合も安全側（閲覧へ）
+    location.href = "view.html";
+    return;
+  }
+
   await loadTeacherName();
 
   const displayName = currentTeacherName || user.email;

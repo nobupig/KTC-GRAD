@@ -717,6 +717,39 @@ else if (!criteriaItems || criteriaItems.length === 0) {
   criteriaItems.forEach((item, index) => {
     const td = document.createElement("td");
     const input = document.createElement("input");
+    // ================================
+// Enterキーで「同じ列の次の行」へ移動
+// ================================
+input.addEventListener("keydown", (e) => {
+  // Enterのみ／IME変換中は除外
+  if (e.key !== "Enter" || e.isComposing) return;
+
+  e.preventDefault(); // 改行・submit防止
+
+  const currentInput = e.target;
+  const currentRow = currentInput.closest("tr");
+  if (!currentRow) return;
+
+  const tbody = currentRow.closest("tbody");
+  if (!tbody) return;
+
+  const colIndex = currentInput.dataset.index;
+  if (colIndex == null) return;
+
+  // 次の行（最終行なら null）
+  const nextRow = currentRow.nextElementSibling;
+  if (!nextRow) return; // ← 最終行：何もしない（仕様どおり）
+
+  // 同じ列の input を探す
+  const nextInput = nextRow.querySelector(
+    `input[data-index="${colIndex}"]:not([disabled]):not([readonly])`
+  );
+
+  if (nextInput) {
+    nextInput.focus();
+    nextInput.select(); // 既存値を即上書きできて便利
+  }
+});
     input.dataset.weightPercent = String(item.percent ?? 0);
 
 input.type = "text";
@@ -1163,11 +1196,12 @@ export function applyStudentUIState(ui) {
     // applyStudentUIState: entry debug log removed
   if (!ui) return;
 
-
-
   const submitBtn = document.getElementById("submitScoresBtn");
   const saveBtn = document.getElementById("saveScoresBtn");
   if (!submitBtn) return;
+
+
+
   // ================================
   // ★ 提出後は完全に閲覧専用（全学年・特別科目共通）
   // ================================
@@ -1210,6 +1244,13 @@ const grade = String(ui.subject?.grade ?? "");
 const isLowerSpecialSingle =
   isSpecial && (grade === "1" || grade === "2");
 
+ // ★ 提出済みフラグ（送信ボタン制御の最上位条件）
+ const isFinalized =
+   ui.isUnitSubmitted === true ||
+   ui.isCompleted === true ||
+   ui.isSubjectCompleted === true ||
+   window.__submissionFinalized === true;
+   
 // =====================================================
 // 【最終確定】送信ボタン制御ロジック
 // =====================================================
@@ -1219,12 +1260,21 @@ const isLowerSpecialSingle =
 if (isLowerSpecialSingle) {
   submitBtn.style.display = "";
 
-  if (ui.hasUserEdited === true && ui.isUnitSubmitted !== true) {
+  const check = canSubmitScoresByVisibleRows();
+
+  if (isFinalized) {
+    submitBtn.disabled = true;
+    submitBtn.style.display = "none";
+  }
+  else if (
+    ui.hasUserEdited === true &&
+    check.ok === true
+  ) {
     submitBtn.disabled = false;
     submitBtn.textContent = "教務へ送信";
   } else {
     submitBtn.disabled = true;
-    submitBtn.textContent = "保存してから提出";
+    submitBtn.textContent = check.ok ? "保存してから提出" : "未入力があります";
   }
 }
 
@@ -1251,11 +1301,21 @@ else if (ui.canSubmit !== true) {
 }
 
   // 送信可能
-  else {
+else {
+  const check = canSubmitScoresByVisibleRows();
+
+ if (isFinalized) {
+   submitBtn.disabled = true;
+   submitBtn.style.display = "none";
+ }
+ else if (!check.ok) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "未入力があります";
+  } else {
     submitBtn.disabled = false;
-    submitBtn.style.display = "";
     submitBtn.textContent = "教務へ送信";
   }
+}
 }
 
 // =====================================================
@@ -1385,6 +1445,12 @@ if (
 
 
 window.submitScoresForSubject = async function () {
+    // ★ 未入力ガード（UIが壊れても送信させない最終防御）
+  const check = canSubmitScoresByVisibleRows();
+  if (!check.ok) {
+  alert("未入力の成績があります。すべて入力してから送信してください。");
+  return;
+}
     // ★ 現在のUI状態を取得（未定義エラー防止）
   const ui = window.getCurrentUIState?.();
   if (!ui) {
