@@ -304,7 +304,7 @@ td input[type="checkbox"] {
   <main>
     <h2>担当科目の選択</h2>
     <p class="status">
-      学年・コースを選んで「科目を読み込む」を押してください。<br>
+      学年・コースを選択すると自動で科目が表示されます。<br>
       都市環境は <strong>C / CC / CA をまとめて表示</strong> します。
     </p>
 
@@ -337,7 +337,7 @@ td input[type="checkbox"] {
 
       <div class="field">
         <label>&nbsp;</label>
-        <button id="loadBtn" class="btn btn-secondary">科目を読み込む</button>
+       
         <button id="evalBtn" class="btn btn-secondary" style="margin-left:8px;">
           📝 評価基準入力
         </button>
@@ -556,7 +556,7 @@ Slackで担当者までDM連絡をしてください。
 
     const gradeSelect = document.getElementById("gradeSelect");
     const courseSelect = document.getElementById("courseSelect");
-    const loadBtn = document.getElementById("loadBtn");
+    
 
     const loadStatus = document.getElementById("loadStatus");
     const loadError = document.getElementById("loadError");
@@ -705,20 +705,32 @@ document.getElementById("subjectRegisterGoScoreBtn")?.addEventListener("click", 
     });
 
     // ★ 学年変更時にコース自動制御（1・2年はG固定）
-    gradeSelect.addEventListener("change", () => {
-      const grade = gradeSelect.value;
-      if (grade === "1" || grade === "2") {
-        courseSelect.value = "G";
-        courseSelect.disabled = true;
-      } else {
-        courseSelect.disabled = false;
-      }
-    });
+gradeSelect.addEventListener("change", () => {
+  const grade = gradeSelect.value;
 
-    // ===== 科目読み込み処理 =====
-    loadBtn.addEventListener("click", () => {
-      loadSubjects();
-    });
+  if (grade === "1" || grade === "2") {
+    courseSelect.value = "G";
+    courseSelect.disabled = true;
+  } else {
+    courseSelect.disabled = false;
+  }
+
+  autoLoadSubjectsIfReady();   // ★ 追加
+});
+courseSelect.addEventListener("change", () => {
+  autoLoadSubjectsIfReady();
+});
+
+function autoLoadSubjectsIfReady() {
+  const grade = gradeSelect.value;
+  const course = courseSelect.value;
+
+  if (grade && course) {
+    loadSubjects();
+  }
+}
+
+
 
     async function loadSubjects() {
       saveStatus.textContent = "";

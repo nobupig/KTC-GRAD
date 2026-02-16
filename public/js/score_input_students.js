@@ -569,6 +569,9 @@ export function renderStudentRows(
     return;
   }
 
+     // ★ 追加：描画前に必ず安定ソート（選択科目の追加登録でも順序が崩れないように）
+  students = sortStudents(students);
+   
   for (const stu of students) {
      let specialSelect = null; // ★ ここで宣言（行単位で共有）
     const tr = document.createElement("tr");
