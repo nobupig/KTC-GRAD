@@ -412,20 +412,29 @@ try {
   // ================================
   // 平均点表示をリアルタイム更新（未入力行除外・DOMのみ）
   // ================================
-  export function updateAveragePointDisplay() {
-    const el = document.getElementById("avgPointDisplay");
-    if (!el) return;
-    const finalScores = studentState.finalScores ?? new Map();
-    let sum = 0, count = 0;
-    finalScores.forEach((score) => {
-      if (Number.isFinite(score)) {
-        sum += score;
-        count++;
-      }
-    });
-    el.textContent = count === 0 ? "平均点：—" : `平均点：${(sum / count).toFixed(1)}`;
-    updateAdjustPointDisplay();
-  }
+export function updateAveragePointDisplay() {
+  const el = document.getElementById("avgPointDisplay");
+  if (!el) return;
+
+  const finalScores = studentState.finalScores ?? new Map();
+  let sum = 0, count = 0;
+
+  finalScores.forEach((score, studentId) => {
+    // ★ 超過登録学生は平均から除外
+    if (excessStudentsState?.[studentId]) return;
+
+    if (Number.isFinite(score)) {
+      sum += score;
+      count++;
+    }
+  });
+
+  el.textContent = count === 0
+    ? "平均点：—"
+    : `平均点：${(sum / count).toFixed(1)}`;
+
+  updateAdjustPointDisplay();
+}
   // ================================
   // 超過学生登録モーダルの最低限の表示/非表示フック
   // ================================
@@ -1216,10 +1225,12 @@ window.__isEditMode = false;
         finalScoreFloat = 100;
       }
 
-      const finalScore = Math.floor(finalScoreFloat);
+      const finalScore = Math.floor(finalScoreFloat + 1e-9);
 
       finalCell.textContent = String(finalScore);
-      try { studentState.finalScores.set(studentId, finalScore); } catch (e) {}
+      try { studentState.finalScores.set(studentId, finalScore);
+
+       } catch (e) {}
     });
 
     // 平均点・調整点更新

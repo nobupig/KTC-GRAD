@@ -534,38 +534,109 @@ async function saveEditedScores() {
   const prevUnitStudents =
     units?.[unitKeyForFs]?.students || {};
 
-  const updatePayload = {
-    // --- 確定成績（students）
-    students: {
-      ...(current.students || {}),
-      ...students,
-    },
-    updatedAt: serverTimestamp(),
+  // ===============================
+// 1) ユニット最新学生データ（prev + edited）
+// ===============================
+const mergedUnitStudents = {
+  ...prevUnitStudents,
+  ...students,
+};
+
+// ===============================
+// 2) 平均点再計算
+// ===============================
+const numericScores = Object.values(mergedUnitStudents)
+  .map(s => Number(s?.finalScore))
+  .filter(v => Number.isFinite(v));
+
+const avg =
+  numericScores.length > 0
+    ? numericScores.reduce((a, b) => a + b, 0) / numericScores.length
+    : null;
+
+// ===============================
+// 3) 赤点基準決定（調整点 or 60）
+// ===============================
+let border = 60; // デフォルト
+
+try {
+  // ★ 正しいコレクションを参照
+  const subjectRef = doc(db, "subjects", ctx.subjectId);
+  const subjectSnap = await getDoc(subjectRef);
+
+  if (subjectSnap.exists()) {
+    const data = subjectSnap.data() || {};
+
+    console.log("[EDIT] subject meta:", {
+      subjectId: ctx.subjectId,
+      useAdjustment: data.useAdjustment,
+      passRule: data.passRule,
+      fixedPassLine: data.fixedPassLine,
+    });
+
+    // ▼ 調整点科目
+    if (data.useAdjustment === true) {
+      if (avg != null) {
+        border = Math.ceil(avg * 0.7);
+      }
+    }
+    // ▼ 固定基準科目
+    else if (Number.isFinite(Number(data.fixedPassLine))) {
+      border = Number(data.fixedPassLine);
+    }
+  } else {
+    console.warn("subjects にドキュメントが見つかりません:", ctx.subjectId);
+  }
+
+} catch (e) {
+  console.warn("subject取得失敗 → 60点基準", e);
+}
+
+// ===============================
+// 4) 全員の isRed 再評価
+// ===============================
+const recalcedUnitStudents = {};
+Object.entries(mergedUnitStudents).forEach(([sid, stu]) => {
+  const score = Number(stu?.finalScore);
+  const isRed =
+    Number.isFinite(score) && score < border;
+
+  recalcedUnitStudents[sid] = {
+    ...stu,
+    isRed,
   };
+});
 
-  // --- submittedSnapshot（安全なマージ）
-  updatePayload[
-    `submittedSnapshot.units.${unitKeyForFs}.students`
-  ] = {
-    ...prevUnitStudents,
-    ...students,
-  };
+// ===============================
+// 5) Firestore更新
+// ===============================
+const updatePayload = {
+  updatedAt: serverTimestamp(),
+  students: {
+    ...(current.students || {}),
+    ...recalcedUnitStudents,
+  },
+};
 
-  updatePayload[
-    `submittedSnapshot.units.${unitKeyForFs}.savedAt`
-  ] = serverTimestamp();
+updatePayload[`submittedSnapshot.units.${unitKeyForFs}.students`] =
+  recalcedUnitStudents;
 
-  updatePayload[
-    `submittedSnapshot.units.${unitKeyForFs}.savedBy`
-  ] = auth.currentUser.email;
+updatePayload[`submittedSnapshot.units.${unitKeyForFs}.savedAt`] =
+  serverTimestamp();
 
-  updatePayload[
-    `submittedSnapshot.units.${unitKeyForFs}.isEdit`
-  ] = true;
+updatePayload[`submittedSnapshot.units.${unitKeyForFs}.savedBy`] =
+  auth.currentUser.email;
 
-  await updateDoc(ref, updatePayload);
+updatePayload[`submittedSnapshot.units.${unitKeyForFs}.isEdit`] =
+  true;
 
-  alert("修正内容を保存しました（最終成績・スナップショット更新済み）");
+await updateDoc(ref, updatePayload);
+
+alert(
+  `修正保存完了\n平均点：${avg == null ? "—" : avg.toFixed(1)}\n赤点基準：${border}`
+);
+
+  
 }
 
 /* ========= 保存ボタン結線 ========= */
