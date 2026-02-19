@@ -109,18 +109,17 @@ function isUnitSubmittedByUI(subjectDocData, unitKey) {
    * 現在の unitKey に対応する UI 状態を返すヘルパー
    * （存在しない場合は null）
    */
-  function getCurrentUIState() {
+function getCurrentUIState() {
   let unitKey = window.__submissionContext?.unitKey;
 
   // ================================
-  // ★ 単一提出科目（1・2年 特別科目）の補完
+  // 単一提出科目補完
   // ================================
   if (!unitKey) {
     const subject = window.currentSubject;
     const grade = String(subject?.grade ?? "");
     const isSpecial = Number(subject?.specialType ?? 0) === 1;
 
-    // 1・2年の特別科目は常に単一提出
     if (isSpecial && (grade === "1" || grade === "2")) {
       unitKey = "__SINGLE__";
       window.__submissionContext = {
@@ -133,10 +132,19 @@ function isUnitSubmittedByUI(subjectDocData, unitKey) {
 
   if (!unitKey) return null;
 
-  // ★ 必ず state を初期化
   ensureUIStateForUnit(unitKey);
 
-  return window.uiStateByUnit[unitKey];
+  const state = window.uiStateByUnit[unitKey];
+
+  // ==========================================
+  // ★ 重要：途中再開時は毎回 DOM から再評価する
+  // ==========================================
+  if (window.canSubmitScoresByVisibleRows) {
+    const check = window.canSubmitScoresByVisibleRows();
+    state.canSubmit = check.ok;
+  }
+
+  return state;
 }
 
 

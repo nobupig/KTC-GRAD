@@ -1201,7 +1201,41 @@ export function applyStudentUIState(ui) {
 
   const submitBtn = document.getElementById("submitScoresBtn");
   const saveBtn = document.getElementById("saveScoresBtn");
+  
   if (!submitBtn) return;
+  
+  // =====================================================
+// ★ 一時保存ボタン制御（保存済み表示仕様）
+// =====================================================
+if (saveBtn) {
+
+  // 提出済みなら非表示
+  if (
+    ui.isCompleted === true ||
+    ui.isUnitSubmitted === true ||
+    ui.isSubjectCompleted === true ||
+    window.__submissionFinalized === true
+  ) {
+    saveBtn.disabled = true;
+    saveBtn.style.display = "none";
+  }
+
+  // 編集済み（未保存）
+  else if (ui.hasUserEdited === true) {
+    saveBtn.disabled = false;
+    saveBtn.style.display = "";
+    saveBtn.textContent = "一時保存";
+  }
+
+  // 保存済み（変更なし）
+  else {
+    saveBtn.disabled = true;
+    saveBtn.style.display = "";
+    saveBtn.textContent = "✓ 保存済み";
+  }
+}
+  
+
 
 
 
@@ -1296,29 +1330,25 @@ else {
     submitBtn.disabled = true;
     submitBtn.style.display = "none";
   }
-// 未保存（送信不可）
-else if (ui.canSubmit !== true) {
-  submitBtn.disabled = true;
-  submitBtn.style.display = "";
-  submitBtn.textContent = "保存してから提出";
-}
+  // 未入力チェックのみで判定（保存済みかどうかは無関係）
+  else {
+    const check = canSubmitScoresByVisibleRows();
 
-  // 送信可能
-else {
-  const check = canSubmitScoresByVisibleRows();
-
- if (isFinalized) {
-   submitBtn.disabled = true;
-   submitBtn.style.display = "none";
- }
- else if (!check.ok) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "未入力があります";
-  } else {
-    submitBtn.disabled = false;
-    submitBtn.textContent = "教務へ送信";
+    if (isFinalized) {
+      submitBtn.disabled = true;
+      submitBtn.style.display = "none";
+    }
+    else if (!check.ok) {
+      submitBtn.disabled = true;
+      submitBtn.style.display = "";
+      submitBtn.textContent = "未入力があります";
+    }
+    else {
+      submitBtn.disabled = false;
+      submitBtn.style.display = "";
+      submitBtn.textContent = "教務へ送信";
+    }
   }
-}
 }
 
 // =====================================================
@@ -1440,7 +1470,26 @@ if (
   submitBtn.style.display = "none";
 }
 
+// ==========================================
+// 教務送信ガイド表示制御（洗練版）
+// ==========================================
+const guide = document.getElementById("submitGuideNotice");
 
+if (guide) {
+  const check = canSubmitScoresByVisibleRows();
+
+  // 条件：
+  // ・未提出
+  // ・入力は全て揃っている
+  // ・未保存状態
+const shouldShow =
+  submitBtn.disabled === true &&
+  check.ok === true &&
+  ui.isUnitSubmitted !== true &&
+  ui.isCompleted !== true;
+
+  guide.style.display = shouldShow ? "block" : "none";
+}
   // final applyStudentUIState debug log removed
 }
 

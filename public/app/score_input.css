@@ -2832,3 +2832,17 @@ body.edit-mode .loading-toast .spinner {
   transform: translateY(1px);
 }
 
+/* ===========================
+   教務送信 注意表示
+=========================== */
+.submit-guide-notice {
+  display: none;   /* ← 最初は隠す */
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #fff7ed;
+  border-left: 6px solid #f97316;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #9a3412;
+  line-height: 1.6;
+}
