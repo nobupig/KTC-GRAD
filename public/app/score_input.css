@@ -2599,7 +2599,7 @@ body.edit-mode .modal-overlay {
   background: rgba(0, 0, 0, 0.45);
   z-index: 9999;
 
-  display: flex;
+  display: none;   /* ← ここを none に変更 */
   align-items: center;
   justify-content: center;
 }
@@ -2845,4 +2845,34 @@ body.edit-mode .loading-toast .spinner {
   font-weight: 600;
   color: #9a3412;
   line-height: 1.6;
+}
+
+/* 修正モード：超過ボタン（オレンジ） */
+.btn-edit-warning {
+  background-color: #995406;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-edit-warning:hover {
+  background-color: #995406;
+}
+
+.edit-header-guide {
+  font-size: 12pt;        /* 20ポイント */
+  font-weight: 700;       /* 太字 */
+  line-height: 1.6;
+
+  color: #1f2937;         /* 少し濃いグレー（読みやすい） */
+
+  background-color: #f8fafc;  /* うっすら背景 */
+  padding: 12px 16px;
+  border-left: 6px solid #004a99;  /* 近大ブルー強調ライン */
+
+  border-radius: 6px;
+  margin: 12px 0;
 }

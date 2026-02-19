@@ -54,20 +54,22 @@
 
     <!-- 中段：操作説明 -->
     <div class="edit-header-guide">
-      提出済みの成績を表示しています。必要な箇所のみ修正し、
+      成績および超過学生の変更は該当ボタンをクリックし
       <b>「修正内容を教務へ送信」</b>
       操作してください。
       <br>
-      <span class="edit-header-warning">
-        ※ 超過登録の追加・解除・時間数変更は、Slack にて教務部へ連絡してください。
-      </span>
-    </div>
+         </div>
 
     <!-- 下段：操作ボタン -->
     <div class="edit-header-actions">
 <button id="editSelectStudentsBtn" class="secondary">
-   👥 学生の追加・解除
+   👥 成績修正
 </button>
+
+ <button id="editExcessStudentsBtn" class="btn-edit-warning" type="button">
+   ⏱ 超過学生の追加・解除
+</button>
+
       <button
         id="editSaveBtn"
         class="btn-edit-danger"
@@ -140,10 +142,25 @@
     </div>
 
     <!-- ★ ボタンも modal-box の中 -->
-    <div class="modal-actions">
-      <button id="editTargetCancelBtn">キャンセル</button>
-      <button id="editTargetOkBtn">決定</button>
-    </div>
+<div class="modal-actions">
+
+  <button type="button" id="editTargetSelectAllBtn">
+    全選択
+  </button>
+
+  <button type="button" id="editTargetClearAllBtn">
+    全解除
+  </button>
+
+  <button type="button" id="editTargetCancelBtn">
+    キャンセル
+  </button>
+
+  <button type="button" id="editTargetOkBtn">
+    決定
+  </button>
+
+</div>
   </div>
 </div>
 <!-- ========================================= -->
@@ -311,62 +328,7 @@
     </div>
   </div>
 </div>
-<!-- 修正対象選択モーダル -->
-<div id="editTargetSelectModal" class="modal hidden">
-<div
-  class="modal-content"
-  style="width: 15vw; max-width: 900px; margin: 0 auto;"
->
-    <h2 class="modal-title">修正対象の学生を選択</h2>
 
-    <p class="modal-message">
-      修正したい学生にチェックを入れてください。<br>
-      ※ この時点では成績表示は変わりません。
-    </p>
-    <div id="editTargetWarning" class="edit-warning hidden">
-      ⚠ 修正対象を変更すると、現在の修正内容は破棄されます。
-    </div>
-<div style="margin: 8px 0; display: flex; align-items: center; gap: 6px;">
-  <label style="cursor: pointer; font-size: 0.9rem;">
-    <input
-      type="checkbox"
-      id="editTargetSelectAll"
-    >
-    全員を選択
-  </label>
-</div>
-
- <div
-  class="edit-target-list"
-  style="max-height: 70vh; overflow-y: auto;"
->
-  <table class="score-table">
-    <thead>
-      <tr>
-        <th></th>
-        <th>学籍番号</th>
-        
-        <th>番号</th>
-        <th>氏名</th>
-      </tr>
-    </thead>
-    <tbody id="editTargetTableBody">
-      <!-- JSで学生行を流し込む -->
-    </tbody>
-  </table>
-</div>
-
-
-    <div class="modal-footer" style="display:flex; gap:12px; justify-content:flex-end;">
-      <button id="editTargetCancelBtn" class="btn btn-secondary" type="button">
-        キャンセル
-      </button>
-      <button id="editTargetOkBtn" class="btn btn-primary" type="button">
-        この内容で進む
-      </button>
-    </div>
-  </div>
-</div>
 <!-- 修正モード：ローディングトースト（中央表示） -->
 <div id="loadingToast" class="loading-toast hidden">
   <span class="spinner"></span>
