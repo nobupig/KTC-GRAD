@@ -464,6 +464,12 @@ export function updateAveragePointDisplay() {
                 .map((cb) => cb.dataset.studentId)
                 .filter((id) => Boolean(id));
 
+                // ★追加：チェック0件は登録させない
+                if (checkedIds.length === 0) {
+                  alert("超過学生が選択されていません。✔を入れてください。");
+                  return;
+                }
+
               const invalid = checkedIds.some((sid) => {
                 const input = listArea.querySelector(`.excess-hours-input[data-student-id='${sid}']`);
                 return !input || !input.value || Number(input.value) <= 0;
