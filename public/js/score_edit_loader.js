@@ -371,6 +371,13 @@ displaySids.sort((a, b) => {
    
    const critItems = window.__editCriteria?.items || [];
 const scoreMap = scoreObj?.scores || {};
+// ★ デバッグ追加ここから
+console.log("DEBUG CHECK", {
+  studentId: sid,
+  criteriaNames: critItems.map(i => i.name),
+  scoreKeys: Object.keys(scoreMap)
+});
+// ★ デバッグ追加ここまで
 
 // ★ ここで rawScores を定義（←今回の修正点）
 const rawScores = {};

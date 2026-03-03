@@ -98,6 +98,17 @@ async function preload() {
   studentsCache = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+function parseSubjectId(id) {
+
+  const parts = id.split("_");
+
+  const grade = Number(parts[0]);   // "1"
+  const course = parts[1];          // "G"
+  const term = parts[2];            // "後期"
+
+  return { grade, course, term };
+}
+
 /* ============================== */
 function updateCourseOptions() {
 
@@ -108,25 +119,33 @@ function updateCourseOptions() {
 
   if (!grade) return;
 
- if (grade <= 2) {
+  // ===== 1・2年 =====
+  if (grade <= 2) {
 
+    // 学生別は組選択を出す
+    if (currentMode === "students") {
+      courseSelect.style.display = "inline-block";
+
+      ["1","2","3","4","5"].forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c + "組";
+        courseSelect.appendChild(opt);
+      });
+
+    } else {
+      // 科目別は組選択を出さない（全員対象）
+      courseSelect.style.display = "none";
+    }
+
+    updateSubjectOptions();
+    return;
+  }
+
+  // ===== 3年以上 =====
   courseSelect.style.display = "inline-block";
-  courseSelect.innerHTML = "";
 
-  ["1","2","3","4","5"].forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c;
-    opt.textContent = c + "組";
-    courseSelect.appendChild(opt);
-  });
-
-  updateSubjectOptions();
-  return;
-}
-
-  courseSelect.style.display = "inline-block";
-
-  ["M","E","I","CA"].forEach(c => {
+ ["共通","M","E","I","CA"].forEach(c => {
     const opt = document.createElement("option");
     opt.value = c;
     opt.textContent = c;
@@ -148,7 +167,6 @@ function updateSubjectOptions() {
   subjectSelect.appendChild(new Option("科目を選択", ""));
 
   if (!grade || !term) return;
-  if (grade >= 3 && !course) return;
 
   const termMatch = term === "後期通年"
     ? ["後期","通年"]
@@ -156,16 +174,32 @@ function updateSubjectOptions() {
 
   const filtered = subjectsCache.filter(sub => {
 
-    const [subGrade, subCourseType, subTerm] = sub.id.split("_");
+    const { grade: subGrade, course: subCourseType, term: subTerm }
+      = parseSubjectId(sub.id);
 
     if (Number(subGrade) !== grade) return false;
     if (!termMatch.includes(subTerm)) return false;
 
-    if (grade <= 2) return subCourseType === "G";
-    if (course === "共通") return subCourseType === "G";
-    if (course === "CA") return ["C","CC","CA","G"].includes(subCourseType);
+    // ===== 1・2年 =====
+    if (grade <= 2) {
+      return subCourseType === "G";
+    }
 
-    return subCourseType === course || subCourseType === "G";
+    // ===== 3年以上 =====
+    if (!course) return false;
+
+    // 共通選択 → Gのみ
+    if (course === "共通") {
+      return subCourseType === "G";
+    }
+
+    // CA選択 → C / CC / CA
+    if (course === "CA") {
+      return ["C","CC","CA"].includes(subCourseType);
+    }
+
+    // M / E / I
+    return subCourseType === course;
   });
 
   filtered.forEach(sub => {
@@ -193,12 +227,34 @@ async function run() {
       return;
     }
 
-    const targetStudents = studentsCache.filter(s => {
-      if (s.grade != grade) return false;
-      if (course === "CA") return s.courseClass === "C" || s.courseClass === "A";
-      if (!course) return true;
-      return s.courseClass === course;
-    });
+const targetStudents = studentsCache.filter(s => {
+
+  if (s.grade != grade) return false;
+
+  const gradeNum = Number(grade);
+
+  // ===== 1・2年 =====
+  if (gradeNum <= 2) {
+    if (!course) return true;
+    return s.courseClass === course;
+  }
+
+  // ===== 3年以上 =====
+  if (!course) return true;
+
+  // 共通は全コース対象
+  if (course === "共通") {
+    return true;
+  }
+
+  // CAは C / A 両方対象
+  if (course === "CA") {
+    return ["C","A"].includes(s.courseClass);
+  }
+
+  // M / E / I
+  return s.courseClass === course;
+});
 
     if (currentMode === "students") {
       await renderStudentsStable(targetStudents);
@@ -226,7 +282,8 @@ async function renderStudentsStable(targetStudents) {
 
   const targetSubjects = subjectsCache.filter(sub => {
 
-    const [subGrade, subCourseType, subTerm] = sub.id.split("_");
+    const { grade: subGrade, course: subCourseType, term: subTerm }
+  = parseSubjectId(sub.id);
 
     if (Number(subGrade) !== grade) return false;
     if (!termMatch.includes(subTerm)) return false;
@@ -239,12 +296,17 @@ async function renderStudentsStable(targetStudents) {
   });
 
   // 横断取得
-  const scoreMap = {};
-  for (const sub of targetSubjects) {
-    const snap = await getDoc(doc(db, "scores_2025", sub.id));
-    if (snap.exists())
-      scoreMap[sub.id] = snap.data().students || {};
-  }
+const scoreMap = {};
+
+for (const sub of targetSubjects) {
+
+  const snap = await getDoc(doc(db, "scores_2025", sub.id));
+  if (!snap.exists()) continue;
+
+  const data = snap.data();
+
+scoreMap[sub.id] = data.students || {};
+}
 
   const results = [];
 
@@ -259,10 +321,10 @@ const requiredCount = targetSubjects.filter(sub => sub.required).length;
 
 for (const sub of targetSubjects) {
 
-  const st = scoreMap[sub.id]?.[student.id];
+  const st = scoreMap[sub.id]?.[student.studentId];
   if (!st || !st.isRed) continue;
 
-  const name = sub.id.split("_").slice(3).join("_");
+ const name = sub.id.split("_").slice(3).join("_");
 
   if (sub.required) {
     requiredRed++;
@@ -343,19 +405,35 @@ async function renderSubjectsStable(targetStudents) {
 
   for (const subjectId of selected) {
 
-const snap = await getDoc(doc(db, "scores_2025", subjectId));
+    const snap = await getDoc(doc(db, "scores_2025", subjectId));
 
-const subjectName = subjectId.split("_").slice(3).join("_");
+    const subjectName = subjectId.split("_").slice(3).join("_");
 
-if (!snap.exists()) {
-  html += `
-    <div class="rp-subject-title">${subjectName}</div>
-    <div class="no-result">該当者なし（データ未作成）</div>
-  `;
-  continue;
-}
+    if (!snap.exists()) {
+      html += `
+        <div class="rp-subject-title">${subjectName}</div>
+        <div class="no-result">該当者なし（データ未作成）</div>
+      `;
+      continue;
+    }
 
-    const studentsData = snap.data().students || {};
+    const data = snap.data();
+
+    let studentsData = {};
+
+    // ===== 旧構造対応 =====
+    if (data.students) {
+      studentsData = { ...data.students };
+    }
+
+    // ===== 新構造対応 =====
+    if (data.submittedSnapshot?.units) {
+      for (const unitKey in data.submittedSnapshot.units) {
+        const unitStudents =
+          data.submittedSnapshot.units[unitKey].students || {};
+        studentsData = { ...studentsData, ...unitStudents };
+      }
+    }
 
     let redCount = 0;
     let totalScore = 0;
@@ -364,7 +442,9 @@ if (!snap.exists()) {
 
     for (const student of targetStudents) {
 
-      const st = studentsData[student.id];
+      const key = student.studentId || student.id;
+
+      const st = studentsData[key];
       if (!st) continue;
 
       const fs = Number(st.finalScore);
@@ -379,39 +459,26 @@ if (!snap.exists()) {
       }
     }
 
-    // ここに追加
+    if (count === 0) {
+      html += `
+        <div class="rp-subject-title">${subjectName}</div>
+        <div class="no-result">該当者なし（成績データなし）</div>
+      `;
+      continue;
+    }
 
-// 成績データが1件もない
-if (count === 0) {
-  html += `
-    <div class="rp-subject-title">${subjectName}</div>
-    <div class="no-result">該当者なし（成績データなし）</div>
-  `;
-  continue;
-}
+    if (redCount === 0) {
+      html += `
+        <div class="rp-subject-title">${subjectName}</div>
+        <div class="no-result">該当者なし</div>
+      `;
+      continue;
+    }
 
-// 赤点者が0人
-if (redCount === 0) {
-  html += `
-    <div class="rp-subject-title">${subjectName}</div>
-    <div class="no-result">該当者なし</div>
-  `;
-  continue;
-}
     const avgNum = totalScore / count;
     const avg = avgNum.toFixed(1);
     const adjust = Math.ceil(avgNum * 0.7);
     const redRate = ((redCount / targetStudents.length) * 100).toFixed(1);
-    
-
-    if (redCount === 0) {
-
-  html += `
-  <h3>${subjectName}</h3>
-  <div class="no-result">該当者なし</div>
-`;
-  continue;
-}
 
     html += `
       <h3>${subjectName}</h3>
@@ -455,9 +522,9 @@ if (pcTableEl) {
   table = rpTableEl ? rpTableEl.innerHTML : "";
 }
 
-  const subjectName = subjectId
-    ? subjectId.split("_").slice(3).join("_")
-    : "";
+ const subjectName = subjectId
+  ? subjectId.split("_").slice(3).join("_")
+  : "";
 
   const headerInfo = `
     <div style="margin-bottom:20px;">

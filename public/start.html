@@ -273,7 +273,8 @@ import {
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { doc, getDoc, collection, getDocs } from
+"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
     const params = new URLSearchParams(window.location.search);
     const fromEdit = params.get("fromEdit") === "1";
@@ -775,16 +776,39 @@ onAuthStateChanged(auth, async (user) => {
   // トップ画面サマリー描画
   // ===============================
   try {
-    const tsRef = doc(db, teacherSubjectsCol, user.email);
-    const tsSnap = await getDoc(tsRef);
+  const area = document.getElementById("unitStatusArea");
 
-    const area = document.getElementById("unitStatusArea");
-    if (!tsSnap.exists()) {
-      renderStartMenuOverview(area, []);
-    } else {
-      const subjects = tsSnap.data()?.subjects || [];
-      renderStartMenuOverview(area, subjects);
+let subjects = [];
+
+const isAdmin =
+  user.email &&
+  user.email.toLowerCase().trim() === "nyasui@ktc.ac.jp";
+
+if (isAdmin) {
+
+  // ★ 管理者は teacherSubjects 全件取得
+  const colRef = collection(db, teacherSubjectsCol);
+  const snap = await getDocs(colRef);
+
+  snap.forEach(docSnap => {
+    const data = docSnap.data();
+    if (Array.isArray(data.subjects)) {
+      subjects.push(...data.subjects);
     }
+  });
+
+} else {
+
+  const tsRef = doc(db, teacherSubjectsCol, user.email);
+  const tsSnap = await getDoc(tsRef);
+
+  if (tsSnap.exists()) {
+    subjects = tsSnap.data()?.subjects || [];
+  }
+
+}
+
+renderStartMenuOverview(area, subjects);
   } catch (e) {
     console.error("[Start] failed to load teacherSubjects:", e);
   }

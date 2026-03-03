@@ -393,30 +393,44 @@ try {
   // ================================
   // 調整点表示を更新
   // ================================
-  function updateAdjustPointDisplay() {
-    const el = document.getElementById("adjustPointDisplay");
-    if (!el) return;
-    const passRule = currentSubjectMeta?.passRule ?? null;
-    const required = currentSubjectMeta?.required === true;
-    if (passRule !== "adjustment" && !required) {
-      el.textContent = "調整点：—";
-      return;
-    }
-    // 平均点表示から値を取得
+ function updateAdjustPointDisplay() {
+  const el = document.getElementById("adjustPointDisplay");
+  if (!el) return;
+
+  const passRule = currentSubjectMeta?.passRule ?? null;
+  const fixedPassLine = Number(currentSubjectMeta?.fixedPassLine ?? 60);
+
+  // ===== 調整点科目 =====
+  if (passRule === "adjustment") {
+
     const avgEl = document.getElementById("avgPointDisplay");
     if (!avgEl) {
       el.textContent = "調整点：—";
       return;
     }
+
     const avgText = avgEl.textContent.replace(/[^\d.]/g, "");
     const avg = parseFloat(avgText);
+
     if (isNaN(avg)) {
       el.textContent = "調整点：—";
       return;
     }
+
     const adjust = Math.ceil(avg * 0.7);
     el.textContent = `調整点：${adjust}`;
+    return;
   }
+
+  // ===== 固定合格点科目 =====
+  if (passRule?.startsWith("fixed")) {
+    el.textContent = `合格基準：${fixedPassLine}`;
+    return;
+  }
+
+  // ===== それ以外 =====
+  el.textContent = "";
+}
   // ================================
   // 平均点表示をリアルタイム更新（未入力行除外・DOMのみ）
   // ================================
@@ -1016,12 +1030,17 @@ window.__isEditMode = false;
     // cellEl.classList.toggle("cell-excess", !!flags.isExcess);
   }
 
-  function buildRiskContext() {
-    const useAdjustment = currentSubjectMeta?.usesAdjustPoint === true;
-    const adjustPoint = getCurrentAdjustPointNumber();
-    const subjectType = getSubjectType(currentSubjectMeta);
-    return { useAdjustment, adjustPoint, subjectType };
-  }
+function buildRiskContext() {
+  const passRule = currentSubjectMeta?.passRule ?? null;
+
+  // 調整点を使う科目のみ adjustment
+  const useAdjustment = passRule === "adjustment";
+
+  const adjustPoint = getCurrentAdjustPointNumber();
+  const subjectType = getSubjectType(currentSubjectMeta);
+
+  return { useAdjustment, adjustPoint, subjectType };
+}
   // ================================
   // 赤点・超過判定（最終成績ベース）
   // ================================
